@@ -32,7 +32,7 @@ jobs:
       - name: Create extension zip
         run: |
           UUID=$(node -e "const m = require('./metadata.json'); console.log(m.uuid)")
-          VERSION=$(node -e "const m = require('./metadata.json'); console.log(m.version)")
+          VERSION=$(node -p "require('./package.json').version")
           cp metadata.json dist/
           cp stylesheet.css dist/
           mkdir -p dist/schemas
