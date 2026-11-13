@@ -18,6 +18,21 @@ EXT="$P/usr/share/gnome-shell/extensions/macos-dock@vinnytherobot.github.io"
 mkdir -p "$EXT"; cp -r "$ROOT"/dock/dist/. "$EXT"/; cp "$ROOT"/dock/metadata.json "$ROOT"/dock/stylesheet.css "$EXT"/
 cp -r "$ROOT"/dock/schemas "$EXT"/; rm -f "$EXT"/schemas/gschemas.compiled; glib-compile-schemas "$EXT/schemas"
 
+# --- Isle's background programs: the daemon, the shelf window, speech recognition (built from isle/crates)
+FEATURES=(); { command -v glslc >/dev/null && pkg-config --exists vulkan; } || FEATURES=(--no-default-features)
+(cd "$ROOT/isle" && cargo build --release -p isle-daemon -p isle-shelf >&2 && cargo build --release -p isle-whisper "${FEATURES[@]}" >&2)
+for b in isled isle-shelf isle-whisper; do install -D -m 755 "$ROOT/isle/target/release/$b" "$P/usr/bin/$b"; done
+install -D -m 755 "$ROOT/isle/scripts/isle-charge-limit" "$P/usr/bin/isle-charge-limit"
+install -D -m 755 "$ROOT/isle/scripts/setup-voice.sh" "$P/usr/bin/isle-setup-voice"
+for u in io.github.zickrian.isle.Daemon.service io.github.zickrian.isle.ShelfWindow.service; do
+  sed 's|@BINDIR@|/usr/bin|' "$ROOT/isle/data/$u" | install -D -m 644 /dev/stdin "$P/usr/share/dbus-1/services/$u"
+done
+sed -e 's|@BINDIR@|/usr/bin|' -e 's|file://%h/.local/share/doc/isle|file:///usr/share/doc/niro-control|' "$ROOT/isle/data/isled.service" \
+  | install -D -m 644 /dev/stdin "$P/usr/lib/systemd/user/isled.service"
+install -D -m 644 "$ROOT/isle/data/fonts/InterVariable.ttf" "$P/usr/share/fonts/truetype/isle/InterVariable.ttf"
+install -D -m 644 "$ROOT/isle/data/fonts/Inter-LICENSE.txt" "$P/usr/share/fonts/truetype/isle/Inter-LICENSE.txt"
+install -D -m 644 "$ROOT/isle/README.md" "$P/usr/share/doc/niro-control/README.md"
+
 # --- DigUp's panel (built here: cargo build, not installed)
 (cd "$ROOT/digup/shell/src-tauri" && cargo build --release --features tauri/custom-protocol >&2)
 install -D -m 755 "$ROOT/digup/shell/src-tauri/target/release/digup-shell" "$P/usr/bin/digup-shell"
@@ -38,7 +53,7 @@ favorite-apps=['org.gnome.Nautilus.desktop', 'google-chrome.desktop', 'yelp.desk
 D
 install -D -m 644 /dev/stdin "$P/etc/dconf/profile/user" <<< $'user-db:user\nsystem-db:local'
 
-printf 'Package: niro-control\nVersion: %s\nSection: gnome\nPriority: optional\nArchitecture: amd64\nMaintainer: nerufuyo <local@localhost>\nDepends: gnome-shell (>= 46), dig-up, util-linux, dconf-cli, gjs, gir1.2-gtk-4.0, gir1.2-adw-1\nReplaces: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults\nConflicts: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults\nDescription: Niro Control: the look of the desktop in one place\n Isle (the island on the top bar), the macOS-style dock, DigUp'"'"'s panel with the Isle look, and one control panel\n (org.niro.control: tone, opacity, blur) that sets them all. Local build.\n' "$VER" > "$P/DEBIAN/control"
+printf 'Package: niro-control\nVersion: %s\nSection: gnome\nPriority: optional\nArchitecture: amd64\nMaintainer: nerufuyo <local@localhost>\nDepends: gnome-shell (>= 46), dig-up, util-linux, dconf-cli, libgtk-4-1, libvulkan1, fontconfig, gjs, gir1.2-gtk-4.0, gir1.2-adw-1\nReplaces: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults\nConflicts: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults\nDescription: Niro Control: the look of the desktop in one place\n Isle (the island on the top bar), the macOS-style dock, DigUp'"'"'s panel with the Isle look, and one control panel\n (org.niro.control: tone, opacity, blur) that sets them all. Local build.\n' "$VER" > "$P/DEBIAN/control"
 cat > "$P/DEBIAN/preinst" <<'S'
 #!/bin/sh
 set -e
@@ -46,6 +61,11 @@ set -e
 if [ "$1" = install ] || [ "$1" = upgrade ]; then
   dpkg-divert --list niro-control | grep -q digup-shell || dpkg-divert --package niro-control --add --rename --divert /usr/bin/digup-shell.distrib /usr/bin/digup-shell
 fi
+exit 0
+S
+cat > "$P/DEBIAN/prerm" <<'S'
+#!/bin/sh
+if [ "$1" = remove ]; then systemctl --global disable isled.service >/dev/null 2>&1 || true; fi
 exit 0
 S
 cat > "$P/DEBIAN/postrm" <<'S'
@@ -58,10 +78,12 @@ cat > "$P/DEBIAN/postinst" <<'S'
 #!/bin/sh
 rm -rf /usr/local/share/gnome-shell/extensions/isle@zickrian.github.io
 glib-compile-schemas /usr/share/glib-2.0/schemas
+fc-cache /usr/share/fonts/truetype/isle >/dev/null 2>&1 || true
+systemctl --global enable isled.service >/dev/null 2>&1 || true
 dconf update
 sysctl -q --system >/dev/null 2>&1 || true
 exit 0
 S
-chmod 755 "$P"/DEBIAN/{preinst,postrm,postinst}
+chmod 755 "$P"/DEBIAN/{preinst,prerm,postrm,postinst}
 dpkg-deb --root-owner-group -Zxz -b "$P" "$OUT/niro-control_${VER}_amd64.deb" >/dev/null
 ls -la "$OUT"
