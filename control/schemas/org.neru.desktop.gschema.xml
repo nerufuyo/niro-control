@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.neru.desktop" path="/org/neru/desktop/">
+    <key name="opacity" type="i">
+      <range min="0" max="100"/>
+      <default>80</default>
+      <summary>How opaque the surfaces are</summary>
+      <description>One setting for Isle's glass, the dock, app windows (blur my shell) and DigUp's panel: 0 is clear, 100 is solid.</description>
+    </key>
+    <key name="blur" type="b">
+      <default>true</default>
+      <summary>Blur behind surfaces</summary>
+      <description>Frosted glass behind the dock and app windows (DigUp's panel can't blur: it is a full-screen window).</description>
+    </key>
+    <key name="blur-strength" type="i">
+      <range min="0" max="100"/>
+      <default>30</default>
+      <summary>How strong the blur is</summary>
+    </key>
+    <key name="accent" type="s">
+      <default>'#E8472B'</default>
+      <summary>Accent colour</summary>
+      <description>The one accent of the desktop: Isle's highlights, the dock's running dots, DigUp's selection.</description>
+    </key>
+    <key name="tint" type="s">
+      <default>'#1C1C1E'</default>
+      <summary>Surface tint</summary>
+      <description>The colour of the dark surfaces (the dock, DigUp's panel).</description>
+    </key>
+  </schema>
+</schemalist>

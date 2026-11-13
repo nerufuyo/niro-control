@@ -1,0 +1,96 @@
+#!/usr/bin/python3
+# Neru Desktop: one control panel for the look of Isle, the dock, DigUp and app windows (org.neru.desktop).
+import gi
+gi.require_version("Gtk", "4.0")
+gi.require_version("Adw", "1")
+from gi.repository import Adw, Gdk, Gio, GLib, Gtk
+
+SCHEMA = "org.neru.desktop"
+TONES = [("Ember", "#E8472B", "#1C1C1E"), ("Ocean", "#0A84FF", "#10161F"), ("Mint", "#30D158", "#101A14"),
+         ("Violet", "#5E5CE6", "#171527"), ("Amber", "#FF9F0A", "#1C1810"), ("Mono", "#8E8E93", "#1C1C1E")]
+
+
+def to_hex(rgba):
+    return "#%02X%02X%02X" % tuple(round(c * 255) for c in (rgba.red, rgba.green, rgba.blue))
+
+
+def to_rgba(hex_):
+    rgba = Gdk.RGBA()
+    rgba.parse(hex_)
+    return rgba
+
+
+class Window(Adw.ApplicationWindow):
+    def __init__(self, app, settings):
+        super().__init__(application=app, title="Neru Desktop", default_width=520, default_height=640)
+        self.s = settings
+        page = Adw.PreferencesPage()
+
+        tones = Adw.PreferencesGroup(title="Tone", description="One accent and one surface tint for the whole desktop")
+        flow = Gtk.FlowBox(selection_mode=Gtk.SelectionMode.NONE, max_children_per_line=6, column_spacing=8, row_spacing=8)
+        for name, accent, tint in TONES:
+            button = Gtk.Button(label=name)
+            button.connect("clicked", lambda _b, a=accent, t=tint: (self.s.set_string("accent", a), self.s.set_string("tint", t)))
+            flow.append(button)
+        tones.add(flow)
+        page.add(tones)
+
+        colours = Adw.PreferencesGroup(title="Colours")
+        self.accent = self.colour_row(colours, "Accent", "accent")
+        self.tint = self.colour_row(colours, "Surface tint", "tint")
+        page.add(colours)
+
+        glass = Adw.PreferencesGroup(title="Glass", description="Isle, the dock, app windows and DigUp's panel")
+        self.scale_row(glass, "Opacity", "opacity", "0 is clear, 100 is solid")
+        row = Adw.SwitchRow(title="Blur", subtitle="Frosted glass behind the dock and app windows (not DigUp's panel)")
+        self.s.bind("blur", row, "active", Gio.SettingsBindFlags.DEFAULT)
+        glass.add(row)
+        self.scale_row(glass, "Blur strength", "blur-strength", "")
+        page.add(glass)
+
+        view = Adw.ToolbarView()
+        view.add_top_bar(Adw.HeaderBar())
+        view.set_content(page)
+        self.set_content(view)
+        self.s.connect("changed::accent", lambda *_: self.sync())
+        self.s.connect("changed::tint", lambda *_: self.sync())
+
+    def colour_row(self, group, title, key):
+        row = Adw.ActionRow(title=title)
+        button = Gtk.ColorDialogButton(dialog=Gtk.ColorDialog(), valign=Gtk.Align.CENTER)
+        button.set_rgba(to_rgba(self.s.get_string(key)))
+        button.connect("notify::rgba", lambda b, _p: self.s.set_string(key, to_hex(b.get_rgba())))
+        row.add_suffix(button)
+        group.add(row)
+        return (key, button)
+
+    def sync(self):
+        for key, button in (self.accent, self.tint):
+            rgba = to_rgba(self.s.get_string(key))
+            if to_hex(button.get_rgba()) != to_hex(rgba):
+                button.set_rgba(rgba)
+
+    def scale_row(self, group, title, key, subtitle):
+        row = Adw.ActionRow(title=title, subtitle=subtitle)
+        scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 100, 1)
+        scale.set_hexpand(True)
+        scale.set_size_request(220, -1)
+        scale.set_draw_value(True)
+        scale.set_value_pos(Gtk.PositionType.RIGHT)
+        scale.set_value(self.s.get_int(key))
+        scale.connect("value-changed", lambda sc: self.s.set_int(key, int(sc.get_value())))
+        self.s.connect(f"changed::{key}", lambda *_: scale.set_value(self.s.get_int(key)))
+        row.add_suffix(scale)
+        group.add(row)
+
+
+class App(Adw.Application):
+    def __init__(self):
+        super().__init__(application_id="org.neru.Settings")
+
+    def do_activate(self):
+        window = self.props.active_window or Window(self, Gio.Settings.new(SCHEMA))
+        window.present()
+
+
+App().run(None)

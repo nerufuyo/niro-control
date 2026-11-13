@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Neru Desktop
+Comment=One look for Isle, the dock, DigUp and app windows
+Exec=neru-settings
+Icon=preferences-desktop-theme
+Categories=GNOME;GTK;Settings;DesktopSettings;
+Keywords=appearance;theme;accent;opacity;blur;transparent;acrylic;isle;dock;
+StartupWMClass=org.neru.Settings
