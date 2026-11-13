@@ -11,7 +11,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Signals from 'resource:///org/gnome/shell/misc/signals.js';
 
 import {clutterBackend, uiScale} from './compat.js';
-import {NeruSync} from './neruSync.js';
+import {NiroSync} from './niroSync.js';
 import {normalized, restyle} from './panelStyle.js';
 import {sendSuperV, watchRecorder} from './shortcutRecorder.js';
 
@@ -99,7 +99,7 @@ export class TopBar extends Signals.EventEmitter {
         // Nor does it catch clicks: the window buttons under it (a maximized window's close, minimize) work.
         this._barReactive = [Main.layoutManager.panelBox, Main.panel].map(actor => [actor, actor.reactive]);
         this._barReactive.forEach(([actor]) => (actor.reactive = false));
-        this._neruSync = new NeruSync(this._settings);
+        this._niroSync = new NiroSync(this._settings);
         // The bar floats over the windows: maximized ones run up to the top of the screen, the island on top of them.
         this._barTracked = Main.layoutManager._trackedActors?.find(t => t.actor === panelBox) ?? null;
         this._barStrutWas = this._barTracked?.affectsStruts;
@@ -364,7 +364,7 @@ export class TopBar extends Signals.EventEmitter {
         Main.panel.disconnect(this._styleChanged);
         this._unwatchWindows();
         this._barMoved.forEach(id => Main.layoutManager.panelBox.disconnect(id));
-        this._neruSync?.destroy();
+        this._niroSync?.destroy();
         this._barReactive?.forEach(([actor, was]) => (actor.reactive = was));
         if (this._barTracked) {
             this._barTracked.affectsStruts = this._barStrutWas;

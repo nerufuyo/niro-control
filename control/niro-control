@@ -1,11 +1,11 @@
 #!/usr/bin/python3
-# Neru Desktop: one control panel for the look of Isle, the dock, DigUp and app windows (org.neru.desktop).
+# Niro Control: one control panel for the look of Isle, the dock, DigUp and app windows (org.niro.control).
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Adw, Gdk, Gio, GLib, Gtk
 
-SCHEMA = "org.neru.desktop"
+SCHEMA = "org.niro.control"
 TONES = [("Ember", "#E8472B", "#1C1C1E"), ("Ocean", "#0A84FF", "#10161F"), ("Mint", "#30D158", "#101A14"),
          ("Violet", "#5E5CE6", "#171527"), ("Amber", "#FF9F0A", "#1C1810"), ("Mono", "#8E8E93", "#1C1C1E")]
 
@@ -22,7 +22,7 @@ def to_rgba(hex_):
 
 class Window(Adw.ApplicationWindow):
     def __init__(self, app, settings):
-        super().__init__(application=app, title="Neru Desktop", default_width=520, default_height=640)
+        super().__init__(application=app, title="Niro Control", default_width=520, default_height=640)
         self.s = settings
         page = Adw.PreferencesPage()
 
@@ -86,7 +86,7 @@ class Window(Adw.ApplicationWindow):
 
 class App(Adw.Application):
     def __init__(self):
-        super().__init__(application_id="org.neru.Settings")
+        super().__init__(application_id="org.niro.Control")
 
     def do_activate(self):
         window = self.props.active_window or Window(self, Gio.Settings.new(SCHEMA))

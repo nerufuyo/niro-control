@@ -1,4 +1,4 @@
-// One look for the whole desktop: org.neru.desktop (opacity, blur, blur-strength; neru-desktop-defaults installs it)
+// One look for the whole desktop: org.niro.control (opacity, blur, blur-strength; the niro-control package installs it)
 // is copied, when it changes, to what Isle's glass, the dock and the app windows (Blur my Shell) read. Without the
 // schema (the package isn't installed) nothing happens.
 import Gio from 'gi://Gio';
@@ -24,13 +24,13 @@ function extensionSettings(uuid, schemaId) {
     return null;
 }
 
-export class NeruSync {
+export class NiroSync {
     constructor(isleSettings) {
         this._isle = isleSettings;
         const source = Gio.SettingsSchemaSource.get_default();
-        if (!source?.lookup('org.neru.desktop', true))
+        if (!source?.lookup('org.niro.control', true))
             return;
-        this._shared = new Gio.Settings({schema_id: 'org.neru.desktop'});
+        this._shared = new Gio.Settings({schema_id: 'org.niro.control'});
         this._dock = extensionSettings('macos-dock@vinnytherobot.github.io', 'org.gnome.shell.extensions.macosdock');
         this._apps = extensionSettings('blur-my-shell@aunetx', 'org.gnome.shell.extensions.blur-my-shell.applications');
         this._id = this._shared.connect('changed', () => this._apply());
@@ -43,7 +43,7 @@ export class NeruSync {
 
     /** Isle's own highlights in the accent: its stylesheet names the colour in a few places, overridden here. */
     _applyAccent(accent) {
-        const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'neru']);
+        const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'niro']);
         GLib.mkdir_with_parents(dir, 0o755);
         const path = GLib.build_filenamev([dir, 'accent.css']);
         const css = `.isle-pill-accent, .isle-sys-fill, .isle-privacy-dot.screenShare { background-color: ${accent}; }

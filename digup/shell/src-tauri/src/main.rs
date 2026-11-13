@@ -655,7 +655,7 @@ fn main() {
         .setup(move |app| setup(app, options))
         .invoke_handler(tauri::generate_handler![
             ask, estimate, setup_info, pick_folders, apply_setup_folders, finish_setup, open_path, open_code, reveal, hide_panel, panel_height,
-            neru_look, panel_area, settings_info, set_open_at_login, set_center_panel, set_processor_only, debug_query, debug_report, window_info,
+            niro_look, panel_area, settings_info, set_open_at_login, set_center_panel, set_processor_only, debug_query, debug_report, window_info,
             app_state, open_window, open_settings, choose_folders, index_now, quit_app, close_window, pause_indexing,
             remove_folder, set_skipped, set_skip_types, set_index_hours, code_setup_info, set_code_folders, choose_code_folders,
             remove_code_folder, turn_off_code, set_code_editor, window_resized, copy_file, drag_out, set_hotkey, hold_hotkey,
@@ -772,7 +772,7 @@ fn setup(app: &mut tauri::App, options: Options) -> Result<(), Box<dyn std::erro
 
     make_panel(&handle, shell.centers_panel())?;
     #[cfg(target_os = "linux")]
-    watch_neru_look(&handle);
+    watch_niro_look(&handle);
     // No tray (a session without a taskbar, a Linux desktop without one): the hotkey and the panel still work.
     if let Err(error) = make_tray(&handle, &shell) {
         eprintln!("digup-shell: no tray icon: {error}");
@@ -1567,15 +1567,15 @@ fn with_exec(text: &str, exec: &str) -> String {
     lines.join("\n")
 }
 
-/// The desktop-wide look (org.neru.desktop, set for Isle, the dock and the app windows too): how opaque the panel is.
+/// The desktop-wide look (org.niro.control, set for Isle, the dock and the app windows too): how opaque the panel is.
 #[tauri::command]
-fn neru_look() -> Value {
+fn niro_look() -> Value {
     #[cfg(target_os = "linux")]
     {
         use gio::prelude::*;
-        let has = gio::SettingsSchemaSource::default().is_some_and(|source| source.lookup("org.neru.desktop", true).is_some());
+        let has = gio::SettingsSchemaSource::default().is_some_and(|source| source.lookup("org.niro.control", true).is_some());
         if has {
-            let look = gio::Settings::new("org.neru.desktop");
+            let look = gio::Settings::new("org.niro.control");
             return json!({"opacity": look.int("opacity"), "accent": look.string("accent").as_str(), "tint": look.string("tint").as_str()});
         }
     }
@@ -1584,15 +1584,15 @@ fn neru_look() -> Value {
 
 /// Pages hear of a change in the look as it is made.
 #[cfg(target_os = "linux")]
-fn watch_neru_look(app: &AppHandle) {
+fn watch_niro_look(app: &AppHandle) {
     use gio::prelude::*;
-    if !gio::SettingsSchemaSource::default().is_some_and(|source| source.lookup("org.neru.desktop", true).is_some()) {
+    if !gio::SettingsSchemaSource::default().is_some_and(|source| source.lookup("org.niro.control", true).is_some()) {
         return;
     }
-    let settings = gio::Settings::new("org.neru.desktop");
+    let settings = gio::Settings::new("org.niro.control");
     let handle = app.clone();
     settings.connect_changed(None, move |_, _| {
-        let _ = handle.emit("neru-look", neru_look());
+        let _ = handle.emit("niro-look", niro_look());
     });
     // Kept for as long as DigUp runs.
     std::mem::forget(settings);

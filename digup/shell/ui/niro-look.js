@@ -1,4 +1,4 @@
-// The desktop-wide look (org.neru.desktop): the panel's opacity, accent and tint follow it, live.
+// The desktop-wide look (org.niro.control): the panel's opacity, accent and tint follow it, live.
 (() => {
   const tauri = window.__TAURI__;
   if (!tauri) return;
@@ -7,14 +7,14 @@
     const root = document.documentElement.style;
     const [r, g, b] = rgb(look.tint);
     const [ar, ag, ab] = rgb(look.accent);
-    root.setProperty("--neru-opacity", String(look.opacity / 100));
-    root.setProperty("--neru-tint", `${r}, ${g}, ${b}`);
+    root.setProperty("--niro-opacity", String(look.opacity / 100));
+    root.setProperty("--niro-tint", `${r}, ${g}, ${b}`);
     root.setProperty("--accent", look.accent);
     root.setProperty("--ember", look.accent);
     root.setProperty("--amber", look.accent);
     root.setProperty("--selected", `rgba(${ar}, ${ag}, ${ab}, 0.28)`);
     root.setProperty("--mark", `rgba(${ar}, ${ag}, ${ab}, 0.38)`);
   };
-  tauri.core.invoke("neru_look").then(apply).catch(() => {});
-  tauri.event.listen("neru-look", ({ payload }) => apply(payload));
+  tauri.core.invoke("niro_look").then(apply).catch(() => {});
+  tauri.event.listen("niro-look", ({ payload }) => apply(payload));
 })();

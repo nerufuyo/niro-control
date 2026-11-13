@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
-  <schema id="org.neru.desktop" path="/org/neru/desktop/">
+  <schema id="org.niro.control" path="/org/niro/control/">
     <key name="opacity" type="i">
       <range min="0" max="100"/>
       <default>80</default>
