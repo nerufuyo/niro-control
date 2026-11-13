@@ -158,73 +158,114 @@ function lookPage(settings) {
     return page;
 }
 
-function islePage() {
-    const settings = extensionSettings('isle@zickrian.github.io', 'org.gnome.shell.extensions.isle');
-    if (!settings)
-        return missingPage('Isle');
+const INTERNAL_KEYS = new Set(['update-shown', 'prefs-page', 'focus-dnd-owned', 'focus-dnd-declined', 'agents-announced',
+    'app-usage-clear', 'hidden-pages', 'event-calendar', 'clipboard-ignored-apps']);
+
+const escape = (text: string) => GLib.markup_escape_text(text.replace(/\s+/g, ' ').trim(), -1);
+
+/** A row for one key, by its type, with the schema's own title and description. */
+function keyRow(settings, key: string) {
+    const schemaKey = settings.settings_schema.get_key(key);
+    const title = schemaKey.get_summary() ?? key;
+    const subtitle = escape((schemaKey.get_description() ?? '').slice(0, 160));
+    const type = schemaKey.get_value_type().dup_string();
+    const [kind, detail] = schemaKey.get_range().deep_unpack();
+    const range = detail.deep_unpack();
+    let row;
+    if (type === 'b') {
+        row = new Adw.SwitchRow({title, subtitle});
+        settings.bind(key, row, 'active', Gio.SettingsBindFlags.DEFAULT);
+    } else if (type === 's' && kind === 'enum') {
+        const choices: string[] = range.map(v => v.deep_unpack?.() ?? v);
+        row = new Adw.ComboRow({title, subtitle, model: Gtk.StringList.new(choices)});
+        const sync = () => row.set_selected(Math.max(0, choices.indexOf(settings.get_string(key))));
+        sync();
+        row.connect('notify::selected', () => settings.set_string(key, choices[row.get_selected()]));
+        settings.connect(`changed::${key}`, sync);
+    } else if (type === 's') {
+        row = new Adw.EntryRow({title, show_apply_button: true, text: settings.get_string(key)});
+        row.connect('apply', () => settings.set_string(key, row.get_text()));
+        settings.connect(`changed::${key}`, () => row.get_text() !== settings.get_string(key) && row.set_text(settings.get_string(key)));
+    } else if (type === 'as') {
+        row = new Adw.EntryRow({title, show_apply_button: true, text: settings.get_strv(key).join(', ')});
+        row.connect('apply', () => settings.set_strv(key, row.get_text().split(',').map(t => t.trim()).filter(Boolean)));
+        settings.connect(`changed::${key}`, () => {
+            const text = settings.get_strv(key).join(', ');
+            if (row.get_text() !== text)
+                row.set_text(text);
+        });
+    } else if (type === 'i' || type === 'u' || type === 'x' || type === 'd') {
+        const double = type === 'd';
+        const [min, max] = kind === 'range' ? range : [double ? 0 : -1000000, double ? 100 : 1000000];
+        row = new Adw.SpinRow({title, subtitle, digits: double ? 2 : 0,
+            adjustment: new Gtk.Adjustment({lower: Number(min), upper: Number(max), step_increment: double ? 0.05 : 1})});
+        const read = () => double ? settings.get_double(key) : Number(settings.get_value(key).deep_unpack());
+        row.set_value(read());
+        row.connect('notify::value', () => {
+            if (double)
+                settings.set_double(key, row.get_value());
+            else if (type === 'i')
+                settings.set_int(key, Math.round(row.get_value()));
+            else
+                settings.set_value(key, new GLib.Variant(type, Math.round(row.get_value())));
+        });
+        settings.connect(`changed::${key}`, () => row.get_value() !== read() && row.set_value(read()));
+    }
+    return row;
+}
+
+/** Every public key of a schema, in groups: `groupOf` names the group of a key, `order` is the groups' order. */
+function generatedPage(settings, groupOf: (key: string) => string, order: string[]) {
     const page = new Adw.PreferencesPage();
-    const look = new Adw.PreferencesGroup({title: 'Island'});
-    choiceRow(settings, look, 'Shape', 'island-shape', ['notch', 'pill']);
-    choiceRow(settings, look, 'Opens on', 'open-on', ['hover', 'click']);
-    spinRow(settings, look, 'Hover delay (ms)', 'hover-delay', 0, 1000, 10);
-    choiceRow(settings, look, 'Auto-hide', 'auto-hide', ['off', 'always', 'top-bar', 'windows']);
-    choiceRow(settings, look, 'Size when open', 'open-size', ['standard', 'large']);
-    choiceRow(settings, look, 'Top bar style', 'top-bar-style', ['glass', 'black']);
-    switchRow(settings, look, 'Compact top bar', 'compact-top-bar');
-    switchRow(settings, look, 'Space below the island', 'notch-gap');
-    page.add(look);
-    const alerts = new Adw.PreferencesGroup({title: 'Alerts'});
-    switchRow(settings, alerts, 'System alerts', 'system-alerts', 'Battery, network, Bluetooth, Caps Lock');
-    switchRow(settings, alerts, 'Calendar event alerts', 'event-alerts');
-    switchRow(settings, alerts, 'Volume and brightness in the island', 'replace-osd');
-    switchRow(settings, alerts, 'Alerts over full-screen apps', 'alerts-over-fullscreen');
-    switchRow(settings, alerts, 'Camera, microphone and screen-share indicators', 'privacy-indicators');
-    page.add(alerts);
-    const more = new Adw.PreferencesGroup({title: 'Features'});
-    switchRow(settings, more, 'Clipboard history', 'clipboard-history');
-    switchRow(settings, more, 'Voice assistant', 'voice-assistant');
-    switchRow(settings, more, 'AI plan usage', 'usage-enabled');
-    switchRow(settings, more, 'Look up lyrics online', 'lyrics-online');
-    switchRow(settings, more, 'Chimes', 'chimes');
-    page.add(more);
-    const all = new Adw.PreferencesGroup();
-    launchRow(all, 'All Isle settings', 'Shortcuts, assistant, calendar, pages, and the rest', ['gnome-extensions', 'prefs', 'isle@zickrian.github.io']);
-    page.add(all);
+    const groups = new Map<string, any>();
+    for (const name of order)
+        groups.set(name, new Adw.PreferencesGroup({title: name}));
+    for (const key of settings.settings_schema.list_keys()) {
+        const summary = settings.settings_schema.get_key(key).get_summary() ?? '';
+        if (INTERNAL_KEYS.has(key) || summary.startsWith('Internal'))
+            continue;
+        const row = keyRow(settings, key);
+        if (!row)
+            continue;
+        const name = groupOf(key);
+        if (!groups.has(name))
+            groups.set(name, new Adw.PreferencesGroup({title: name}));
+        groups.get(name).add(row);
+    }
+    for (const group of groups.values())
+        page.add(group);
     return page;
 }
 
+const isleGroup = (key: string) =>
+    /^(shortcut-|voice-shortcut|super-v)/.test(key) ? 'Shortcuts'
+    : /^(voice-|bot-)/.test(key) ? 'Voice assistant'
+    : /^usage-/.test(key) ? 'AI usage'
+    : /^(alert-|system-alerts|event-|privacy-|call-|gnome-banners|replace-osd|alerts-over-fullscreen|chimes)/.test(key) ? 'Alerts'
+    : /^(island-|open-|notch-|hover-|auto-hide|top-bar|compact|glass|clock-|track-peek)/.test(key) ? 'Island'
+    : 'Features';
+
+function islePage() {
+    const settings = extensionSettings('isle@zickrian.github.io', 'org.gnome.shell.extensions.isle');
+    return settings ? generatedPage(settings, isleGroup, ['Island', 'Alerts', 'Features', 'Voice assistant', 'AI usage', 'Shortcuts'])
+        : missingPage('Isle');
+}
+
+const dockGroup = (key: string) =>
+    /^(magnification|animation|bounce|icon-quality|show-threshold)/.test(key) ? 'Motion'
+    : /^(dock-|icon-size|custom-css)/.test(key) ? 'Appearance'
+    : 'Behaviour';
+
 function dockPage() {
     const settings = extensionSettings('macos-dock@vinnytherobot.github.io', 'org.gnome.shell.extensions.macosdock');
-    if (!settings)
-        return missingPage('Dock');
-    const page = new Adw.PreferencesPage();
-    const size = new Adw.PreferencesGroup({title: 'Dock'});
-    spinRow(settings, size, 'Icon size', 'icon-size', 16, 128, 1);
-    spinRow(settings, size, 'Corner radius', 'dock-border-radius', 0, 40, 1);
-    switchRow(settings, size, 'Auto-hide', 'auto-hide');
-    switchRow(settings, size, 'Show running apps', 'show-running-apps');
-    switchRow(settings, size, 'Running indicators', 'running-indicators');
-    switchRow(settings, size, 'Drag to reorder', 'drag-reorder');
-    switchRow(settings, size, 'Applications button', 'show-applications-button');
-    page.add(size);
-    const motion = new Adw.PreferencesGroup({title: 'Motion'});
-    switchRow(settings, motion, 'Magnification', 'magnification-enabled');
-    spinRow(settings, motion, 'Magnification scale', 'magnification-scale', 1, 3, 0.05, 2);
-    spinRow(settings, motion, 'Magnification reach', 'magnification-falloff', 40, 300, 5);
-    switchRow(settings, motion, 'Bounce on launch', 'bounce-on-launch');
-    spinRow(settings, motion, 'Animation duration (ms)', 'animation-duration', 0, 1000, 10);
-    page.add(motion);
-    const windows = new Adw.PreferencesGroup({title: 'Windows and media'});
-    switchRow(settings, windows, 'Window previews', 'window-previews');
-    switchRow(settings, windows, 'Media controls', 'media-controls');
-    page.add(windows);
-    return page;
+    return settings ? generatedPage(settings, dockGroup, ['Appearance', 'Motion', 'Behaviour']) : missingPage('Dock');
 }
 
 function searchPage() {
     const page = new Adw.PreferencesPage();
     const group = new Adw.PreferencesGroup({title: 'Search (DigUp)', description: 'Opens with Super+Space. Its folders, model and shortcut are set in DigUp itself.'});
-    launchRow(group, 'Open DigUp', 'The window, with its settings', ['digup-shell']);
+    launchRow(group, 'DigUp settings', 'Folders, indexing hours, code search, model, shortcut', ['digup-shell', '--open-settings']);
+    launchRow(group, 'Open DigUp', 'The search window', ['digup-shell']);
     page.add(group);
     return page;
 }
@@ -236,6 +277,9 @@ function build(app) {
     stack.add_titled_with_icon(islePage(), 'isle', 'Isle', 'view-pin-symbolic');
     stack.add_titled_with_icon(dockPage(), 'dock', 'Dock', 'view-app-grid-symbolic');
     stack.add_titled_with_icon(searchPage(), 'search', 'Search', 'system-search-symbolic');
+    const first = GLib.getenv('NIRO_PAGE');
+    if (first && stack.get_child_by_name(first))
+        stack.set_visible_child_name(first);
     const header = new Adw.HeaderBar({title_widget: new Adw.ViewSwitcher({stack, policy: Adw.ViewSwitcherPolicy.WIDE})});
     const view = new Adw.ToolbarView();
     view.add_top_bar(header);

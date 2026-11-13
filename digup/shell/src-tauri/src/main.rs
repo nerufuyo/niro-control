@@ -634,6 +634,10 @@ fn main() {
         .plugin(tauri_plugin_single_instance::init(|app, args, _| {
             if args.iter().any(|arg| arg == "--toggle") {
                 toggle_panel(app)
+            } else if args.iter().any(|arg| arg == "--open-settings") {
+                later(app, |app| {
+                    let _ = show_settings(app);
+                });
             } else {
                 show_window_or_setup(app);
             }
@@ -832,6 +836,9 @@ fn setup(app: &mut tauri::App, options: Options) -> Result<(), Box<dyn std::erro
         show_setup(&handle)?;
     }
     let options = &shell.options;
+    if options.open_settings {
+        let _ = show_settings(&handle);
+    }
     if options.toggle || options.debug_show && options.debug_window.is_none() {
         // Started by the shortcut (DigUp wasn't running): the panel comes up as it would have.
         show_panel(&handle);

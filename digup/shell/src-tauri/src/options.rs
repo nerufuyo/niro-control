@@ -46,6 +46,8 @@ pub struct Options {
     /// A desktop shortcut's command (hotkey.rs): show or hide the panel of the DigUp already running, or start DigUp
     /// with the panel up.
     pub toggle: bool,
+    /// Open the settings window (Niro Control's Search page does).
+    pub open_settings: bool,
     /// Started at login (the autostart entry says so): DigUp waits in the tray. Opened by hand, it shows its window.
     pub at_login: bool,
     /// Debug runs: check for updates at once (in a dev run too), once.
@@ -74,6 +76,7 @@ impl Options {
             debug_settings: false,
             debug_copy: false,
             toggle: false,
+            open_settings: false,
             at_login: false,
             debug_update_check: false,
             debug_update_install: false,
@@ -100,6 +103,7 @@ impl Options {
                 "--debug-settings" => options.debug_settings = true,
                 "--debug-copy" => options.debug_copy = true,
                 "--toggle" => options.toggle = true,
+                "--open-settings" => options.open_settings = true,
                 "--at-login" => options.at_login = true,
                 "--debug-update-check" => options.debug_update_check = true,
                 "--debug-update-install" => options.debug_update_install = true,
