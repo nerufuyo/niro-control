@@ -6,7 +6,7 @@ import Gdk from 'gi://Gdk?version=4.0';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
-import {findConflict, hasModifier} from './logic.js';
+import {canonicalAccel, findConflict, hasModifier} from './logic.js';
 import type {Binding} from './store.js';
 import type {Item} from './types.js';
 
@@ -181,14 +181,13 @@ export function shortcutRecorder(title: string, binding: Binding, ctx: Context, 
         const clash = accel && findConflict(accel, ctx.takenShortcuts(siblings));
         if (clash) { ctx.toast(`Already used by ${clash.owner}`); return; }
         stop();
-        guard(ctx, title, () => binding.write(accel ? [accel] : []));
+        guard(ctx, title, () => binding.write(accel ? [canonicalAccel(accel)] : []));
     };
     button.connect('clicked', () => {
         if (recording) { stop(); return; }
         recording = true; stack.set_visible_child_name('hint'); ctx.inhibitShortcuts(true); button.grab_focus();
     });
-    const keys = new Gtk.EventControllerKey({propagation_phase: Gtk.PropagationPhase.CAPTURE});
-    keys.connect('key-pressed', (_c, keyval, _code, state) => {
+    const press = (keyval, state) => {
         if (!recording) return false;
         if (keyval === Gdk.KEY_Escape) { stop(); return true; }
         if (keyval === Gdk.KEY_BackSpace || keyval === Gdk.KEY_Delete) { commit(''); return true; }
@@ -196,7 +195,9 @@ export function shortcutRecorder(title: string, binding: Binding, ctx: Context, 
         const accel = Gtk.accelerator_name(Gdk.keyval_to_lower(keyval), state & Gtk.accelerator_get_default_mod_mask());
         if (accel) commit(accel);
         return true;
-    });
+    };
+    const keys = new Gtk.EventControllerKey({propagation_phase: Gtk.PropagationPhase.CAPTURE});
+    keys.connect('key-pressed', (_c, keyval, _code, state) => press(keyval, state));
     button.add_controller(keys);
     const focus = new Gtk.EventControllerFocus();
     focus.connect('leave', () => recording && stop());
@@ -216,7 +217,7 @@ export function shortcutRecorder(title: string, binding: Binding, ctx: Context, 
     });
     pop.set_child(entry); type.set_popover(pop);
     box.append(button); box.append(type);
-    return {widget: box, focus: button};
+    return {widget: box, focus: button, press, click: () => button.emit('clicked')};
 }
 
 // ---- SettingsRow: title, then the description below it, then the control and the reset button

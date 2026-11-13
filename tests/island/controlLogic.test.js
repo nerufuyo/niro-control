@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 
 import {CATALOG} from '../../control/build/catalog.js';
-import {decodeEntities, dependencyMet, findConflict, hasModifier, normalizeAccel, searchItems} from '../../control/build/logic.js';
+import {canonicalAccel, decodeEntities, dependencyMet, findConflict, hasModifier, normalizeAccel, searchItems} from '../../control/build/logic.js';
 
 const csv = readFileSync(new URL('../../docs/control-panel-items.csv', import.meta.url), 'utf8').trim().split('\n').slice(1);
 
@@ -79,4 +79,10 @@ test('every shortcut default in the catalog is free of conflicts with the others
         assert.ok(!seen.has(accel) || seen.get(accel).source !== i.source, `${i.id} clashes with ${seen.get(accel)?.id}`);
         seen.set(accel, i);
     }
+});
+
+test('a recorded shortcut is written the way the schemas write theirs', () => {
+    assert.equal(canonicalAccel('<Alt><Super>z'), '<Super><Alt>z');
+    assert.equal(canonicalAccel('<Shift><Control>F5'), '<Control><Shift>F5');
+    assert.equal(canonicalAccel('<Super>space'), '<Super>space');
 });

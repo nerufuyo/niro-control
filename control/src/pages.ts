@@ -28,6 +28,7 @@ export class Model {
         this.cache = new Map();
         this.rows = new Map();     // item id -> the rows showing it (to grey them out when a dependency is off)
         this.byId = new Map(CATALOG.map(i => [i.id, i]));
+        this.narrow = [];          // [widget, property, value] the window sets when it is narrow
         this.system = this.readSystemShortcuts();
     }
 
@@ -102,7 +103,13 @@ export class Model {
     }
 
     applyDependency(item: Item, row) {
-        row.set_sensitive(dependencyMet(item, this.read));
+        const met = dependencyMet(item, this.read);
+        row.set_sensitive(met);
+        const dep = item.depends && this.item(item.depends.id);
+        if (dep) {
+            const need = {on: 'is on', off: 'is off', eq: `is "${item.depends.value}"`, ne: `isn't "${item.depends.value}"`}[item.depends.op];
+            row.set_tooltip_text(met ? (item.detail !== item.help ? item.detail : null) : `Available when "${dep.title}" ${need}`);
+        }
     }
 
     // ---- Rows
@@ -286,14 +293,26 @@ function subnav(model: Model, menu: string, order: string[], header?: any) {
         list.append(row);
         stack.add_named(page(model.section(g, gi)), g);
     }
-    list.connect('row-selected', (_l, row) => row && stack.set_visible_child_name(row.get_name()));
+    // in a narrow window the list becomes a menu above the page
+    const picker = Gtk.DropDown.new_from_strings(groups);
+    picker.set_visible(false); picker.set_margin_start(14); picker.set_margin_end(14); picker.set_margin_top(8);
+    picker.update_property([Gtk.AccessibleProperty.LABEL], ['Section']);
+    let syncing = false;
+    list.connect('row-selected', (_l, row) => {
+        if (!row) return;
+        stack.set_visible_child_name(row.get_name());
+        syncing = true; picker.set_selected(groups.indexOf(row.get_name())); syncing = false;
+    });
+    picker.connect('notify::selected', () => !syncing && list.select_row(list.get_row_at_index(picker.get_selected())));
     list.select_row(list.get_row_at_index(0));
     const side = new Gtk.ScrolledWindow({child: list, hscrollbar_policy: Gtk.PolicyType.NEVER, min_content_width: 200, vexpand: true, css_classes: ['niro-subnav']});
+    const rule = new Gtk.Separator();
     const body = new Gtk.Box({orientation: Gtk.Orientation.HORIZONTAL});
-    body.append(side); body.append(new Gtk.Separator()); body.append(stack);
+    body.append(side); body.append(rule); body.append(stack);
     const outer = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL});
     if (header) outer.append(header);
-    outer.append(body);
+    outer.append(picker); outer.append(body);
+    model.narrow.push([picker, 'visible', true], [side, 'visible', false], [rule, 'visible', false]);
     return outer;
 }
 

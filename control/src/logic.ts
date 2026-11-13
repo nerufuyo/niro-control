@@ -72,3 +72,12 @@ export function findConflict(accel: string, taken: Binding[]): Binding | null {
 export function hasModifier(accel: string): boolean {
     return MODIFIERS.some(m => accel.includes(`<${m}>`)) || /^(F\d{1,2}|XF86\w+)$/.test(accel.replace(/<[^>]+>/g, ''));
 }
+
+const ORDER = ['Primary', 'Control', 'Super', 'Alt', 'Shift', 'Meta', 'Hyper'];
+
+/** The way the schemas write a shortcut (`<Super><Alt>m`), whatever order GTK names the modifiers in. */
+export function canonicalAccel(accel: string): string {
+    const mods = [...accel.matchAll(/<([^>]+)>/g)].map(m => m[1]);
+    const key = accel.replace(/<[^>]+>/g, '');
+    return [...mods].sort((a, b) => ORDER.indexOf(a) - ORDER.indexOf(b)).map(m => `<${m}>`).join('') + key;
+}

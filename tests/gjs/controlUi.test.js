@@ -95,3 +95,30 @@ if (!Gtk.init_check()) {
     if (!findConflict('<Alt><Super>M', model.takenShortcuts([]))) fail('the same keys in another order were not seen as a conflict');
     print(`controlUi: ok (${bound} bindings, ${names.size} rows, ${labels} labels)`);
 }
+
+// The shortcut recorder, driven with key events: records, refuses a clash or a bare key, clears, cancels
+if (Gtk.init_check()) {
+    const {shortcutRecorder} = await import('../../control/build/components.js');
+    const {Model} = await import('../../control/build/pages.js');
+    const Gdk = (await import('gi://Gdk?version=4.0')).default;
+    const toasts = [];
+    const ctx = {toast: m => toasts.push(m), openLook: () => {}, inhibitShortcuts: () => {}, takenShortcuts: e => model2.takenShortcuts(e), window: null};
+    const model2 = new Model(ctx);
+    const music = model2.binding(CATALOG.find(i => i.id === 'island.shortcut-music'));
+    const rec = shortcutRecorder('Music', music, ctx);
+    const SUPER_ALT = Gdk.ModifierType.SUPER_MASK | Gdk.ModifierType.ALT_MASK;
+    rec.click();
+    if (!rec.press(Gdk.KEY_z, SUPER_ALT)) fail('recorder ignored a key while recording');
+    if (music.read()[0] !== '<Super><Alt>z') fail(`recorded ${music.read()}`);
+    rec.click(); rec.press(Gdk.KEY_n, SUPER_ALT);                       // Notifications already has Super+Alt+N
+    if (music.read()[0] !== '<Super><Alt>z' || !toasts.some(t => /Already used by Island › Shortcut to the Notifications page/.test(t))) fail(`a clash was not refused (${toasts})`);
+    rec.press(Gdk.KEY_m, 0);                                            // a bare letter
+    if (!toasts.some(t => /at least one modifier/.test(t))) fail('a bare key was not refused');
+    rec.press(Gdk.KEY_BackSpace, 0);
+    if (music.read().length !== 0) fail('Backspace did not clear the shortcut');
+    rec.click(); rec.press(Gdk.KEY_Escape, 0);
+    rec.click(); rec.press(Gdk.KEY_q, SUPER_ALT); rec.click(); rec.press(Gdk.KEY_Escape, 0);
+    if (music.read()[0] !== '<Super><Alt>q') fail('Escape should leave the shortcut as it was');
+    music.reset();
+    print('controlUi: shortcut recorder ok');
+}

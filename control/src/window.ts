@@ -19,10 +19,10 @@ const MODULES = [
 ];
 
 const CSS = `
-.niro-window { background-color: alpha(@window_bg_color, 0.84); }
-.niro-sidebar { background-color: alpha(@sidebar_bg_color, 0.72); }
-.niro-window .boxed-list, .niro-window preferencesgroup > box > box > list { background-color: alpha(@card_bg_color, 0.7); }
-.niro-subnav { background-color: alpha(@sidebar_bg_color, 0.45); }
+.niro-window { background-color: alpha(@window_bg_color, 0.93); }
+.niro-sidebar { background-color: alpha(@sidebar_bg_color, 0.86); }
+.niro-window .boxed-list, .niro-window preferencesgroup > box > box > list { background-color: alpha(@card_bg_color, 0.88); }
+.niro-subnav { background-color: alpha(@sidebar_bg_color, 0.6); }
 .niro-subnav row { border-radius: 8px; margin: 1px 6px; }
 .niro-preview { border-radius: 12px; background-color: alpha(@card_bg_color, 0.55); }
 .niro-preset { padding: 6px 10px; border-radius: 9px; }
@@ -52,6 +52,8 @@ export function buildWindow(app) {
     const overlay = new Adw.ToastOverlay();
     const window = new Adw.ApplicationWindow({application: app, title: 'Niro Control', default_width: 1060, default_height: 740, css_classes: ['niro-window']});
     window.set_size_request(380, 420);
+    const size = (GLib.getenv('NIRO_SIZE') ?? '').match(/^(\d+)x(\d+)$/); // to look at the panel at another size
+    if (size) window.set_default_size(Number(size[1]), Number(size[2]));
 
     const ctx = {
         window,
@@ -119,17 +121,26 @@ export function buildWindow(app) {
     const sideView = new Adw.ToolbarView({content: sideBody}); sideView.add_top_bar(sideTop);
     sideView.add_css_class('niro-sidebar');
 
-    const contentView = new Adw.ToolbarView({content}); contentView.add_top_bar(new Adw.HeaderBar({title_widget: contentTitle}));
-    const stale = staleParts();
+    const pageBox = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL});
+    const contentView = new Adw.ToolbarView({content: pageBox}); contentView.add_top_bar(new Adw.HeaderBar({title_widget: contentTitle}));
+    const stale = GLib.getenv('NIRO_NOBANNER') ? [] : staleParts();
     const banner = new Adw.Banner({title: `A newer ${stale.join(', ')} is installed. Log out and in to load it.`, button_label: 'Log out', revealed: stale.length > 0});
     banner.connect('button-clicked', () => { try { Gio.Subprocess.new(['gnome-session-quit', '--logout'], Gio.SubprocessFlags.NONE); } catch (e) { ctx.toast(`Couldn't log out: ${e.message}`); } });
-    contentView.add_top_bar(banner);
+    pageBox.append(banner); pageBox.append(content); // in the page, not a top bar: a banner that wraps would cover the first rows
     overlay.set_child(contentView);
     const split = new Adw.NavigationSplitView({sidebar: Adw.NavigationPage.new(sideView, 'Niro Control'), content: Adw.NavigationPage.new(overlay, 'Settings'),
         min_sidebar_width: 210, max_sidebar_width: 250, sidebar_width_fraction: 0.24});
     window.set_content(split);
     const bp = Adw.Breakpoint.new(Adw.BreakpointCondition.parse('max-width: 760sp'));
     bp.add_setter(split, 'collapsed', true);
+    bp.connect('apply', () => split.set_show_content(true)); // narrow: start on the page, the back arrow shows the modules
+    // narrow: the sections list of Island and Dock becomes a menu above the page (watched by hand: breakpoints are one at a time)
+    let narrow = null;
+    window.add_tick_callback(() => {
+        const now = window.get_width() > 0 && window.get_width() <= 660;
+        if (now !== narrow) { narrow = now; model.narrow.forEach(([widget, prop, value]) => widget.set_property(prop, now ? value : !value)); }
+        return GLib.SOURCE_CONTINUE;
+    });
     window.add_breakpoint(bp);
 
     // keyboard: Ctrl+F searches, Ctrl+1…6 switch modules, Esc leaves the search
