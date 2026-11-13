@@ -1,0 +1,17 @@
+node_modules/
+dist/
+dist-legacy/
+*.js.map
+schemas/*.compiled
+
+# Internal docs
+ROADMAP.md
+FEATURES.md
+FEATURE_PLAN.md
+
+# AI
+.mimocode
+.claude
+.gemini
+.cursor
+.orion
