@@ -1,4 +1,4 @@
-// Niro Control: one control panel for the look of Isle, the dock, DigUp and app windows (org.niro.control).
+// Niro Control: one control panel for the look of Isle, the dock, the search and app windows (org.niro.control).
 // Runs under `gjs -m`; the gi:// modules come from the system, so they are typed loosely.
 // @ts-nocheck: GJS bindings are not typed here
 import Adw from 'gi://Adw?version=1';
@@ -147,9 +147,9 @@ function lookPage(settings) {
     colourRow(settings, colours, 'Surface tint', 'tint');
     page.add(colours);
 
-    const glass = new Adw.PreferencesGroup({title: 'Glass', description: "Isle, the dock, app windows and DigUp's panel"});
+    const glass = new Adw.PreferencesGroup({title: 'Glass', description: "Isle, the dock, app windows and the search panel"});
     scaleRow(settings, glass, 'Opacity', 'opacity', '0 is clear, 100 is solid');
-    const blur = new Adw.SwitchRow({title: 'Blur', subtitle: "Frosted glass behind the dock and app windows (not DigUp's panel)"});
+    const blur = new Adw.SwitchRow({title: 'Blur', subtitle: "Frosted glass behind the dock and app windows"});
     settings.bind('blur', blur, 'active', Gio.SettingsBindFlags.DEFAULT);
     glass.add(blur);
     scaleRow(settings, glass, 'Blur strength', 'blur-strength', '');
@@ -261,11 +261,10 @@ function dockPage() {
     return settings ? generatedPage(settings, dockGroup, ['Appearance', 'Motion', 'Behaviour']) : missingPage('Dock');
 }
 
-function searchPage() {
+function searchPage(settings) {
     const page = new Adw.PreferencesPage();
-    const group = new Adw.PreferencesGroup({title: 'Search (DigUp)', description: 'Opens with Super+Space. Its folders, model and shortcut are set in DigUp itself.'});
-    launchRow(group, 'DigUp settings', 'Folders, indexing hours, code search, model, shortcut', ['digup-shell', '--open-settings']);
-    launchRow(group, 'Open DigUp', 'The search window', ['digup-shell']);
+    const group = new Adw.PreferencesGroup({title: 'Application search', description: 'Finds the applications you have installed as you type. Its tone and opacity follow Look.'});
+    group.add(keyRow(settings, 'search-shortcut'));
     page.add(group);
     return page;
 }
@@ -276,7 +275,7 @@ function build(app) {
     stack.add_titled_with_icon(lookPage(settings), 'look', 'Look', 'preferences-desktop-theme-symbolic');
     stack.add_titled_with_icon(islePage(), 'isle', 'Isle', 'view-pin-symbolic');
     stack.add_titled_with_icon(dockPage(), 'dock', 'Dock', 'view-app-grid-symbolic');
-    stack.add_titled_with_icon(searchPage(), 'search', 'Search', 'system-search-symbolic');
+    stack.add_titled_with_icon(searchPage(settings), 'search', 'Search', 'system-search-symbolic');
     const first = GLib.getenv('NIRO_PAGE');
     if (first && stack.get_child_by_name(first))
         stack.set_visible_child_name(first);

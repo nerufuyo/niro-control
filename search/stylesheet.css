@@ -1,0 +1,24 @@
+/* Niro Search: the panel's colour and selection come from org.niro.control (set in code). */
+.niro-search {
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 10px;
+  box-shadow: 0 18px 60px rgba(0, 0, 0, 0.55);
+  font-family: "Inter Variable", Inter, sans-serif;
+}
+.niro-search-entry {
+  font-size: 20px;
+  color: #f2f2f7;
+  caret-color: #f2f2f7;
+  background-color: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 10px 12px;
+  min-height: 28px;
+}
+.niro-search-entry StLabel.hint-text { color: #8e8e93; }
+.niro-search-list { padding-top: 6px; spacing: 2px; }
+.niro-search-row { border-radius: 12px; padding: 8px 10px; }
+.niro-search-icon { margin-right: 12px; }
+.niro-search-name { color: #f2f2f7; font-size: 14px; font-weight: 600; }
+.niro-search-description { color: #8e8e93; font-size: 11px; }

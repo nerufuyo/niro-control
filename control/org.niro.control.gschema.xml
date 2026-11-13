@@ -20,12 +20,17 @@
     <key name="accent" type="s">
       <default>'#E8472B'</default>
       <summary>Accent colour</summary>
-      <description>The one accent of the desktop: Isle's highlights, the dock's running dots, DigUp's selection.</description>
+      <description>The one accent of the desktop: Isle's highlights, the dock's running dots, the search panel's selection.</description>
     </key>
     <key name="tint" type="s">
       <default>'#1C1C1E'</default>
       <summary>Surface tint</summary>
-      <description>The colour of the dark surfaces (the dock, DigUp's panel).</description>
+      <description>The colour of the dark surfaces (the dock, the search panel).</description>
+    </key>
+    <key name="search-shortcut" type="as">
+      <default>['&lt;Super&gt;space']</default>
+      <summary>Search shortcut</summary>
+      <description>Opens the application search.</description>
     </key>
   </schema>
 </schemalist>
