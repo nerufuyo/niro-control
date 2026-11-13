@@ -32,11 +32,7 @@ export class DockManager {
   private _dockPosition: number = POSITIONS.BOTTOM;
   private _blurEffect: Shell.BlurEffect | null = null;
   private _bg: InstanceType<typeof St.Widget> | null = null;
-  private _hump: InstanceType<typeof St.DrawingArea> | null = null;
   private _bgExtra: [number, number] = [0, 0];
-  private _humpPeak = 0;
-  private _humpProfile: { x: number; w: number; h: number }[] = [];
-  private _humpRGBA: [number, number, number, number] = [0.1, 0.06, 0.06, 0.45];
   private _launching: { app: Shell.App; time: number } | null = null;
   private _launchBounceId: number | null = null;
   private _previewPopup: WindowPreviewPopup | null = null;
@@ -83,11 +79,6 @@ export class DockManager {
     this._bg = new St.Widget({ style_class: "macos-dock-bg", reactive: false });
     Main.layoutManager.addTopChrome(this._bg);
     this._container.get_parent()?.set_child_below_sibling(this._bg, this._container);
-    // The part of the shelf that rises above the bar, shaped by the magnified icons (a smooth hump).
-    this._hump = new St.DrawingArea({ reactive: false });
-    Main.layoutManager.addTopChrome(this._hump);
-    this._container.get_parent()?.set_child_below_sibling(this._hump, this._container);
-    this._hump.connect("repaint", (area: InstanceType<typeof St.DrawingArea>) => this._paintHump(area));
     for (const prop of ["x", "y", "width", "height", "opacity", "visible", "translation-x", "translation-y"])
       this._signals.connect(this._container, `notify::${prop}`, () => this._syncBg());
 
@@ -151,11 +142,9 @@ export class DockManager {
       settings.get_int("magnification-framerate"),
     );
     this._magnification = magnification;
-    magnification.setOnExtent((w, h, profile) => {
+    magnification.setOnExtent((w) => {
       const bottom = this._dockPosition === POSITIONS.BOTTOM;
       this._bgExtra = bottom ? [w, 0] : [0, 0];
-      this._humpPeak = bottom ? h : 0;
-      this._humpProfile = bottom ? profile : [];
       this._syncBg();
     });
     magnification.start();
@@ -331,12 +320,6 @@ export class DockManager {
     if (this._launchBounceId) {
       GLib.source_remove(this._launchBounceId);
       this._launchBounceId = null;
-    }
-
-    if (this._hump) {
-      Main.layoutManager.removeChrome(this._hump);
-      this._hump.destroy();
-      this._hump = null;
     }
 
     if (this._bg) {
@@ -662,63 +645,6 @@ export class DockManager {
     bg.set_size(Math.round(w + ew), Math.round(h + eh));
     bg.opacity = c.opacity;
     bg.visible = c.visible;
-    const hump = this._hump;
-    if (hump) {
-      const H = Math.ceil(this._humpPeak);
-      hump.visible = c.visible && H > 0;
-      hump.opacity = c.opacity;
-      if (H > 0) {
-        hump.set_position(Math.round(gx - ew / 2), Math.round(gy) - H);
-        hump.set_size(Math.round(w + ew), H);
-        hump.queue_repaint();
-      }
-    }
-  }
-
-  // Draw the hump: its top edge follows the enlarged icons (cosine blend between icon centres).
-  private _paintHump(area: InstanceType<typeof St.DrawingArea>): void {
-    const [W, H] = area.get_surface_size();
-    const prof = this._humpProfile;
-    const cr = area.get_context();
-    if (prof.length === 0 || H <= 0) {
-      cr.$dispose();
-      return;
-    }
-    const ox = this._bgExtra[0] / 2;
-    const knots: { x: number; h: number }[] = [];
-    const first = prof[0];
-    const last = prof[prof.length - 1];
-    knots.push({ x: Math.max(0, first.x + ox - first.w / 2 - 36), h: 0 });
-    for (const p of prof) knots.push({ x: p.x + ox, h: Math.min(H, p.h) });
-    knots.push({ x: Math.min(W, last.x + ox + last.w / 2 + 36), h: 0 });
-    // The hump fades to nothing toward the bar's two ends, so it never ends in a vertical cliff.
-    const EDGE = 56;
-    const taper = (x: number): number => {
-      const e = Math.max(0, Math.min(1, Math.min(x, W - x) / EDGE));
-      return e * e * (3 - 2 * e);
-    };
-    const hAt = (x: number): number => {
-      if (x <= knots[0].x || x >= knots[knots.length - 1].x) return 0;
-      for (let i = 1; i < knots.length; i++) {
-        if (x <= knots[i].x) {
-          const a = knots[i - 1];
-          const b = knots[i];
-          const t = b.x === a.x ? 1 : (x - a.x) / (b.x - a.x);
-          return (a.h + ((b.h - a.h) * (1 - Math.cos(Math.PI * t))) / 2) * taper(x);
-        }
-      }
-      return 0;
-    };
-    const [r, g, b, a] = this._humpRGBA;
-    cr.setSourceRGBA(r, g, b, a);
-    const x0 = Math.floor(knots[0].x);
-    const x1 = Math.ceil(knots[knots.length - 1].x);
-    cr.moveTo(x0, H);
-    for (let x = x0; x <= x1; x += 2) cr.lineTo(x, H - hAt(x));
-    cr.lineTo(x1, H);
-    cr.closePath();
-    cr.fill();
-    cr.$dispose();
   }
 
   private _applyDockStyle(): void {
@@ -739,7 +665,6 @@ export class DockManager {
       padding: 4px 10px;
       spacing: 6px;
     `;
-    this._humpRGBA = [r / 255, g / 255, b / 255, alpha];
     this._bg.style = `
       background-color: rgba(${r}, ${g}, ${b}, ${alpha});
       border-radius: ${radius}px;
