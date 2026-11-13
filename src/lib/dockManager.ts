@@ -2,10 +2,12 @@ import Clutter from "gi://Clutter";
 import Gio from "gi://Gio";
 import GLib from "gi://GLib";
 import Meta from "gi://Meta";
+import Mtk from "gi://Mtk";
 import Shell from "gi://Shell";
 import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { DockVisibility } from "./dockVisibility.js";
+import { genie } from "./genie.js";
 import { IconManager, type MediaAction } from "./iconManager.js";
 import { Intellihide } from "./intellihide.js";
 import { Magnification } from "./magnification.js";
@@ -29,6 +31,14 @@ export class DockManager {
   private _originalDashVisible?: boolean;
   private _dockPosition: number = POSITIONS.BOTTOM;
   private _blurEffect: Shell.BlurEffect | null = null;
+  private _bg: InstanceType<typeof St.Widget> | null = null;
+  private _hump: InstanceType<typeof St.DrawingArea> | null = null;
+  private _bgExtra: [number, number] = [0, 0];
+  private _humpPeak = 0;
+  private _humpProfile: { x: number; w: number; h: number }[] = [];
+  private _humpRGBA: [number, number, number, number] = [0.1, 0.06, 0.06, 0.45];
+  private _launching: { app: Shell.App; time: number } | null = null;
+  private _launchBounceId: number | null = null;
   private _previewPopup: WindowPreviewPopup | null = null;
   private _mediaManager: MediaManager | null = null;
   private _theme: St.Theme | null = null;
@@ -46,7 +56,7 @@ export class DockManager {
 
   private get _dockHeight(): number {
     const iconSize = this._settings?.get_int("icon-size") ?? 48;
-    const iconActorHeight = iconSize + 16;
+    const iconActorHeight = iconSize + 8;
     const verticalPadding = 8; // 4px top + 4px bottom from _applyDockStyle
     return iconActorHeight + verticalPadding;
   }
@@ -69,6 +79,18 @@ export class DockManager {
 
     Main.layoutManager.addTopChrome(this._container);
 
+    // Separate background actor so the dock "shelf" can grow with the magnified icons.
+    this._bg = new St.Widget({ style_class: "macos-dock-bg", reactive: false });
+    Main.layoutManager.addTopChrome(this._bg);
+    this._container.get_parent()?.set_child_below_sibling(this._bg, this._container);
+    // The part of the shelf that rises above the bar, shaped by the magnified icons (a smooth hump).
+    this._hump = new St.DrawingArea({ reactive: false });
+    Main.layoutManager.addTopChrome(this._hump);
+    this._container.get_parent()?.set_child_below_sibling(this._hump, this._container);
+    this._hump.connect("repaint", (area: InstanceType<typeof St.DrawingArea>) => this._paintHump(area));
+    for (const prop of ["x", "y", "width", "height", "opacity", "visible", "translation-x", "translation-y"])
+      this._signals.connect(this._container, `notify::${prop}`, () => this._syncBg());
+
     // Icon manager: populates the container with app buttons.
     const iconManager = new IconManager(
       this._container,
@@ -80,7 +102,25 @@ export class DockManager {
     );
     this._iconManager = iconManager;
     iconManager.setOnClicked((app) => this._onAppClicked(app));
-    iconManager.setOnIconsChanged(() => this._updatePosition());
+    iconManager.setOnIconsChanged(() => {
+      this._updatePosition();
+      this._syncAllIconGeometry();
+    });
+    // Windows minimize into (and restore from) their dock icon, and new ones fly out of it.
+    this._signals.connect(global.window_manager, "map", (_wm: unknown, actor: unknown) => this._flyOut(actor as Clutter.Actor));
+    // Genie: a funnel-shaped clone of the window flies into (or out of) its dock icon.
+    this._signals.connect(global.window_manager, "minimize", (_wm: unknown, actor: unknown) =>
+      this._genie(actor as Clutter.Actor, false),
+    );
+    this._signals.connect(global.window_manager, "unminimize", (_wm: unknown, actor: unknown) =>
+      this._genie(actor as Clutter.Actor, true),
+    );
+    this._signals.connect(global.display, "window-created", () =>
+      GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+        this._syncAllIconGeometry();
+        return GLib.SOURCE_REMOVE;
+      }),
+    );
     iconManager.setOnMediaAction((action) => this._onMediaAction(action));
     iconManager.setOnContextMenuActorChanged((actor) => {
       if (this._visibility) {
@@ -111,6 +151,13 @@ export class DockManager {
       settings.get_int("magnification-framerate"),
     );
     this._magnification = magnification;
+    magnification.setOnExtent((w, h, profile) => {
+      const bottom = this._dockPosition === POSITIONS.BOTTOM;
+      this._bgExtra = bottom ? [w, 0] : [0, 0];
+      this._humpPeak = bottom ? h : 0;
+      this._humpProfile = bottom ? profile : [];
+      this._syncBg();
+    });
     magnification.start();
     iconManager.setOnDragStateChanged((dragging) => {
       previewPopup.cancelScheduledHide();
@@ -281,6 +328,23 @@ export class DockManager {
       this._debounceSourceId = null;
     }
 
+    if (this._launchBounceId) {
+      GLib.source_remove(this._launchBounceId);
+      this._launchBounceId = null;
+    }
+
+    if (this._hump) {
+      Main.layoutManager.removeChrome(this._hump);
+      this._hump.destroy();
+      this._hump = null;
+    }
+
+    if (this._bg) {
+      Main.layoutManager.removeChrome(this._bg);
+      this._bg.destroy();
+      this._bg = null;
+    }
+
     if (this._container) {
       Main.layoutManager.removeChrome(this._container);
       this._container.destroy();
@@ -335,7 +399,61 @@ export class DockManager {
     }
   }
 
+  // Where the app's icon sits on screen; GNOME animates minimize/restore to and from this rectangle.
+  private _iconRect(app: Shell.App): { x: number; y: number; width: number; height: number } | null {
+    const actor = this._iconManager?.getIconActor(app);
+    if (!actor) return null;
+    const [x, y] = actor.get_transformed_position();
+    const [w, h] = actor.get_transformed_size();
+    return { x: Math.round(x), y: Math.round(y), width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)) };
+  }
+
+  private _syncIconGeometry(app: Shell.App): void {
+    const rect = this._iconRect(app);
+    if (!rect) return;
+    for (const win of app.get_windows()) win.set_icon_geometry(new Mtk.Rectangle(rect));
+  }
+
+  private _syncAllIconGeometry(): void {
+    for (const app of Shell.AppSystem.get_default().get_running()) this._syncIconGeometry(app);
+  }
+
+  private _genie(actor: Clutter.Actor, reverse: boolean): void {
+    const win = (actor as unknown as { meta_window?: Meta.Window }).meta_window;
+    const app = win ? Shell.WindowTracker.get_default().get_window_app(win) : null;
+    const rect = app ? this._iconRect(app) : null;
+    if (rect) genie(actor, rect, { reverse });
+  }
+
+  // A window opened by a dock click scales up out of the app's icon, macOS style.
+  private _flyOut(actor: Clutter.Actor): void {
+    const win = (actor as unknown as { meta_window?: Meta.Window }).meta_window;
+    const pending = this._launching;
+    if (!win || !pending || Date.now() - pending.time > 5000 || win.get_window_type() !== Meta.WindowType.NORMAL) return;
+    if (Shell.WindowTracker.get_default().get_window_app(win) !== pending.app) return;
+    const rect = this._iconRect(pending.app);
+    if (!rect) return;
+    this._launching = null;
+    actor.remove_all_transitions(); // drops GNOME's own map animation (it finishes the map for us)
+    const [ax, ay] = actor.get_position();
+    const [aw, ah] = actor.get_size();
+    actor.set_pivot_point(
+      (rect.x + rect.width / 2 - ax) / Math.max(1, aw),
+      (rect.y + rect.height / 2 - ay) / Math.max(1, ah),
+    );
+    actor.set({ scale_x: 0.04, scale_y: 0.04, opacity: 0 } as Record<string, number>);
+    (actor as unknown as { ease(p: Record<string, unknown>): void }).ease({
+      scale_x: 1,
+      scale_y: 1,
+      opacity: 255,
+      duration: 320,
+      mode: Clutter.AnimationMode.EASE_OUT_EXPO,
+      onComplete: () => actor.set_pivot_point(0, 0),
+    });
+  }
+
   private _onAppClicked(app: Shell.App): void {
+    this._syncIconGeometry(app);
     const firstWindow = this._findFirstWindow(app);
 
     if (firstWindow) {
@@ -351,8 +469,32 @@ export class DockManager {
         firstWindow.activate(global.get_current_time());
       }
     } else {
+      this._launching = { app, time: Date.now() };
       app.open_new_window(-1);
+      this._launchBounce(app);
     }
+  }
+
+  // macOS keeps the icon jumping until the app's window is up (at most 10 s).
+  private _launchBounce(app: Shell.App): void {
+    const id = app.get_id();
+    this._recentlyLaunched.add(id); // the focus-change bounce would be a second jump
+    const started = Date.now();
+    const step = (): boolean => {
+      if (!this._iconManager || app.get_windows().length > 0 || Date.now() - started > 10000) {
+        this._launchBounceId = null;
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
+          this._recentlyLaunched.delete(id);
+          return GLib.SOURCE_REMOVE;
+        });
+        return GLib.SOURCE_REMOVE;
+      }
+      this._iconManager.bounceForApp(app);
+      return GLib.SOURCE_CONTINUE;
+    };
+    this._iconManager?.bounceForApp(app);
+    if (this._launchBounceId) GLib.source_remove(this._launchBounceId);
+    this._launchBounceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 700, step);
   }
 
   private _onMediaAction(action: MediaAction): void {
@@ -486,6 +628,7 @@ export class DockManager {
 
     this._container.set_size(w, h);
     this._container.set_position(x, y);
+    this._syncBg();
 
     if (this._visibility) {
       this._visibility.updateShownY(y);
@@ -508,8 +651,72 @@ export class DockManager {
     dash.visible = this._originalDashVisible ?? true;
   }
 
+  private _syncBg(): void {
+    const c = this._container;
+    const bg = this._bg;
+    if (!c || !bg) return;
+    const [w, h] = c.get_size();
+    const [gx, gy] = c.get_transformed_position();
+    const [ew, eh] = this._bgExtra;
+    bg.set_position(Math.round(gx - ew / 2), Math.round(gy - eh));
+    bg.set_size(Math.round(w + ew), Math.round(h + eh));
+    bg.opacity = c.opacity;
+    bg.visible = c.visible;
+    const hump = this._hump;
+    if (hump) {
+      const H = Math.ceil(this._humpPeak);
+      hump.visible = c.visible && H > 0;
+      hump.opacity = c.opacity;
+      if (H > 0) {
+        hump.set_position(Math.round(gx - ew / 2), Math.round(gy) - H);
+        hump.set_size(Math.round(w + ew), H);
+        hump.queue_repaint();
+      }
+    }
+  }
+
+  // Draw the hump: its top edge follows the enlarged icons (cosine blend between icon centres).
+  private _paintHump(area: InstanceType<typeof St.DrawingArea>): void {
+    const [W, H] = area.get_surface_size();
+    const prof = this._humpProfile;
+    const cr = area.get_context();
+    if (prof.length === 0 || H <= 0) {
+      cr.$dispose();
+      return;
+    }
+    const ox = this._bgExtra[0] / 2;
+    const knots: { x: number; h: number }[] = [];
+    const first = prof[0];
+    const last = prof[prof.length - 1];
+    knots.push({ x: Math.max(0, first.x + ox - first.w / 2 - 14), h: 0 });
+    for (const p of prof) knots.push({ x: p.x + ox, h: Math.min(H, p.h) });
+    knots.push({ x: Math.min(W, last.x + ox + last.w / 2 + 14), h: 0 });
+    const hAt = (x: number): number => {
+      if (x <= knots[0].x || x >= knots[knots.length - 1].x) return 0;
+      for (let i = 1; i < knots.length; i++) {
+        if (x <= knots[i].x) {
+          const a = knots[i - 1];
+          const b = knots[i];
+          const t = b.x === a.x ? 1 : (x - a.x) / (b.x - a.x);
+          return a.h + ((b.h - a.h) * (1 - Math.cos(Math.PI * t))) / 2;
+        }
+      }
+      return 0;
+    };
+    const [r, g, b, a] = this._humpRGBA;
+    cr.setSourceRGBA(r, g, b, a);
+    const x0 = Math.floor(knots[0].x);
+    const x1 = Math.ceil(knots[knots.length - 1].x);
+    cr.moveTo(x0, H);
+    for (let x = x0; x <= x1; x += 2) cr.lineTo(x, H - hAt(x));
+    cr.lineTo(x1, H);
+    cr.closePath();
+    cr.fill();
+    cr.$dispose();
+  }
+
   private _applyDockStyle(): void {
-    if (!this._container || !this._settings) return;
+    if (!this._container || !this._bg || !this._settings) return;
 
     const opacity = this._settings.get_int("dock-opacity");
     const color = this._settings.get_string("dock-background-color");
@@ -523,19 +730,22 @@ export class DockManager {
     const alpha = opacity / 100;
 
     this._container.style = `
-      background-color: rgba(${r}, ${g}, ${b}, ${alpha});
-      border-radius: ${radius}px;
       padding: 4px 10px;
       spacing: 6px;
+    `;
+    this._humpRGBA = [r / 255, g / 255, b / 255, alpha];
+    this._bg.style = `
+      background-color: rgba(${r}, ${g}, ${b}, ${alpha});
+      border-radius: ${radius}px;
     `;
 
     // Handle blur effect
     if (blurEnabled && !this._blurEffect) {
       this._blurEffect = new Shell.BlurEffect();
       this._blurEffect.set({ sigma: 30, mode: Shell.BlurMode.BACKGROUND });
-      this._container.add_effect(this._blurEffect);
+      this._bg.add_effect(this._blurEffect);
     } else if (!blurEnabled && this._blurEffect) {
-      this._container.remove_effect(this._blurEffect);
+      this._bg.remove_effect(this._blurEffect);
       this._blurEffect = null;
     }
   }

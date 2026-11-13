@@ -215,8 +215,9 @@ export class WindowPreviewPopup {
         // Scale the clone to fit the thumbnail width
         const [actorWidth, actorHeight] = wa.get_size();
         if (actorWidth > 0 && actorHeight > 0) {
-          const scale = this._previewWidth / actorWidth;
-          clone.set_size(this._previewWidth, Math.round(actorHeight * scale));
+          // Fit inside width x thumbHeight so tall windows can't overflow the popup.
+          const scale = Math.min(this._previewWidth / actorWidth, thumbHeight / actorHeight);
+          clone.set_size(Math.round(actorWidth * scale), Math.round(actorHeight * scale));
         }
         thumbBox.add_child(clone);
         break;
@@ -230,13 +231,10 @@ export class WindowPreviewPopup {
       text: title,
       x_align: Clutter.ActorAlign.CENTER,
     });
-    thumbBox.add_child(titleLabel);
-
     // Close button
     const closeBtn = new St.Button({
       style_class: "macos-dock-preview-close-btn",
-      x_align: Clutter.ActorAlign.END,
-      y_align: Clutter.ActorAlign.START,
+      y_align: Clutter.ActorAlign.CENTER,
       label: "×",
       reactive: true,
     });
@@ -254,7 +252,13 @@ export class WindowPreviewPopup {
       });
     });
     this._signals.connect(closeBtn, "button-press-event", () => Clutter.EVENT_STOP);
-    thumbBox.add_child(closeBtn);
+    // Title and close button share one header row, so nothing falls outside the popup.
+    const header = new St.BoxLayout({ vertical: false, x_expand: true });
+    titleLabel.set_x_expand(true);
+    titleLabel.clutter_text.set_ellipsize(3); // Pango.EllipsizeMode.END
+    header.add_child(titleLabel);
+    header.add_child(closeBtn);
+    thumbBox.add_child(header);
 
     // Click to focus this window
     this._signals.connect(thumbBox, "button-press-event", (_actor, event) => {
@@ -276,7 +280,7 @@ export class WindowPreviewPopup {
 
     // Set size
     const thumbWidth = this._previewWidth;
-    thumbBox.set_size(thumbWidth, thumbHeight + 24);
+    thumbBox.set_size(thumbWidth + 8, thumbHeight + 8 + 24);
 
     return { actor: thumbBox, metaWindow: metaWin, app };
   }

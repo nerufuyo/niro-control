@@ -1,215 +1,198 @@
-import GLib from "gi://GLib";
+import Clutter from "gi://Clutter";
 import type St from "gi://St";
 import { SignalManager } from "./signalManager.js";
-
-type IconActor = InstanceType<typeof St.BoxLayout>;
-
 const MIN_SCALE = 1.0;
-const LERP_FACTOR = 0.25; // smoothing factor per tick
-
+type Profile = { x: number; w: number; h: number };
+const STIFFNESS = 20; // 1/s; higher = snappier. Frame-rate independent (see _tick).
 export class Magnification {
-  private _signals: SignalManager;
-  private _container: InstanceType<typeof St.BoxLayout>;
-  private _enabled: boolean;
-  private _maxScale: number;
-  private _falloffDistance: number;
-  private _framerate: number;
-  private _pollId: number | null = null;
-  private _currentScales: number[] = [];
-  private _pivotX = 0.5;
-  private _pivotY = 1.0;
-  private _paused = false;
-
-  constructor(
-    container: InstanceType<typeof St.BoxLayout>,
-    enabled: boolean,
-    maxScale: number,
-    falloffDistance: number = 100,
-    framerate: number = 60,
-  ) {
-    this._signals = new SignalManager();
-    this._container = container;
-    this._enabled = enabled;
-    this._maxScale = maxScale;
-    this._falloffDistance = falloffDistance;
-    this._framerate = framerate;
-  }
-
-  setEnabled(enabled: boolean): void {
-    this._enabled = enabled;
-    if (!enabled) this._resetAll();
-  }
-
-  setMaxScale(scale: number): void {
-    this._maxScale = scale;
-  }
-
-  setFalloffDistance(distance: number): void {
-    this._falloffDistance = distance;
-  }
-
-  setFramerate(fps: number): void {
-    this._framerate = fps;
-    this._restartPoll();
-  }
-
-  setPivotPoint(x: number, y: number): void {
-    this._pivotX = x;
-    this._pivotY = y;
-  }
-
-  /**
-   * Freeze magnification and snap all icons back to scale 1.0. Used while a
-   * drag-reorder is in progress so icon geometry stays stable for drop-index
-   * math. The poll keeps running but returns early while paused.
-   */
-  pause(): void {
-    if (this._paused) return;
-    this._paused = true;
-    this._snapAllToMin();
-  }
-
-  resume(): void {
-    if (!this._paused) return;
-    this._paused = false;
-    // Icons may have been reordered while paused; drop stale per-index scales.
-    this._currentScales = [];
-  }
-
-  start(): void {
-    this._signals.connect(this._container, "leave-event", () => {
-      this._resetAll();
-    });
-    this._startPoll();
-  }
-
-  stop(): void {
-    this._signals.disconnectAll();
-    this._stopPoll();
-    this._paused = false;
-    this._resetAll();
-  }
-
-  private _startPoll(): void {
-    this._stopPoll();
-    const interval = Math.round(1000 / this._framerate);
-    this._pollId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, interval, () => {
-      this._update();
-      return GLib.SOURCE_CONTINUE;
-    });
-  }
-
-  private _stopPoll(): void {
-    if (this._pollId !== null) {
-      GLib.source_remove(this._pollId);
-      this._pollId = null;
+    _signals: SignalManager;
+    _container: InstanceType<typeof St.BoxLayout>;
+    _enabled: boolean;
+    _maxScale: number;
+    _falloffDistance: number;
+    _timeline: Clutter.Timeline | null = null;
+    _lastMs = 0;
+    _currentScales: number[] = [];
+    _pivotX = 0.5;
+    _pivotY = 1.0;
+    _paused = false;
+    _onExtent: ((width: number, height: number, profile: Profile[]) => void) | null = null;
+    constructor(container: InstanceType<typeof St.BoxLayout>, enabled: boolean, maxScale: number, falloffDistance = 100, _framerate = 60) {
+        this._signals = new SignalManager();
+        this._container = container;
+        this._enabled = enabled;
+        this._maxScale = maxScale;
+        this._falloffDistance = falloffDistance;
     }
-  }
-
-  private _restartPoll(): void {
-    if (this._pollId !== null) {
-      this._startPoll();
+    setEnabled(enabled: boolean) {
+        this._enabled = enabled;
+        if (!enabled)
+            this._snapAllToMin();
     }
-  }
-
-  private _update(): void {
-    if (!this._enabled) return;
-    if (this._paused) return;
-    if (!this._container.visible) return;
-
-    const [px, py] = global.get_pointer();
-    const [dx, dy] = this._container.get_position();
-    const [, dh] = this._container.get_size();
-
-    const localX = px - dx;
-    const localY = py - dy;
-
-    if (localY < -40 || localY > dh + 20) {
-      this._resetAll();
-      return;
+    setMaxScale(scale: number) {
+        this._maxScale = scale;
     }
-
-    const children = this._container.get_children() as IconActor[];
-    if (children.length === 0) return;
-
-    // Ensure pivot-point and currentScales array are sized.
-    for (const child of children) {
-      if (
-        child.get_pivot_point()[0] !== this._pivotX ||
-        child.get_pivot_point()[1] !== this._pivotY
-      ) {
-        child.set_pivot_point(this._pivotX, this._pivotY);
-      }
+    setFalloffDistance(distance: number) {
+        this._falloffDistance = distance;
     }
-    while (this._currentScales.length < children.length) {
-      this._currentScales.push(MIN_SCALE);
+    setOnExtent(cb: (width: number, height: number, profile: Profile[]) => void) {
+        this._onExtent = cb;
     }
-
-    // Find closest icon to pointer.
-    let focalIdx = 0;
-    let bestDist = Infinity;
-    for (let i = 0; i < children.length; i++) {
-      const [cx] = children[i].get_position();
-      const [cw] = children[i].get_size();
-      const d = Math.abs(localX - (cx + cw / 2));
-      if (d < bestDist) {
-        bestDist = d;
-        focalIdx = i;
-      }
+    setFramerate(_fps: number) { /* animation now follows the compositor's frame clock */ }
+    setPivotPoint(x: number, y: number) {
+        this._pivotX = x;
+        this._pivotY = y;
     }
-
-    if (bestDist > this._falloffDistance * 1.5) {
-      this._resetAll();
-      return;
+    pause() {
+        if (this._paused)
+            return;
+        this._paused = true;
+        this._stopTimeline();
+        this._snapAllToMin();
     }
-
-    // Compute target scales and interpolate.
-    const [fx] = children[focalIdx].get_position();
-    const [fw] = children[focalIdx].get_size();
-    const focalCenter = fx + fw / 2;
-
-    for (let i = 0; i < children.length; i++) {
-      const [cx] = children[i].get_position();
-      const [cw] = children[i].get_size();
-      const dist = Math.abs(cx + cw / 2 - focalCenter);
-
-      const t = Math.max(0, 1 - dist / this._falloffDistance);
-      const smooth = t * t * (3 - 2 * t);
-      const target = MIN_SCALE + (this._maxScale - MIN_SCALE) * smooth;
-
-      // Lerp towards target.
-      const prev = this._currentScales[i] ?? MIN_SCALE;
-      const next = prev + (target - prev) * LERP_FACTOR;
-      this._currentScales[i] = next;
-
-      children[i].scale_x = next;
-      children[i].scale_y = next;
+    resume() {
+        if (!this._paused)
+            return;
+        this._paused = false;
+        this._currentScales = [];
     }
-  }
-
-  private _resetAll(): void {
-    if (this._paused) return;
-    const children = this._container.get_children() as IconActor[];
-    for (let i = 0; i < children.length; i++) {
-      const prev = this._currentScales[i] ?? MIN_SCALE;
-      if (Math.abs(prev - MIN_SCALE) < 0.001) continue;
-      const next = prev + (MIN_SCALE - prev) * LERP_FACTOR;
-      this._currentScales[i] = next;
-      children[i].scale_x = next;
-      children[i].scale_y = next;
+    start() {
+        // The animation loop only runs while the pointer is over the dock or icons are still settling.
+        for (const sig of ["enter-event", "motion-event", "leave-event"])
+            this._signals.connect(this._container, sig, () => {
+                this._kick();
+                return Clutter.EVENT_PROPAGATE;
+            });
     }
-  }
-
-  /**
-   * Immediately set every icon back to scale 1.0 (no interpolation) and
-   * forget the cached per-index scales.
-   */
-  private _snapAllToMin(): void {
-    const children = this._container.get_children() as IconActor[];
-    for (const child of children) {
-      child.scale_x = MIN_SCALE;
-      child.scale_y = MIN_SCALE;
+    stop() {
+        this._signals.disconnectAll();
+        this._stopTimeline();
+        this._paused = false;
+        this._snapAllToMin();
     }
-    this._currentScales = [];
-  }
+    _kick() {
+        if (!this._enabled || this._paused || this._timeline)
+            return;
+        // Frame-synced timeline (runs on the actor's frame clock, so no timer jitter).
+        const tl = new Clutter.Timeline({ actor: this._container, duration: 3600000 });
+        tl.set_repeat_count(-1);
+        this._lastMs = 0;
+        tl.connect("new-frame", (_t: Clutter.Timeline, ms: number) => {
+            const dt = this._lastMs ? Math.min(0.05, (ms - this._lastMs) / 1000) : 1 / 60;
+            this._lastMs = ms;
+            this._tick(dt);
+        });
+        this._timeline = tl;
+        tl.start();
+    }
+    _stopTimeline() {
+        if (this._timeline) {
+            this._timeline.stop();
+            this._timeline = null;
+        }
+    }
+    _tick(dt: number) {
+        if (!this._enabled || this._paused || !this._container.visible) {
+            this._stopTimeline();
+            return;
+        }
+        const children = (this._container.get_children() as InstanceType<typeof St.BoxLayout>[]);
+        if (children.length === 0) {
+            this._stopTimeline();
+            return;
+        }
+        const [px, py] = global.get_pointer();
+        const [dx, dy] = this._container.get_position();
+        const [, dh] = this._container.get_size();
+        const localX = px - dx;
+        const localY = py - dy;
+        let pointerNear = localY >= -40 && localY <= dh + 20;
+        const widths: number[] = [];
+        const centers: number[] = [];
+        let nearest = Infinity;
+        for (const child of children) {
+            // Pivot on the icon's own bottom edge so every baseline stays level.
+            let pivotY = this._pivotY;
+            if (pivotY === 1.0) {
+                const first = child.get_first_child?.() as InstanceType<typeof St.Widget> | null;
+                const h = child.get_height();
+                if (first && h > 0)
+                    pivotY = Math.min(1.0, first.get_height() / h);
+            }
+            const pp = child.get_pivot_point();
+            if (pp[0] !== this._pivotX || Math.abs(pp[1] - pivotY) > 0.001)
+                child.set_pivot_point(this._pivotX, pivotY);
+            const [cx] = child.get_position();
+            const [cw] = child.get_size();
+            widths.push(cw);
+            centers.push(cx + cw / 2);
+            nearest = Math.min(nearest, Math.abs(localX - (cx + cw / 2)));
+        }
+        if (nearest > this._falloffDistance * 1.5)
+            pointerNear = false;
+        while (this._currentScales.length < children.length)
+            this._currentScales.push(MIN_SCALE);
+        // Critically-damped style smoothing, independent of the frame rate.
+        const alpha = 1 - Math.exp(-STIFFNESS * dt);
+        let settled = true;
+        for (let i = 0; i < children.length; i++) {
+            let target = MIN_SCALE;
+            if (pointerNear) {
+                const t = Math.min(1, Math.abs(centers[i] - localX) / this._falloffDistance);
+                target = MIN_SCALE + (this._maxScale - MIN_SCALE) * 0.5 * (1 + Math.cos(Math.PI * t));
+            }
+            const prev = this._currentScales[i];
+            const next = prev + (target - prev) * alpha;
+            this._currentScales[i] = next;
+            if (Math.abs(next - MIN_SCALE) > 0.002 || Math.abs(next - target) > 0.002)
+                settled = false;
+        }
+        if (!pointerNear && settled) {
+            this._snapAllToMin();
+            this._stopTimeline();
+            return;
+        }
+        this._apply(children, widths);
+    }
+    // Apply scales and push neighbours apart so enlarged icons never overlap; row stays centred.
+    _apply(children: InstanceType<typeof St.BoxLayout>[], widths: number[]) {
+        let total = 0;
+        for (let i = 0; i < children.length; i++)
+            total += (this._currentScales[i] - MIN_SCALE) * widths[i];
+        let left = 0;
+        for (let i = 0; i < children.length; i++) {
+            const s = this._currentScales[i];
+            const extra = (s - MIN_SCALE) * widths[i];
+            children[i].scale_x = s;
+            children[i].scale_y = s;
+            children[i].translation_x = left + extra / 2 - total / 2;
+            left += extra;
+        }
+        // Tell the dock how much its background must grow (width: total extra, height: tallest icon's growth).
+        // Measure the real rendered top of every icon (scale, pivot and translation included),
+        // so the hump always sits just above the enlarged icons whatever their padding is.
+        const [, barTop] = this._container.get_transformed_position();
+        let peak = 0;
+        const profile: Profile[] = [];
+        for (let i = 0; i < children.length; i++) {
+            const [, top] = children[i].get_transformed_position();
+            const h = Math.max(0, barTop - top);
+            peak = Math.max(peak, h);
+            profile.push({
+                x: children[i].get_position()[0] + widths[i] / 2 + children[i].translation_x,
+                w: widths[i] * this._currentScales[i],
+                h,
+            });
+        }
+        this._onExtent?.(total, peak, profile);
+    }
+    _snapAllToMin() {
+        for (const child of (this._container.get_children() as InstanceType<typeof St.BoxLayout>[])) {
+            child.scale_x = MIN_SCALE;
+            child.scale_y = MIN_SCALE;
+            child.translation_x = 0;
+        }
+        this._currentScales = [];
+        this._onExtent?.(0, 0, []);
+    }
 }

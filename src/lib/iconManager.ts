@@ -188,7 +188,7 @@ export class IconManager {
     if (this._appButton && this._appButtonIcon) {
       this._appButtonIcon.set_icon_size(this._iconSize);
       const padded = this._iconSize + 12;
-      this._appButton.set_size(padded, padded + 4);
+      this._appButton.set_size(padded, padded - 4);
     }
   }
 
@@ -414,6 +414,10 @@ export class IconManager {
    * Trigger a macOS-style "bounce" animation on the icon for a given app,
    * used to draw the user's attention when an app is launched.
    */
+  getIconActor(app: Shell.App): IconActor | null {
+    return this._icons.get(app.get_id()) ?? null;
+  }
+
   bounceForApp(app: Shell.App): void {
     const appId = app.get_id();
     const actor = this._icons.get(appId);
@@ -533,6 +537,21 @@ export class IconManager {
         const app = appSystem.lookup_app(id);
         if (!app) continue;
         this._addIcon(app);
+        // New running app: pops in like macOS (grows from small, slight overshoot).
+        const fresh = this._icons.get(id);
+        if (fresh) {
+          fresh.set_pivot_point(0.5, 1.0);
+          fresh.set({ opacity: 0, scale_x: 0.2, scale_y: 0.2 });
+          const easeIn = (params: Record<string, unknown>) =>
+            (fresh as unknown as { ease(p: Record<string, unknown>): void }).ease(params);
+          easeIn({
+            opacity: 255,
+            scale_x: 1,
+            scale_y: 1,
+            duration: 320,
+            mode: Clutter.AnimationMode.EASE_OUT_BACK,
+          });
+        }
         changed = true;
       }
     }
@@ -735,7 +754,7 @@ export class IconManager {
       }
     }
     const padded = this._iconSize + 12;
-    actor.set_size(padded, padded + 4);
+    actor.set_size(padded, padded - 4);
   }
 
   private _positionMediaIndicator(indicator: InstanceType<typeof St.Widget>): void {
@@ -1464,7 +1483,7 @@ export class IconManager {
       x_align: Clutter.ActorAlign.CENTER,
       y_align: Clutter.ActorAlign.FILL,
       width: padded,
-      height: padded + 4,
+      height: padded - 4,
     });
     this._appButton = appButton;
 
