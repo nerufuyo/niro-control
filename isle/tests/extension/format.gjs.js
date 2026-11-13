@@ -5,7 +5,7 @@
 
 import GLib from 'gi://GLib';
 
-import {answerPlain, clockParts, hoursMinutes, setClockFormat, shortcutLabel, uses12Hour, weekendDays} from '../../gnome-extension/src/format.js';
+import {answerPlain, clockParts, hoursMinutes, setClockFormat, shortcutLabel, uses12Hour, weekendDays} from '../../build/extension/src/format.js';
 
 let failures = 0;
 // Prints a failure and counts it; JSON compares arrays by value.

@@ -7,8 +7,8 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {AppUsageReports} from '../../gnome-extension/src/appUsageReports.js';
-import {AppUsageSession} from '../../gnome-extension/src/appUsageSession.js';
+import {AppUsageReports} from '../../build/extension/src/appUsageReports.js';
+import {AppUsageSession} from '../../build/extension/src/appUsageSession.js';
 
 const BRAVE = {id: 'brave-browser.desktop', name: 'Brave Web Browser'};
 const CODE = {id: 'code.desktop', name: 'Visual Studio Code'};

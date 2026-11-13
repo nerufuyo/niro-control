@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {normalized, restyle} from '../../gnome-extension/src/panelStyle.js';
+import {normalized, restyle} from '../../build/extension/src/panelStyle.js';
 
 const isle = ['background-color: transparent'];
 const ownOf = (...texts) => text => texts.map(normalized).includes(text);

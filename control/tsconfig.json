@@ -1,0 +1,7 @@
+{
+  "compilerOptions": {
+    "target": "ES2023", "module": "ESNext", "moduleResolution": "Bundler", "lib": ["ES2023"],
+    "rootDir": "src", "outDir": "build", "verbatimModuleSyntax": true, "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -13,7 +13,7 @@ GLib.setenv('XDG_CONFIG_HOME', `${home}/.config`, true);
 // Downloads deeper than any folder there yet: it is made with its parents.
 GLib.mkdir_with_parents(`${home}/.config`, 0o755);
 GLib.file_set_contents(`${home}/.config/user-dirs.dirs`, 'XDG_DOWNLOAD_DIR="$HOME/Deep/Down/Downloads"\n');
-const {isShelfCopy, numbered, saveToDownloads} = await import('../../gnome-extension/src/downloads.js');
+const {isShelfCopy, numbered, saveToDownloads} = await import('../../build/extension/src/downloads.js');
 
 let failures = 0;
 function check(what, actual, expected) {

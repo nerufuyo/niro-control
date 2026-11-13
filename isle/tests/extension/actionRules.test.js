@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {ROOT_WRAPPER, RUN_WRAPPER, describeActions, failed, namesProject, outcomeOf, runnable, slotsFor, stoppable, terminalLine} from '../../gnome-extension/src/actionRules.js';
+import {ROOT_WRAPPER, RUN_WRAPPER, describeActions, failed, namesProject, outcomeOf, runnable, slotsFor, stoppable, terminalLine} from '../../build/extension/src/actionRules.js';
 
 test('an action says what it did, or why it could not', () => {
     assert.deepEqual(outcomeOf(undefined), {ok: true, detail: ''});

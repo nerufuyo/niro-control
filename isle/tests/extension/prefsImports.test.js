@@ -9,7 +9,7 @@ import {dirname, resolve} from 'node:path';
 import {test} from 'node:test';
 import {fileURLToPath} from 'node:url';
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../gnome-extension');
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../build/extension');
 const SHELL_ONLY = /^(resource:\/\/\/org\/gnome\/shell\/|gi:\/\/(St|Clutter|Meta|Mtk|Shell|Cogl)(\?|$))/;
 
 /** Every module `file` imports, with what each one imports, from the extension's own files. */

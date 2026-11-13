@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {callStreamOf, callWindowIndex, isCallApp, isEngineName, serviceOf, sinkCaptures, streamOwner, webCallShown} from '../../gnome-extension/src/callServices.js';
+import {callStreamOf, callWindowIndex, isCallApp, isEngineName, serviceOf, sinkCaptures, streamOwner, webCallShown} from '../../build/extension/src/callServices.js';
 
 const chrome = (title, focused = false) => ({title: `${title} - Google Chrome`, focused});
 

@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {NONE, focusSession, focusStep} from '../../gnome-extension/src/focusRules.js';
+import {NONE, focusSession, focusStep} from '../../build/extension/src/focusRules.js';
 
 const MINUTES_25 = 25 * 60000;
 const focus = state => ({phase: 'focus', running: false, started_at_ms: null, remaining_ms: MINUTES_25,

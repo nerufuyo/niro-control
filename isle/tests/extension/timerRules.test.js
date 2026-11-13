@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {typedMinutes} from '../../gnome-extension/src/timerRules.js';
+import {typedMinutes} from '../../build/extension/src/timerRules.js';
 
 test('a typed length is kept within its stepper', () => {
     assert.equal(typedMinutes('45', 1, 180), 45);

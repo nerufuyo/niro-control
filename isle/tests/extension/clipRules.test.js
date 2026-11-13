@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {thumbSize} from '../../gnome-extension/src/clipRules.js';
+import {thumbSize} from '../../build/extension/src/clipRules.js';
 
 test('a full thumbnail covers the card at 1× and 2×', () => {
     assert.equal(thumbSize(272, 216, 1), 'cover');

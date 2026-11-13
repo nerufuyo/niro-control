@@ -7,8 +7,10 @@ REV="${NIRO_REV:-1}"; VER="1.0.0~niro$REV"; P="$W/niro-control"
 mkdir -p "$OUT" "$P/DEBIAN"
 
 # --- Isle
+(cd "$ROOT" && { [ -d node_modules ] || npm ci >/dev/null; } && npx tsc -p isle/gnome-extension && npx tsc -p control && npx tsc -p digup/shell/ui-ts)
 EXT="$P/usr/share/gnome-shell/extensions/isle@zickrian.github.io"
-mkdir -p "$EXT"; cp -r "$ROOT"/isle/gnome-extension/. "$EXT"/; glib-compile-schemas "$EXT/schemas"
+mkdir -p "$EXT"; (cd "$ROOT/isle/gnome-extension" && find . -type f ! -name '*.ts' ! -name tsconfig.json ! -name gschemas.compiled -print0 | cpio -0pdm "$EXT" 2>/dev/null)
+cp -r "$ROOT"/isle/build/extension/. "$EXT"/; glib-compile-schemas "$EXT/schemas"
 
 # --- The dock
 (cd "$ROOT/dock" && { [ -d node_modules ] || npm ci >/dev/null; } && make build >/dev/null)
@@ -22,7 +24,11 @@ install -D -m 755 "$ROOT/digup/shell/src-tauri/target/release/digup-shell" "$P/u
 install -D -m 644 /dev/stdin "$P/etc/sysctl.d/60-digup-inotify.conf" <<< "fs.inotify.max_user_watches=1048576"
 
 # --- The control panel, the shared schema, the defaults
-install -D -m 755 "$ROOT/control/niro-control" "$P/usr/bin/niro-control"
+install -D -m 644 "$ROOT/control/build/niro-control.js" "$P/usr/share/niro-control/niro-control.js"
+install -D -m 755 /dev/stdin "$P/usr/bin/niro-control" <<'L'
+#!/bin/sh
+exec gjs -m /usr/share/niro-control/niro-control.js "$@"
+L
 install -D -m 644 "$ROOT/control/org.niro.Control.desktop" "$P/usr/share/applications/org.niro.Control.desktop"
 install -D -m 644 "$ROOT/control/org.niro.control.gschema.xml" "$P/usr/share/glib-2.0/schemas/org.niro.control.gschema.xml"
 install -D -m 644 /dev/stdin "$P/etc/dconf/db/local.d/00-niro" <<'D'
@@ -32,7 +38,7 @@ favorite-apps=['org.gnome.Nautilus.desktop', 'google-chrome.desktop', 'yelp.desk
 D
 install -D -m 644 /dev/stdin "$P/etc/dconf/profile/user" <<< $'user-db:user\nsystem-db:local'
 
-printf 'Package: niro-control\nVersion: %s\nSection: gnome\nPriority: optional\nArchitecture: amd64\nMaintainer: nerufuyo <local@localhost>\nDepends: gnome-shell (>= 46), dig-up, util-linux, dconf-cli, python3-gi, gir1.2-gtk-4.0, gir1.2-adw-1\nReplaces: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults\nConflicts: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults\nDescription: Niro Control: the look of the desktop in one place\n Isle (the island on the top bar), the macOS-style dock, DigUp'"'"'s panel with the Isle look, and one control panel\n (org.niro.control: tone, opacity, blur) that sets them all. Local build.\n' "$VER" > "$P/DEBIAN/control"
+printf 'Package: niro-control\nVersion: %s\nSection: gnome\nPriority: optional\nArchitecture: amd64\nMaintainer: nerufuyo <local@localhost>\nDepends: gnome-shell (>= 46), dig-up, util-linux, dconf-cli, gjs, gir1.2-gtk-4.0, gir1.2-adw-1\nReplaces: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults\nConflicts: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults\nDescription: Niro Control: the look of the desktop in one place\n Isle (the island on the top bar), the macOS-style dock, DigUp'"'"'s panel with the Isle look, and one control panel\n (org.niro.control: tone, opacity, blur) that sets them all. Local build.\n' "$VER" > "$P/DEBIAN/control"
 cat > "$P/DEBIAN/preinst" <<'S'
 #!/bin/sh
 set -e

@@ -9,7 +9,7 @@ import {dirname, resolve} from 'node:path';
 import {test} from 'node:test';
 import {fileURLToPath} from 'node:url';
 
-import * as Theme from '../../gnome-extension/src/theme.js';
+import * as Theme from '../../build/extension/src/theme.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../gnome-extension');
 

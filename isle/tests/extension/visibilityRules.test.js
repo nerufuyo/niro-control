@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {autoHide, revealBand} from '../../gnome-extension/src/visibilityRules.js';
+import {autoHide, revealBand} from '../../build/extension/src/visibilityRules.js';
 
 const closed = {mode: 'always', presentation: 'compact', visible: true, hovered: false, fullscreen: false,
     barHidden: false, windowAtTop: false};

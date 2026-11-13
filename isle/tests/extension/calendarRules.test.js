@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {REMINDER_LATE_MS, occurrenceKey, parseReminderId, spanOf, standsInFor} from '../../gnome-extension/src/calendarRules.js';
+import {REMINDER_LATE_MS, occurrenceKey, parseReminderId, spanOf, standsInFor} from '../../build/extension/src/calendarRules.js';
 
 const MINUTE = 60 * 1000;
 const NOW = new Date(2026, 9, 28, 8, 45).getTime();
