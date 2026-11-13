@@ -6,6 +6,8 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 
+import {setBlurRadius} from './blurPipeline.js';
+
 const EXTENSION_DIRS = [GLib.get_user_data_dir(), '/usr/local/share', '/usr/share'].map(base => `${base}/gnome-shell/extensions`);
 
 /** Settings of another extension, read from the schemas folder it ships; null when it isn't there. */
@@ -34,6 +36,7 @@ export class NiroSync {
         this._shared = new Gio.Settings({schema_id: 'org.niro.control'});
         this._dock = extensionSettings('dock@niro.local', 'org.gnome.shell.extensions.dock');
         this._apps = extensionSettings('blur@niro.local', 'org.gnome.shell.extensions.blur-my-shell.applications');
+        this._blur = extensionSettings('blur@niro.local', 'org.gnome.shell.extensions.blur-my-shell');
         this._id = this._shared.connect('changed', () => this._apply());
         try {
             this._applyAccent(this._shared.get_string('accent'));
@@ -79,10 +82,16 @@ export class NiroSync {
             this._dock.set_string('custom-css',
                 `.dock-indicator-dot { background-color: ${accent}; } .dock-indicator-bar { background-color: ${accent}; }`);
         }
+        if (this._blur) {
+            try {
+                setBlurRadius(this._blur, strength);
+            } catch (e) {
+                console.error(`Island: blur strength not applied: ${e.message}`);
+            }
+        }
         if (this._apps) {
             this._apps.set_int('opacity', Math.round(opacity * 2.55));
             this._apps.set_boolean('blur', blur);
-            this._apps.set_int('sigma', strength);
         }
     }
 
