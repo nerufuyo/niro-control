@@ -4,28 +4,28 @@
     <key name="opacity" type="i">
       <range min="0" max="100"/>
       <default>80</default>
-      <summary>How opaque the surfaces are</summary>
-      <description>One setting for Island's glass, the dock, app windows (blur my shell) and the search panel: 0 is clear, 100 is solid.</description>
+      <summary>Opacity</summary>
+      <description>How see-through the surfaces are, from 0 (clear) to 100 (solid): the island&apos;s glass, the dock, application windows and the search panel.</description>
     </key>
     <key name="blur" type="b">
       <default>true</default>
-      <summary>Blur behind surfaces</summary>
-      <description>Frosted glass behind the dock and app windows.</description>
+      <summary>Blur</summary>
+      <description>Frosted glass behind the dock and application windows.</description>
     </key>
     <key name="blur-strength" type="i">
       <range min="0" max="100"/>
       <default>30</default>
-      <summary>How strong the blur is</summary>
-    </key>
+      <summary>Blur strength</summary>
+      <description>How strong the blur is: the blur radius of the windows&apos; default blur pipeline.</description></key>
     <key name="accent" type="s">
       <default>'#E8472B'</default>
       <summary>Accent colour</summary>
-      <description>The one accent of the desktop: Island's highlights, the dock's running dots, the search panel's selection.</description>
+      <description>The one accent of the desktop: the island&apos;s highlights, the dock&apos;s running dots and the search panel&apos;s selection.</description>
     </key>
     <key name="tint" type="s">
       <default>'#1C1C1E'</default>
       <summary>Surface tint</summary>
-      <description>The colour of the dark surfaces (the dock, the search panel).</description>
+      <description>The colour of the dark surfaces: the dock and the search panel.</description>
     </key>
     <key name="search-shortcut" type="as">
       <default>['&lt;Super&gt;space']</default>

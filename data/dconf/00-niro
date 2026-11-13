@@ -1,3 +1,7 @@
 [org/gnome/shell]
 enabled-extensions=['island@niro.local', 'dock@niro.local', 'search@niro.local', 'blur@niro.local', 'corners@niro.local', 'emoji@niro.local', 'emulator@niro.local', 'user-theme@gnome-shell-extensions.gcampax.github.com', 'tiling-assistant@ubuntu.com', 'ubuntu-appindicators@ubuntu.com']
 favorite-apps=['org.gnome.Nautilus.desktop', 'google-chrome.desktop', 'yelp.desktop', 'orca.desktop', 'android-emulator.desktop', 'bytedance-lark.desktop', 'steam.desktop']
+
+# Super+Space belongs to the search: the input-source switch keeps its media key only
+[org/gnome/desktop/wm/keybindings]
+switch-input-source=['XF86Keyboard']

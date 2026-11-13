@@ -8,9 +8,8 @@
   the dock (`dock-opacity`, `dock-blur-enabled`, `dock-background-color`, indicator colours) and Blur my Shell. It also
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
-- **The control panel** (`control/src/niro-control.ts`) has a Look page of its own and builds the Island and Dock
-  pages from those extensions' schemas: a new setting in a schema shows up without touching the panel (hide internal
-  keys in `INTERNAL_KEYS`).
+- **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
+  writes from the schemas (`make catalog`; 132 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -47,3 +46,27 @@ panel load after logging out and in. The island's update check against the origi
 
 `island-whisper` needs cmake, a C++ compiler, libclang and, for the GPU, `libvulkan-dev` and `glslc`;
 `island-shelf` needs `libgtk-4-dev`. The first build compiles whisper.cpp and takes several minutes.
+
+## The control panel
+
+```
+control/src/catalog.ts     generated: every setting (key, type, range, default, title, help, group, control kind)
+control/src/types.ts       what an item is
+control/src/logic.ts       pure: search, dependencies, shortcut conflicts (tested with node)
+control/src/store.ts       bindings: one per key, per dictionary field (rounded corners) or per shadow; reset, isDefault, subscribe
+control/src/components.ts  SettingsRow, SettingsSwitch/Slider/Stepper/Select/Text, ColorPicker, ShortcutRecorder, ResetControl,
+                           SettingsSection, AdvancedDisclosure, SettingsSearch, PreviewPanel
+control/src/previews.ts    the drawings (Look, Dock, Windows)
+control/src/pages.ts       the Model (bindings, dependencies, conflicts) and the pages
+control/src/window.ts      the window: sidebar, search, stack, banner, keyboard shortcuts
+```
+
+- **One owner per setting.** Look writes opacity, blur, blur strength, tint and accent; the island, dock and windows copy them
+  (`niroSync.ts`). Their copies are shown as "Change in Look", never as a second control.
+- **Adding a setting:** add the key to its schema, then `make catalog`. Give it a group in `island_group` / `dock_group` in the
+  script if the default grouping is wrong. `make test` fails if the catalog and the CSV drift or a setting has no binding.
+- **Dependencies** (a control greyed out while another is off) are the `DEPENDS` table in the script.
+- **Looking at it:** `NIRO_PAGE=dock`, `NIRO_SEARCH=blur` and `NIRO_SCHEME=light` open the panel on a page, a search or the other
+  appearance (`gjs -m control/build/niro-control.js`).
+- **Tests:** `tests/island/controlLogic.test.js` (catalog, search, conflicts), `tests/gjs/controlUi.test.js` (every setting binds,
+  writes, reads back and resets against real schemas; with a display, every setting has a row and no raw HTML entity is shown).

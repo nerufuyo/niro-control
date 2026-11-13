@@ -1,5 +1,5 @@
 # Niro Control: `make` builds and tests everything; `make deb` makes the package; `make install` installs it.
-.PHONY: all build test lint deb install clean
+.PHONY: all build test lint deb install clean catalog
 
 all: test
 
@@ -13,6 +13,9 @@ test:
 
 lint:
 	npm run --silent lint
+
+catalog:
+	python3 scripts/control-panel-items.py
 
 deb:
 	./packaging/build.sh

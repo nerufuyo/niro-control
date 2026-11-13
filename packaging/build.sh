@@ -55,7 +55,8 @@ install -D -m 644 data/fonts/Inter-LICENSE.txt "$P/usr/share/fonts/truetype/isla
 install -D -m 644 README.md "$P/usr/share/doc/niro-control/README.md"
 
 # --- The control panel, the shared schema, the defaults
-install -D -m 644 control/build/niro-control.js "$P/usr/share/niro-control/niro-control.js"
+for f in control/build/*.js; do install -D -m 644 "$f" "$P/usr/share/niro-control/$(basename "$f")"; done
+echo "$VER" | install -D -m 644 /dev/stdin "$P/usr/share/niro-control/VERSION"
 install -D -m 755 control/niro-control "$P/usr/bin/niro-control"
 install -D -m 644 control/org.niro.Control.desktop "$P/usr/share/applications/org.niro.Control.desktop"
 install -D -m 644 control/org.niro.control.gschema.xml "$P/usr/share/glib-2.0/schemas/org.niro.control.gschema.xml"

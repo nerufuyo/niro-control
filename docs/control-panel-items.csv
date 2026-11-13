@@ -1,133 +1,133 @@
-menu,group,item,control,choices_or_range,default,help,key
-Windows,Window blur,Blur windows,switch,,on,Frosted glass behind application windows,blur
-Windows,Window blur,Blur every app by default,switch,,on,"Off: only the apps in ""Only blur these""",enable-all
-Windows,Window blur,Only blur these apps,list,app names,[],"Used when ""every app"" is off",whitelist
-Windows,Window blur,Never blur these apps,list,app names,"Plank, Conky, vlc, mpv, OBS…",Video players and the like,blacklist
-Windows,Window blur,Window opacity over the blur,number,0–255,225,Also set by Look > Opacity,opacity
-Windows,Window blur,Keep the focused window opaque,switch,,off,,dynamic-opacity
-Windows,Window blur,Unblur full-screen apps,switch,,on,,unblur-when-fullscreen
-Windows,Window blur,Blur application menus (popovers),switch,,off,,blur-menus
-Windows,Window blur,Blur apps in the overview,switch,,off,,blur-on-overview
-Windows,Window blur,Blur strength,number,0–100,30,Set in Look > Blur strength,pipelines (blur radius)
-Windows,Rounded corners,Round window corners,switch,,on,,global-rounded-corner-settings.enabled
-Windows,Rounded corners,Corner radius,number,px,12,,global-rounded-corner-settings.borderRadius
-Windows,Rounded corners,Keep corners on maximized windows,switch,,on,,global-rounded-corner-settings.keepRoundedCorners.maximized
-Windows,Rounded corners,Keep corners on full-screen windows,switch,,on,,global-rounded-corner-settings.keepRoundedCorners.fullscreen
-Windows,Rounded corners,Skip GTK 4 (libadwaita) apps,switch,,on,They round their own corners,skip-libadwaita-app
-Windows,Rounded corners,Skip libhandy apps,switch,,off,,skip-libhandy-app
-Windows,Rounded corners,Border width,number,-40–40 px,0,,border-width
-Windows,Rounded corners,Never round these apps,list,app names,[],,blacklist
-Windows,Rounded corners,Window shadow (focused / unfocused),group,"offset, blur, spread, opacity",,Two sets of four numbers,focused-shadow / unfocused-shadow
-Look,Glass,How opaque the surfaces are,number,0–100,80,"One setting for Island's glass, the dock, app windows (blur my shell) and the search panel: 0 is clear, 100 is solid.",opacity
-Look,Glass,Blur behind surfaces,switch,,true,Frosted glass behind the dock and app windows.,blur
-Look,Glass,How strong the blur is,number,0–100,30,,blur-strength
-Look,Tone,Accent colour,text,,'#E8472B',"The one accent of the desktop: Island's highlights, the dock's running dots, the search panel's selection.",accent
-Look,Tone,Surface tint,text,,'#1C1C1E',"The colour of the dark surfaces (the dock, the search panel).",tint
-Look,Search,Search shortcut,list,,['<Super>space'],Opens the application search.,search-shortcut
-Island,Island look and behaviour,Top bar style,choice,glass / black,'glass',"“glass”: see-through, with no colour of its own, with the island as a black notch hanging from the top of the screen. “black”: the island blends into a black bar. (A “theme” setting from before 0.7.3 reads as glass.)",top-bar-style
-Island,Island look and behaviour,The island's look,choice,black / glass,'black',"black: Island's own black island. glass: clear glass over what is behind it, blurred, its edge catching the light.",island-theme
-Island,Island look and behaviour,How large the open island is,choice,standard / large,'standard',"""standard"": 600 px wide, its pages 150 px tall. ""large"": 720 px wide and every page 210 px tall, each laid out for the room (a larger cover, timer ring and month, more rows and cards); the type keeps its size.",open-size
-Island,Island look and behaviour,The day beside the closed island's clock,switch,,false,"""Fri 6"" before the time while the island shows the clock alone.",clock-date
-Island,Island look and behaviour,The island's clock,choice,system / 24h / 12h,'system',"system: as GNOME's own clock is set. 24h: 20:40. 12h: 8:40 PM, with AM or PM. Every time Island shows follows it.",clock-format
-Island,Island look and behaviour,Glass tint,number,0–100,0,"With the Glass look: how dark the glass is, from 0 (clear, what is behind shows through) to 100 (dark frosted glass). Still blurred either way.",glass-tint
-Island,Island look and behaviour,Top bar opacity,number,0–100,0,"How black the top bar beside the island is, in %: 0 is glass, 100 is black and the island blends into it. Unset, top-bar-style decides.",top-bar-opacity
-Island,Island look and behaviour,Black top bar beside windows,switch,,false,"With a see-through or grey top bar: while an app's window reaches the bar (maximized, tiled to the top or moved up there), the bar turns black, so the wallpaper doesn't show above it. The island stays where it is.",top-bar-black-with-windows
-Island,Island look and behaviour,Compact top bar,switch,,true,"Smaller text and spacing in the top bar; with the island below the bar, a slimmer bar too.",compact-top-bar
-Island,Island look and behaviour,The island's shape,choice,notch / pill,'notch',"""notch"": joined to the top of the screen, its shoulders flaring into it. ""pill"": floating free, round all over, a little below the top: centred in the top bar with the closed island inside it, else just below the bar, or 8 px from the top of a display without one.",island-shape
-Island,Island look and behaviour,Closed island inside the top bar,switch,,true,"Like a notch: the top bar is as tall as the closed island (plus the space below it), so it never covers windows. Alerts and the open island still hang below it for a moment.",island-in-top-bar
-Island,Music,Look up lyrics online,switch,,true,"From LRCLIB, by the song's title, artist and length.",lyrics-online
-Island,Island look and behaviour,How the island opens,choice,hover / click,'hover',"""hover"": when the pointer rests on it. ""click"": only when clicked.",open-on
-Island,Island look and behaviour,"How long the pointer rests before the island opens, in milliseconds",number,60–1000,120,,hover-delay
-Island,Island look and behaviour,Auto-hide the closed island,choice,off / always / top-bar / windows,'off',"off: always shown. always: hides once the pointer has been off it a while. top-bar: hides and comes back with a top bar another extension hides. windows: hides while an app's window reaches the top (maximized, tiled or moved up there). Hidden, alerts, the open island and the assistant still show; pointing at its place in the top bar brings it back.",auto-hide
-Island,Island look and behaviour,"How long the closed island waits before hiding, in seconds",number,1–60,3,,auto-hide-delay
-Island,Alerts,Alerts over full-screen apps,switch,,false,"When on, alerts (notifications, calls, timers…) show over a full-screen app (a video, a game), the island hidden again between them. Off, they wait until the app leaves full screen, as GNOME's own.",alerts-over-fullscreen
-Island,Island look and behaviour,Display the island is on,choice,primary / active / all,'primary',"""primary"": the main display, in its top bar. ""active"": the display of the window in use; on a display without a top bar it hangs from the top edge. ""all"": every display, the island itself on the one in use; the others show the closed island and its alerts, and pointing at one brings the island there.",island-monitor
-Island,Island look and behaviour,Island height,number,24–40,30,"How far the closed island hangs below the top bar, in pixels, when it is not inside the top bar.",notch-depth
-Island,Island look and behaviour,Space below the island,switch,,true,"With the closed island inside the top bar: the top bar is a little taller than the island, so the island stops just short of the windows below. Off, they are the same height. It shows on a see-through or grey bar.",notch-gap
-Island,Alerts,Show volume and brightness in the island,switch,,true,,replace-osd
-Island,Alerts,"Show battery, network, Bluetooth and Caps Lock alerts",switch,,true,"Before 0.7, one switch for all four; now each has its own (alert-power, alert-network, alert-bluetooth, alert-caps-lock), and this one is only read once to carry an ""off"" over.",system-alerts
-Island,Alerts,Show charging and battery alerts,switch,,true,,alert-power
-Island,Alerts,Show network alerts,switch,,true,,alert-network
-Island,Alerts,Show Bluetooth alerts,switch,,true,,alert-bluetooth
-Island,Alerts,Alert when a Bluetooth device's battery is low,switch,,false,"At 20, 10 and 5 percent, once per level on the way down, for each connected device that reports its battery; again once it has charged more than 5 points above that level. Like the laptop's low battery, it shows during Do Not Disturb. Off until you turn it on.",alert-bluetooth-battery
-Island,Alerts,Show Caps Lock alerts,switch,,true,,alert-caps-lock
-Island,Alerts,Alert before calendar events,switch,,true,"An alert before each event with a time, with a Join button when it has a meeting link.",event-alerts
-Island,Alerts,Minutes before an event its alert shows,number,1–60,5,,event-alert-minutes
-Island,Alerts,World clocks on the Calendar page,switch,,true,A globe on the Calendar page shows the time in the cities of GNOME’s World Clocks.,world-clocks
-Island,Pages and features,Pages left out of the island,list,,[],"Names of the open island’s pages that have no tab: music, notifications, focus, reminders, shelf, calendar. The Apps and Usage pages have their own switches (app-usage, usage-enabled).",hidden-pages
-Island,Pages and features,"The Apps page, timing the application in front",switch,,false,"Shows the Apps page and times the application in front, whether or not there is keyboard or pointer input, keeping 30 days on this computer. Time pauses after five idle minutes, unless a video or another program holds the session awake. Off until you turn it on; off, nothing is timed and the page has no tab.",app-usage
-Island,Pages and features,The Devices page,switch,,false,Shows the Devices page: each connected Bluetooth device with its battery. Its tab shows only while a device is connected. Off until you turn it on.,devices-page
-Island,AI agents,Answer Claude Code from the island,switch,,true,"When on, Island adds a hook to Claude Code's settings so it hears when Claude needs you or is done; off removes it.",agent-alerts-claude
-Island,AI agents,Answer Codex from the island,switch,,true,"When on, Island adds hooks to Codex's hooks.json so it hears when Codex needs you or is done; off removes them.",agent-alerts-codex
-Island,Alerts,Leave notifications to GNOME's own banners,switch,,false,The island then shows no notification alerts; its Notifications page still lists them.,gnome-banners
-Island,Shortcuts,What Super+V (GNOME's calendar shortcut) opens,choice,island / calendar / none / gnome,'calendar',"""island"": the island's clipboard history. ""calendar"": the island's Calendar page. ""none"": nothing. ""gnome"" is from before and reads as ""calendar"". With that page left out of the island, it opens the other one. It is GNOME's own shortcut (Super+V and Super+M), so Island adds none.",super-v
-Island,Music,Briefly show the new song when the track changes,switch,,false,,track-peek
-Island,Alerts,"Show when the camera, microphone or screen sharing is in use",switch,,true,,privacy-indicators
-Island,Alerts,Show calls in the island,switch,,true,"While an app uses the microphone for a call (WhatsApp, Telegram, Meet in a browser…), the island shows it, with mute and a way back to the call.",call-activity
-Island,Alerts,Live preview of the call,switch,,true,"The open island shows the call's window as it is on screen, so you see yourself and whoever you call. The shell draws it from the window; nothing is recorded, and it is hidden while you share your screen.",call-preview
-Island,Focus,Turn on Do Not Disturb during focus sessions,switch,,true,,focus-dnd
-Island,Clipboard,Keep a history of what you copy,switch,,true,"Text, links, images and files, stored only on this computer.",clipboard-history
-Island,Voice assistant,Voice assistant,switch,,true,"Listen for requests on the shortcut and the mic button, and answer them with the AI chosen: Claude Code, Codex, Grok, opencode or Antigravity (agy).",voice-assistant
-Island,Shortcuts,Shortcut to the Music page,list,,['<Super><Alt>m'],"Opens the island on the Music page from anywhere, holding the keyboard; pressed again, it closes. None at first.",shortcut-music
-Island,Shortcuts,Shortcut to the Notifications page,list,,['<Super><Alt>n'],"Opens the island on the Notifications page from anywhere, holding the keyboard; pressed again, it closes. None at first.",shortcut-notifications
-Island,Shortcuts,Shortcut to the Timer page,list,,['<Super><Alt>t'],"Opens the island on the Timer page from anywhere, holding the keyboard; pressed again, it closes. None at first.",shortcut-focus
-Island,Shortcuts,Shortcut to the Reminders page,list,,['<Super><Alt>e'],"Opens the island on the Reminders page from anywhere, holding the keyboard; pressed again, it closes. None at first.",shortcut-reminders
-Island,Shortcuts,Shortcut to the Shelf page,list,,['<Super><Alt>h'],"Opens the island on the Shelf page from anywhere, holding the keyboard; pressed again, it closes. None at first.",shortcut-shelf
-Island,Shortcuts,Shortcut to the Calendar page,list,,['<Super><Alt>c'],"Opens the island on the Calendar page from anywhere, holding the keyboard; pressed again, it closes. None at first.",shortcut-calendar
-Island,Shortcuts,Shortcut to the Apps page,list,,['<Super><Alt>a'],"Opens the island on the Apps page from anywhere, holding the keyboard; pressed again, it closes. None at first.",shortcut-apps
-Island,Shortcuts,Shortcut to the Devices page,list,,['<Super><Alt>d'],"Opens the island on the Devices page from anywhere, holding the keyboard; pressed again, it closes. None at first.",shortcut-devices
-Island,Shortcuts,Shortcut to the Power page,list,,['<Super><Alt>p'],"Opens the island on the Power page (lock, sleep, log out, restart, shut down) from anywhere, holding the keyboard; pressed again, it closes.",shortcut-power
-Island,Shortcuts,Shortcut to the System page,list,,['<Super><Alt>i'],"Opens the island on the System page (CPU, memory, temperature, network) from anywhere, holding the keyboard; pressed again, it closes.",shortcut-system
-Island,Shortcuts,Shortcut to the AI Usage page,list,,['<Super><Alt>u'],"Opens the island on the AI Usage page from anywhere, holding the keyboard; pressed again, it closes. None at first.",shortcut-usage
-Island,Shortcuts,Voice assistant shortcut,list,,['<Super>i'],"Opens the voice assistant and listens. Pressed while listening, it finishes; after an answer, it listens again.",voice-shortcut
-Island,Voice assistant,AI the voice assistant asks,text,,'auto',"“agy” (Antigravity), “claude” (Claude Code), “codex” (Codex), “grok” (Grok) or “opencode” (opencode), each with its own sign-in; “auto” for the first installed and signed in.",voice-provider
-Island,Voice assistant,Model Claude Code answers with,text,,'sonnet',"haiku, sonnet or opus; empty for Claude Code's default.",voice-claude-model
-Island,Voice assistant,Model Codex answers with,text,,'',A model id from Codex; empty for the one Codex itself uses.,voice-codex-model
-Island,Voice assistant,Model Grok answers with,text,,'',A model id from Grok; empty for the one Grok itself uses.,voice-grok-model
-Island,Voice assistant,Model opencode answers with,text,,'',A model as “opencode models” lists it (provider/model); empty for the one opencode itself uses.,voice-opencode-model
-Island,Voice assistant,Model the voice assistant asks,text,,'gemini-3.8-flash-low',A model id from “agy models”; empty for agy's default.,voice-agy-model
-Island,Voice assistant,Speech recognition model,text,,'small',"A whisper.cpp model: tiny, base, small or medium. Bigger is more accurate and slower; island-setup-voice downloads it.",voice-speech-model
-Island,Voice assistant,Spoken language,text,,'',"A language code such as “id” or “en”, several (“id,en”) to tell them apart, or empty to detect any.",voice-language
-Island,Voice assistant,The assistant's shape,choice,circle / pebble / squircle / capsule / cloud / hexagon / drop / ghost,'circle',,bot-shape
-Island,Voice assistant,The assistant's colour,text,,'cloud',"One of Island's colours (cloud, ink, peach, coral, amber, mint, teal, sky, lavender, rose, graphite) or a colour as #rrggbb.",bot-color
-Island,Voice assistant,The colours the island glows with while the assistant is open,text,,'match',"""match"" follows the assistant's colour, ""classic"" is violet, blue and cyan, or a colour as #rrggbb to glow around.",bot-glow
-Island,Voice assistant,How long the assistant keeps a conversation,choice,idle-30m / idle-2h / day,'day',"Until midnight (never more than a day), or after 30 minutes or 2 hours without a word: then it starts a new one and deletes the old, here and in the AI's own history.",voice-keep-chat
-Island,Voice assistant,Send the selected text to the voice assistant,switch,,false,"So it can work on it (""make this shorter""). Never from terminals or apps kept out of the clipboard history.",voice-use-selection
-Island,Voice assistant,Let the voice assistant read notifications,switch,,false,"Send the last few notifications with each request, so the AI (Claude Code, Codex, Grok, opencode or Antigravity) can read them out or summarise them.",voice-read-notifications
-Island,AI usage,Show AI plan usage,switch,,true,"A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT (as Codex last saw it) and Grok, when found.",usage-enabled
-Island,AI usage,Show Claude's usage,switch,,true,,usage-claude
-Island,AI usage,Show ChatGPT's usage,switch,,true,,usage-codex
-Island,AI usage,Show Grok's usage,switch,,true,,usage-grok
-Island,AI usage,Warn at this share of a limit (%),number,50–99,80,,usage-warn
-Island,AI usage,Warn again at this share of a limit (%),number,50–100,95,,usage-critical
-Island,Alerts,"Play a sound when a focus session or break ends, and for reminders",switch,,true,,chimes
-Dock,Appearance,Icon size,number,16–96,48,Size of dock icons in pixels (16-96),icon-size
-Dock,Apps and indicators,Auto-hide,switch,,true,Whether to auto-hide the dock when the pointer moves away,auto-hide
-Dock,Motion,Enable magnification,switch,,true,Whether icons grow when the pointer hovers near the dock,magnification-enabled
-Dock,Motion,Magnification max scale,number,,1.4,Maximum scale applied to the icon directly under the cursor (1.0 = no magnification),magnification-scale
-Dock,Motion,Magnification falloff distance,number,,100,How far (in pixels) the magnification wave reaches from the cursor,magnification-falloff
-Dock,Apps and indicators,Show running indicators,switch,,true,Show a small dot under icons of running apps,running-indicators
-Dock,Apps and indicators,Running indicator style,choice,dots (one per window) / bar,0,"0 = dots per window (macOS style), 1 = horizontal bar",running-indicator-style
-Dock,Motion,Bounce on launch,switch,,true,Play a bounce animation on the dock icon when a new app is launched,bounce-on-launch
-Dock,Motion,Animation duration,number,,200,"Duration of the show/hide animation in milliseconds (0 = instant, max 1000)",animation-duration
-Dock,Motion,Magnification framerate,number,,60,"Target framerate for magnification animation in Hz (30, 60, or 120)",magnification-framerate
-Dock,Motion,Icon quality multiplier,number,,2,"Render icons at a minimum of N times native resolution; HiDPI and magnification may increase it automatically (1, 2, or 4)",icon-quality
-Dock,Motion,Show threshold,number,,25,Distance in pixels from screen edge to trigger dock show,show-threshold
-Dock,Appearance,Dock opacity,number,0–100,60,Dock background opacity percentage (0-100),dock-opacity
-Dock,Appearance,Dock background color,text,,'#1e1e1e',Hex color for dock background (e.g. #1e1e1e),dock-background-color
-Dock,Appearance,Dock border radius,number,,16,Corner radius of the dock in pixels,dock-border-radius
-Dock,Appearance,Enable dock blur,switch,,false,Apply blur effect behind the dock for a frosted glass look,dock-blur-enabled
-Dock,Appearance,Dock position,choice,bottom / left / right / top,0,"Position of the dock on screen (0=bottom, 1=left, 2=right, 3=top)",dock-position
-Dock,Shortcuts,Enable keyboard navigation,switch,,false,Allow keyboard shortcuts to control the dock,enable-keyboard-nav
-Dock,Shortcuts,Toggle dock visibility,list,,['<Super>d'],Keyboard shortcut to toggle dock visibility,toggle-dock
-Dock,Shortcuts,Focus app 1 to 10 shortcuts,list,,['<Super>1'],Super+1 … Super+0 by default: focus the Nth app in the dock,focus-app-1
-Dock,Apps and indicators,Show applications button,switch,,true,Show a button to access all installed applications,show-applications-button
-Dock,Apps and indicators,Applications button position,choice,start / end,0,"Position of the applications button (0=start, 1=end)",show-applications-button-position
-Dock,Appearance,Custom dock CSS,text,,'',Custom CSS stylesheet applied to the dock,custom-css
-Dock,Windows and media,Window previews,switch,,true,Show live thumbnail previews of app windows on hover,window-previews
-Dock,Windows and media,Preview thumbnail width,number,100–400,200,Width of each preview thumbnail in pixels (100-400),preview-scale
-Dock,Apps and indicators,Show running applications,switch,,true,Show non-favorite running applications in the dock,show-running-apps
-Dock,Appearance,Dock workspace mode,choice,all workspaces / current workspace only,0,"Which workspaces show running apps (0=all, 1=current only)",dock-workspace-mode
-Dock,Windows and media,Enable media controls,switch,,false,Show play/pause controls in the dock context menu when media is playing,media-controls
-Dock,Windows and media,Media indicator,switch,,true,Show a music note indicator on the icon of the currently playing media app,media-indicator
-Dock,Apps and indicators,Drag to reorder,switch,,true,Allow dragging pinned icons to reorder them,drag-reorder
+menu,group,item,control,choices_or_range,default,help,key,id
+Look,Glass,Opacity,slider,0–100,80,"How see-through the surfaces are, from 0 (clear) to 100 (solid): the island's glass, the dock, application windows and the search panel.",opacity,niro.opacity
+Look,Glass,Blur,switch,,true,Frosted glass behind the dock and application windows.,blur,niro.blur
+Look,Glass,Blur strength,slider,0–100,30,How strong the blur is: the blur radius of the windows' default blur pipeline.,blur-strength,niro.blur-strength
+Look,Tone,Accent colour,color,,#E8472B,"The one accent of the desktop: the island's highlights, the dock's running dots and the search panel's selection.",accent,niro.accent
+Look,Tone,Surface tint,color,,#1C1C1E,The colour of the dark surfaces: the dock and the search panel.,tint,niro.tint
+Search,Application Search,Search shortcut,shortcut,,['<Super>space'],Opens the application search.,search-shortcut,niro.search-shortcut
+Island,Appearance and Behavior,Top bar style,select,Glass / Black,glass,"“glass”: see-through, with no colour of its own, with the island as a black notch hanging from the top of the screen.",top-bar-style,island.top-bar-style
+Island,Appearance and Behavior,The island's look,select,Black / Glass,black,black: Island's own black island.,island-theme,island.island-theme
+Island,Appearance and Behavior,How large the open island is,select,Standard / Large,standard,"""standard"": 600 px wide, its pages 150 px tall.",open-size,island.open-size
+Island,Appearance and Behavior,The day beside the closed island's clock,switch,,false,"""Fri 6"" before the time while the island shows the clock alone.",clock-date,island.clock-date
+Island,Appearance and Behavior,The island's clock,select,System / 24h / 12h,system,system: as GNOME's own clock is set.,clock-format,island.clock-format
+Island,Appearance and Behavior,Glass tint,slider,0–100,0,"With the Glass look: how dark the glass is, from 0 (clear, what is behind shows through) to 100 (dark frosted glass).",glass-tint,island.glass-tint
+Island,Appearance and Behavior,Top bar opacity,slider,0–100,0,"How black the top bar beside the island is, in %: 0 is glass, 100 is black and the island blends into it.",top-bar-opacity,island.top-bar-opacity
+Island,Appearance and Behavior,Black top bar beside windows,switch,,false,"With a see-through or grey top bar: while an app's window reaches the bar (maximized, tiled to the top or moved up there), the bar turns black, so…",top-bar-black-with-windows,island.top-bar-black-with-windows
+Island,Appearance and Behavior,Compact top bar,switch,,true,"Smaller text and spacing in the top bar; with the island below the bar, a slimmer bar too.",compact-top-bar,island.compact-top-bar
+Island,Appearance and Behavior,The island's shape,select,Notch / Pill,notch,"""notch"": joined to the top of the screen, its shoulders flaring into it.",island-shape,island.island-shape
+Island,Appearance and Behavior,Closed island inside the top bar,switch,,true,"Like a notch: the top bar is as tall as the closed island (plus the space below it), so it never covers windows.",island-in-top-bar,island.island-in-top-bar
+Island,Music,Look up lyrics online,switch,,true,"From LRCLIB, by the song's title, artist and length.",lyrics-online,island.lyrics-online
+Island,Appearance and Behavior,How the island opens,select,Hover / Click,hover,"""hover"": when the pointer rests on it.",open-on,island.open-on
+Island,Appearance and Behavior,"How long the pointer rests before the island opens, in milliseconds",stepper,60–1000,120,,hover-delay,island.hover-delay
+Island,Appearance and Behavior,Auto-hide the closed island,select,Off / Always / Top bar / Windows,off,off: always shown.,auto-hide,island.auto-hide
+Island,Appearance and Behavior,"How long the closed island waits before hiding, in seconds",stepper,1–60,3,,auto-hide-delay,island.auto-hide-delay
+Island,Alerts,Alerts over full-screen apps,switch,,false,"When on, alerts (notifications, calls, timers…) show over a full-screen app (a video, a game), the island hidden again between them.",alerts-over-fullscreen,island.alerts-over-fullscreen
+Island,Appearance and Behavior,Display the island is on,select,Primary / Active / All,primary,"""primary"": the main display, in its top bar.",island-monitor,island.island-monitor
+Island,Appearance and Behavior,Island height,stepper,24–40,30,"How far the closed island hangs below the top bar, in pixels, when it is not inside the top bar.",notch-depth,island.notch-depth
+Island,Appearance and Behavior,Space below the island,switch,,true,"With the closed island inside the top bar: the top bar is a little taller than the island, so the island stops just short of the windows below.",notch-gap,island.notch-gap
+Island,Alerts,Show volume and brightness in the island,switch,,true,,replace-osd,island.replace-osd
+Island,Alerts,"Show battery, network, Bluetooth and Caps Lock alerts",switch,,true,"Before 0.7, one switch for all four; now each has its own (alert-power, alert-network, alert-bluetooth, alert-caps-lock), and this one is only read…",system-alerts,island.system-alerts
+Island,Alerts,Show charging and battery alerts,switch,,true,,alert-power,island.alert-power
+Island,Alerts,Show network alerts,switch,,true,,alert-network,island.alert-network
+Island,Alerts,Show Bluetooth alerts,switch,,true,,alert-bluetooth,island.alert-bluetooth
+Island,Alerts,Alert when a Bluetooth device's battery is low,switch,,false,"At 20, 10 and 5 percent, once per level on the way down, for each connected device that reports its battery; again once it has charged more than 5…",alert-bluetooth-battery,island.alert-bluetooth-battery
+Island,Alerts,Show Caps Lock alerts,switch,,true,,alert-caps-lock,island.alert-caps-lock
+Island,Alerts,Alert before calendar events,switch,,true,"An alert before each event with a time, with a Join button when it has a meeting link.",event-alerts,island.event-alerts
+Island,Alerts,Minutes before an event its alert shows,stepper,1–60,5,,event-alert-minutes,island.event-alert-minutes
+Island,Alerts,World clocks on the Calendar page,switch,,true,A globe on the Calendar page shows the time in the cities of GNOME’s World Clocks.,world-clocks,island.world-clocks
+Island,Pages and Features,Pages left out of the island,list,,[],"Names of the open island’s pages that have no tab: music, notifications, focus, reminders, shelf, calendar.",hidden-pages,island.hidden-pages
+Island,Pages and Features,"The Apps page, timing the application in front",switch,,false,"Shows the Apps page and times the application in front, whether or not there is keyboard or pointer input, keeping 30 days on this computer.",app-usage,island.app-usage
+Island,Pages and Features,The Devices page,switch,,false,Shows the Devices page: each connected Bluetooth device with its battery.,devices-page,island.devices-page
+Island,AI Agents,Answer Claude Code from the island,switch,,true,"When on, Island adds a hook to Claude Code's settings so it hears when Claude needs you or is done; off removes it.",agent-alerts-claude,island.agent-alerts-claude
+Island,AI Agents,Answer Codex from the island,switch,,true,"When on, Island adds hooks to Codex's hooks.json so it hears when Codex needs you or is done; off removes them.",agent-alerts-codex,island.agent-alerts-codex
+Island,Alerts,Leave notifications to GNOME's own banners,switch,,false,The island then shows no notification alerts; its Notifications page still lists them.,gnome-banners,island.gnome-banners
+Island,Shortcuts,What Super+V (GNOME's calendar shortcut) opens,select,Island / Calendar / None / Gnome,calendar,"""island"": the island's clipboard history.",super-v,island.super-v
+Island,Music,Briefly show the new song when the track changes,switch,,false,,track-peek,island.track-peek
+Island,Alerts,"Show when the camera, microphone or screen sharing is in use",switch,,true,,privacy-indicators,island.privacy-indicators
+Island,Alerts,Show calls in the island,switch,,true,"While an app uses the microphone for a call (WhatsApp, Telegram, Meet in a browser…), the island shows it, with mute and a way back to the call.",call-activity,island.call-activity
+Island,Alerts,Live preview of the call,switch,,true,"The open island shows the call's window as it is on screen, so you see yourself and whoever you call.",call-preview,island.call-preview
+Island,Focus,Turn on Do Not Disturb during focus sessions,switch,,true,,focus-dnd,island.focus-dnd
+Island,Clipboard,Keep a history of what you copy,switch,,true,"Text, links, images and files, stored only on this computer.",clipboard-history,island.clipboard-history
+Island,Voice Assistant,Voice assistant,switch,,true,"Listen for requests on the shortcut and the mic button, and answer them with the AI chosen: Claude Code, Codex, Grok, opencode or Antigravity (agy).",voice-assistant,island.voice-assistant
+Island,Shortcuts,Shortcut to the Music page,shortcut,,['<Super><Alt>m'],"Opens the island on the Music page from anywhere, holding the keyboard; pressed again, it closes.",shortcut-music,island.shortcut-music
+Island,Shortcuts,Shortcut to the Notifications page,shortcut,,['<Super><Alt>n'],"Opens the island on the Notifications page from anywhere, holding the keyboard; pressed again, it closes.",shortcut-notifications,island.shortcut-notifications
+Island,Shortcuts,Shortcut to the Timer page,shortcut,,['<Super><Alt>t'],"Opens the island on the Timer page from anywhere, holding the keyboard; pressed again, it closes.",shortcut-focus,island.shortcut-focus
+Island,Shortcuts,Shortcut to the Reminders page,shortcut,,['<Super><Alt>e'],"Opens the island on the Reminders page from anywhere, holding the keyboard; pressed again, it closes.",shortcut-reminders,island.shortcut-reminders
+Island,Shortcuts,Shortcut to the Shelf page,shortcut,,['<Super><Alt>h'],"Opens the island on the Shelf page from anywhere, holding the keyboard; pressed again, it closes.",shortcut-shelf,island.shortcut-shelf
+Island,Shortcuts,Shortcut to the Calendar page,shortcut,,['<Super><Alt>c'],"Opens the island on the Calendar page from anywhere, holding the keyboard; pressed again, it closes.",shortcut-calendar,island.shortcut-calendar
+Island,Shortcuts,Shortcut to the Apps page,shortcut,,['<Super><Alt>a'],"Opens the island on the Apps page from anywhere, holding the keyboard; pressed again, it closes.",shortcut-apps,island.shortcut-apps
+Island,Shortcuts,Shortcut to the Devices page,shortcut,,['<Super><Alt>d'],"Opens the island on the Devices page from anywhere, holding the keyboard; pressed again, it closes.",shortcut-devices,island.shortcut-devices
+Island,Shortcuts,Shortcut to the Power page,shortcut,,['<Super><Alt>p'],"Opens the island on the Power page (lock, sleep, log out, restart, shut down) from anywhere, holding the keyboard; pressed again, it closes.",shortcut-power,island.shortcut-power
+Island,Shortcuts,Shortcut to the System page,shortcut,,['<Super><Alt>i'],"Opens the island on the System page (CPU, memory, temperature, network) from anywhere, holding the keyboard; pressed again, it closes.",shortcut-system,island.shortcut-system
+Island,Shortcuts,Shortcut to the AI Usage page,shortcut,,['<Super><Alt>u'],"Opens the island on the AI Usage page from anywhere, holding the keyboard; pressed again, it closes.",shortcut-usage,island.shortcut-usage
+Island,Shortcuts,Voice assistant shortcut,shortcut,,['<Super>i'],Opens the voice assistant and listens.,voice-shortcut,island.voice-shortcut
+Island,Voice Assistant,AI the voice assistant asks,text,,auto,"“agy” (Antigravity), “claude” (Claude Code), “codex” (Codex), “grok” (Grok) or “opencode” (opencode), each with its own sign-in; “auto” for the first…",voice-provider,island.voice-provider
+Island,Voice Assistant,Model Claude Code answers with,text,,sonnet,"haiku, sonnet or opus; empty for Claude Code's default.",voice-claude-model,island.voice-claude-model
+Island,Voice Assistant,Model Codex answers with,text,,,A model id from Codex; empty for the one Codex itself uses.,voice-codex-model,island.voice-codex-model
+Island,Voice Assistant,Model Grok answers with,text,,,A model id from Grok; empty for the one Grok itself uses.,voice-grok-model,island.voice-grok-model
+Island,Voice Assistant,Model opencode answers with,text,,,A model as “opencode models” lists it (provider/model); empty for the one opencode itself uses.,voice-opencode-model,island.voice-opencode-model
+Island,Voice Assistant,Model the voice assistant asks,text,,gemini-3.8-flash-low,A model id from “agy models”; empty for agy's default.,voice-agy-model,island.voice-agy-model
+Island,Voice Assistant,Speech recognition model,text,,small,"A whisper.cpp model: tiny, base, small or medium.",voice-speech-model,island.voice-speech-model
+Island,Voice Assistant,Spoken language,text,,,"A language code such as “id” or “en”, several (“id,en”) to tell them apart, or empty to detect any.",voice-language,island.voice-language
+Island,Voice Assistant,The assistant's shape,select,Circle / Pebble / Squircle / Capsule / Cloud / Hexagon / Drop / Ghost,circle,,bot-shape,island.bot-shape
+Island,Voice Assistant,The assistant's colour,text,,cloud,"One of Island's colours (cloud, ink, peach, coral, amber, mint, teal, sky, lavender, rose, graphite) or a colour as #rrggbb.",bot-color,island.bot-color
+Island,Voice Assistant,The colours the island glows with while the assistant is open,text,,match,"""match"" follows the assistant's colour, ""classic"" is violet, blue and cyan, or a colour as #rrggbb to glow around.",bot-glow,island.bot-glow
+Island,Voice Assistant,How long the assistant keeps a conversation,select,Idle 30m / Idle 2h / Day,day,"Until midnight (never more than a day), or after 30 minutes or 2 hours without a word: then it starts a new one and deletes the old, here and in the…",voice-keep-chat,island.voice-keep-chat
+Island,Voice Assistant,Send the selected text to the voice assistant,switch,,false,"So it can work on it (""make this shorter"").",voice-use-selection,island.voice-use-selection
+Island,Voice Assistant,Let the voice assistant read notifications,switch,,false,"Send the last few notifications with each request, so the AI (Claude Code, Codex, Grok, opencode or Antigravity) can read them out or summarise them.",voice-read-notifications,island.voice-read-notifications
+Island,AI Usage,Show AI plan usage,switch,,true,"A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT (as Codex last saw it) and Grok, when found.",usage-enabled,island.usage-enabled
+Island,AI Usage,Show Claude's usage,switch,,true,,usage-claude,island.usage-claude
+Island,AI Usage,Show ChatGPT's usage,switch,,true,,usage-codex,island.usage-codex
+Island,AI Usage,Show Grok's usage,switch,,true,,usage-grok,island.usage-grok
+Island,AI Usage,Warn at this share of a limit (%),slider,50–99,80,,usage-warn,island.usage-warn
+Island,AI Usage,Warn again at this share of a limit (%),slider,50–100,95,,usage-critical,island.usage-critical
+Island,Alerts,"Play a sound when a focus session or break ends, and for reminders",switch,,true,,chimes,island.chimes
+Dock,Appearance,Icon size,stepper,16–128,48,Size of dock icons in pixels (16-96),icon-size,dock.icon-size
+Dock,Applications and Indicators,Auto-hide,switch,,true,Whether to auto-hide the dock when the pointer moves away,auto-hide,dock.auto-hide
+Dock,Motion,Enable magnification,switch,,true,Whether icons grow when the pointer hovers near the dock,magnification-enabled,dock.magnification-enabled
+Dock,Motion,Magnification max scale,stepper,1–3,1.4,Maximum scale applied to the icon directly under the cursor (1.0 = no magnification),magnification-scale,dock.magnification-scale
+Dock,Motion,Magnification falloff distance,stepper,40–300,100,How far (in pixels) the magnification wave reaches from the cursor,magnification-falloff,dock.magnification-falloff
+Dock,Applications and Indicators,Show running indicators,switch,,true,Show a small dot under icons of running apps,running-indicators,dock.running-indicators
+Dock,Applications and Indicators,Running indicator style,select,"Dots, one per window / Bar",0,"0 = dots per window (macOS style), 1 = horizontal bar",running-indicator-style,dock.running-indicator-style
+Dock,Motion,Bounce on launch,switch,,true,Play a bounce animation on the dock icon when a new app is launched,bounce-on-launch,dock.bounce-on-launch
+Dock,Motion,Animation duration,stepper,0–1000,200,"Duration of the show/hide animation in milliseconds (0 = instant, max 1000)",animation-duration,dock.animation-duration
+Dock,Motion,Magnification framerate,stepper,15–144,60,"Target framerate for magnification animation in Hz (30, 60, or 120)",magnification-framerate,dock.magnification-framerate
+Dock,Motion,Icon quality multiplier,stepper,0–4,2,"Render icons at a minimum of N times native resolution; HiDPI and magnification may increase it automatically (1, 2, or 4)",icon-quality,dock.icon-quality
+Dock,Motion,Show threshold,stepper,0–200,25,Distance in pixels from screen edge to trigger dock show,show-threshold,dock.show-threshold
+Dock,Appearance,Dock opacity,slider,0–100,60,Dock background opacity percentage (0-100),dock-opacity,dock.dock-opacity
+Dock,Appearance,Dock background color,color,,#1e1e1e,Hex color for dock background (e.g. #1e1e1e),dock-background-color,dock.dock-background-color
+Dock,Appearance,Dock border radius,stepper,0–40,16,Corner radius of the dock in pixels,dock-border-radius,dock.dock-border-radius
+Dock,Appearance,Enable dock blur,switch,,false,Apply blur effect behind the dock for a frosted glass look,dock-blur-enabled,dock.dock-blur-enabled
+Dock,Appearance,Dock position,select,Bottom / Left / Right / Top,0,"Position of the dock on screen (0=bottom, 1=left, 2=right, 3=top)",dock-position,dock.dock-position
+Dock,Shortcuts,Enable keyboard navigation,switch,,false,Allow keyboard shortcuts to control the dock,enable-keyboard-nav,dock.enable-keyboard-nav
+Dock,Shortcuts,Toggle dock visibility,shortcut,,['<Super>d'],Keyboard shortcut to toggle dock visibility,toggle-dock,dock.toggle-dock
+Dock,Shortcuts,Focus app 1 to 10,shortcuts,,['<Super>1'],Focus the Nth app in the dock: Super+1 to Super+0 by default,focus-app,dock.focus-app
+Dock,Applications and Indicators,Show applications button,switch,,true,Show a button to access all installed applications,show-applications-button,dock.show-applications-button
+Dock,Applications and Indicators,Applications button position,select,Start / End,0,"Position of the applications button (0=start, 1=end)",show-applications-button-position,dock.show-applications-button-position
+Dock,Appearance,Custom dock CSS,textarea,,,Custom CSS stylesheet applied to the dock,custom-css,dock.custom-css
+Dock,Windows and Media,Window previews,switch,,true,Show live thumbnail previews of app windows on hover,window-previews,dock.window-previews
+Dock,Windows and Media,Preview thumbnail width,stepper,100–400,200,Width of each preview thumbnail in pixels (100-400),preview-scale,dock.preview-scale
+Dock,Applications and Indicators,Show running applications,switch,,true,Show non-favorite running applications in the dock,show-running-apps,dock.show-running-apps
+Dock,Appearance,Dock workspace mode,select,All workspaces / Current workspace only,0,"Which workspaces show running apps (0=all, 1=current only)",dock-workspace-mode,dock.dock-workspace-mode
+Dock,Windows and Media,Enable media controls,switch,,false,Show play/pause controls in the dock context menu when media is playing,media-controls,dock.media-controls
+Dock,Windows and Media,Media indicator,switch,,true,Show a music note indicator on the icon of the currently playing media app,media-indicator,dock.media-indicator
+Dock,Applications and Indicators,Drag to reorder,switch,,true,Allow dragging pinned icons to reorder them,drag-reorder,dock.drag-reorder
+Windows,Window Blur,Blur windows,switch,,true,Frosted glass behind application windows. Set in Look.,blur,windows.blur
+Windows,Window Blur,Blur every app by default,switch,,false,"Off: only the apps listed under ""Only blur these"".",enable-all,blur.enable-all
+Windows,Window Blur,Only blur these apps,list,,[],"Window classes, used when ""every app"" is off.",whitelist,blur.whitelist
+Windows,Window Blur,Never blur these apps,list,,"[""Plank"", ""Conky""]",Window classes: video players and the like.,blacklist,blur.blacklist
+Windows,Window Blur,Window opacity over the blur,slider,0–100,80,How see-through the windows are. Set in Look.,opacity,windows.opacity
+Windows,Window Blur,Keep the focused window opaque,switch,,true,,dynamic-opacity,blur.dynamic-opacity
+Windows,Window Blur,Unblur full-screen apps,switch,,false,,unblur-when-fullscreen,blur.unblur-when-fullscreen
+Windows,Window Blur,Blur application menus,switch,,false,GTK popovers and the like.,blur-menus,blur.blur-menus
+Windows,Window Blur,Blur apps in the overview,switch,,false,,blur-on-overview,blur.blur-on-overview
+Windows,Window Blur,Blur strength,slider,0–100,30,How strong the blur is: the blur radius of the default pipeline. Set in Look.,blur-strength,windows.blur-strength
+Windows,Rounded Corners,Round window corners,switch,,true,,global-rounded-corner-settings,corners.global-rounded-corner-settings.enabled
+Windows,Rounded Corners,Corner radius,stepper,0–40,12,,global-rounded-corner-settings,corners.global-rounded-corner-settings.borderRadius
+Windows,Rounded Corners,Keep corners on maximized windows,switch,,false,,global-rounded-corner-settings,corners.global-rounded-corner-settings.keepRoundedCorners.maximized
+Windows,Rounded Corners,Keep corners on full-screen windows,switch,,false,,global-rounded-corner-settings,corners.global-rounded-corner-settings.keepRoundedCorners.fullscreen
+Windows,Rounded Corners,Skip GTK 4 (libadwaita) apps,switch,,true,They round their own corners.,skip-libadwaita-app,corners.skip-libadwaita-app
+Windows,Rounded Corners,Skip libhandy apps,switch,,false,,skip-libhandy-app,corners.skip-libhandy-app
+Windows,Rounded Corners,Border width,stepper,-40–40,0,,border-width,corners.border-width
+Windows,Rounded Corners,Never round these apps,list,,[],Window classes.,blacklist,corners.blacklist
+Windows,Rounded Corners,Window shadow,dict,,,"Focused and unfocused windows: offset, blur, spread and opacity.",focused-shadow,corners.shadows
