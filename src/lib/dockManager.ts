@@ -118,6 +118,8 @@ export class DockManager {
         this._visibility.setContextMenuActor(actor);
       }
     });
+    // Read at start-up too: the setting was only applied when it changed, so the button came back on every login.
+    iconManager.setShowAppButton(settings.get_boolean("show-applications-button"));
     iconManager.setShowRunningApps(settings.get_boolean("show-running-apps"));
     iconManager.setAppButtonPosition(settings.get_int("show-applications-button-position"));
     iconManager.setWorkspaceMode(settings.get_int("dock-workspace-mode"));
