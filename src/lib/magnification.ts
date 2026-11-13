@@ -5,6 +5,7 @@ const MIN_SCALE = 1.0;
 type Profile = { x: number; w: number; h: number };
 const SPRING_K = 170; // stiffness: higher = snappier
 const SPRING_C = 17; // damping: below 2*sqrt(K) ~ 26 leaves a small, natural overshoot
+const HUMP_SHARE = 2 / 3;
 const POINTER_RATE = 22; // 1/s: how fast the magnified bump follows the pointer
 export class Magnification {
     _signals: SignalManager;
@@ -206,7 +207,8 @@ export class Magnification {
         const profile: Profile[] = [];
         for (let i = 0; i < children.length; i++) {
             const [, top] = children[i].get_transformed_position();
-            const h = Math.max(0, barTop - top);
+            // The hump reaches 2/3 of the way up what pokes out above the bar: the icon's top third stands free.
+            const h = HUMP_SHARE * Math.max(0, barTop - top);
             peak = Math.max(peak, h);
             profile.push({
                 x: children[i].get_position()[0] + widths[i] / 2 + children[i].translation_x,
