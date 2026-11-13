@@ -688,9 +688,15 @@ export class DockManager {
     const knots: { x: number; h: number }[] = [];
     const first = prof[0];
     const last = prof[prof.length - 1];
-    knots.push({ x: Math.max(0, first.x + ox - first.w / 2 - 14), h: 0 });
+    knots.push({ x: Math.max(0, first.x + ox - first.w / 2 - 36), h: 0 });
     for (const p of prof) knots.push({ x: p.x + ox, h: Math.min(H, p.h) });
-    knots.push({ x: Math.min(W, last.x + ox + last.w / 2 + 14), h: 0 });
+    knots.push({ x: Math.min(W, last.x + ox + last.w / 2 + 36), h: 0 });
+    // The hump fades to nothing toward the bar's two ends, so it never ends in a vertical cliff.
+    const EDGE = 56;
+    const taper = (x: number): number => {
+      const e = Math.max(0, Math.min(1, Math.min(x, W - x) / EDGE));
+      return e * e * (3 - 2 * e);
+    };
     const hAt = (x: number): number => {
       if (x <= knots[0].x || x >= knots[knots.length - 1].x) return 0;
       for (let i = 1; i < knots.length; i++) {
@@ -698,7 +704,7 @@ export class DockManager {
           const a = knots[i - 1];
           const b = knots[i];
           const t = b.x === a.x ? 1 : (x - a.x) / (b.x - a.x);
-          return a.h + ((b.h - a.h) * (1 - Math.cos(Math.PI * t))) / 2;
+          return (a.h + ((b.h - a.h) * (1 - Math.cos(Math.PI * t))) / 2) * taper(x);
         }
       }
       return 0;
