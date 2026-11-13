@@ -29,6 +29,15 @@ install -D -m 644 shell/search/build/extension.js "$EXT/extension.js"
 install -D -m 644 shell/search/metadata.json "$EXT/metadata.json"
 install -D -m 644 shell/search/stylesheet.css "$EXT/stylesheet.css"
 
+# --- Blur, Corners, Emoji (kept as they were, renamed) and Emulator (TypeScript)
+for pair in blur:blur corners:corners emoji:emoji; do
+  src="${pair%%:*}"; EXT="$EXTDIR/${pair##*:}@niro.local"; mkdir -p "$EXT"
+  cp -r "shell/$src"/. "$EXT"/; rm -f "$EXT"/schemas/gschemas.compiled; glib-compile-schemas "$EXT/schemas"
+done
+EXT="$EXTDIR/emulator@niro.local"
+install -D -m 644 shell/emulator/build/extension.js "$EXT/extension.js"
+install -D -m 644 shell/emulator/metadata.json "$EXT/metadata.json"
+
 # --- The island's programs (Rust): daemon, shelf window, speech recognition
 FEATURES=(); { command -v glslc >/dev/null && pkg-config --exists vulkan; } || FEATURES=(--no-default-features)
 cargo build --release -p island-daemon -p island-shelf >&2
@@ -54,6 +63,8 @@ install -D -m 644 data/dconf/00-niro "$P/etc/dconf/db/local.d/00-niro"
 install -D -m 644 data/dconf/profile-user "$P/etc/dconf/profile/user"
 
 # --- Package
+chmod -R u=rwX,go=rX "$P/usr" "$P/etc" # copied files keep their source's modes: make them readable
+find "$P/usr/bin" -type f -exec chmod 755 {} +
 sed "s/@VERSION@/$VER/" packaging/debian/control.in > "$P/DEBIAN/control"
 for s in preinst prerm postrm postinst; do install -m 755 "packaging/debian/$s" "$P/DEBIAN/$s"; done
 dpkg-deb --root-owner-group -Zxz -b "$P" "$OUT/niro-control_${VER}_amd64.deb" >/dev/null

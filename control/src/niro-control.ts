@@ -261,6 +261,28 @@ function dockPage() {
     return settings ? generatedPage(settings, dockGroup, ['Appearance', 'Motion', 'Behaviour']) : missingPage('Dock');
 }
 
+/** One group with a row for every public key of a schema. */
+function keyGroup(settings, title: string, subtitle = '') {
+    const group = new Adw.PreferencesGroup({title, description: subtitle});
+    for (const key of settings.settings_schema.list_keys()) {
+        const row = keyRow(settings, key);
+        if (row)
+            group.add(row);
+    }
+    return group;
+}
+
+function windowsPage() {
+    const page = new Adw.PreferencesPage();
+    const blur = extensionSettings('blur@niro.local', 'org.gnome.shell.extensions.blur-my-shell.applications');
+    const corners = extensionSettings('corners@niro.local', 'org.gnome.shell.extensions.rounded-window-corners-reborn');
+    if (blur)
+        page.add(keyGroup(blur, 'Window blur', 'Opacity and blur are also set together with the rest of the desktop in Look'));
+    if (corners)
+        page.add(keyGroup(corners, 'Rounded corners'));
+    return page;
+}
+
 function searchPage(settings) {
     const page = new Adw.PreferencesPage();
     const group = new Adw.PreferencesGroup({title: 'Application search', description: 'Finds the applications you have installed as you type. Its tone and opacity follow Look.'});
@@ -275,6 +297,7 @@ function build(app) {
     stack.add_titled_with_icon(lookPage(settings), 'look', 'Look', 'preferences-desktop-theme-symbolic');
     stack.add_titled_with_icon(islandPage(), 'island', 'Island', 'view-pin-symbolic');
     stack.add_titled_with_icon(dockPage(), 'dock', 'Dock', 'view-app-grid-symbolic');
+    stack.add_titled_with_icon(windowsPage(), 'windows', 'Windows', 'window-new-symbolic');
     stack.add_titled_with_icon(searchPage(settings), 'search', 'Search', 'system-search-symbolic');
     const first = GLib.getenv('NIRO_PAGE');
     if (first && stack.get_child_by_name(first))

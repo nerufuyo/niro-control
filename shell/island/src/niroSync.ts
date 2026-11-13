@@ -33,7 +33,7 @@ export class NiroSync {
             return;
         this._shared = new Gio.Settings({schema_id: 'org.niro.control'});
         this._dock = extensionSettings('dock@niro.local', 'org.gnome.shell.extensions.dock');
-        this._apps = extensionSettings('blur-my-shell@aunetx', 'org.gnome.shell.extensions.blur-my-shell.applications');
+        this._apps = extensionSettings('blur@niro.local', 'org.gnome.shell.extensions.blur-my-shell.applications');
         this._id = this._shared.connect('changed', () => this._apply());
         try {
             this._applyAccent(this._shared.get_string('accent'));

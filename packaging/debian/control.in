@@ -4,7 +4,7 @@ Section: gnome
 Priority: optional
 Architecture: amd64
 Maintainer: nerufuyo <local@localhost>
-Depends: gnome-shell (>= 46), dconf-cli, libgtk-4-1, libvulkan1, fontconfig, gjs, gir1.2-gtk-4.0, gir1.2-adw-1
+Depends: gnome-shell (>= 46), dconf-cli, libgtk-4-1, libvulkan1, fontconfig, gjs, gir1.2-gtk-4.0, gir1.2-adw-1, gnome-shell-extensions, gnome-shell-extension-appindicator, gnome-shell-extension-ubuntu-tiling-assistant
 Replaces: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults
 Conflicts: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults
 Description: Niro Control: the look of the desktop in one place

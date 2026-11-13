@@ -14,6 +14,14 @@
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
+## Parts kept as they were
+
+`shell/blur`, `shell/corners` and `shell/emoji` are copies of third-party GPL extensions (renamed `blur@`, `corners@`,
+`emoji@niro.local`; their schemas keep the original ids so settings carry over). `shell/corners` has two small fixes
+(a closing window no longer breaks its refresh). Ubuntu's own `user-theme`, `tiling-assistant` and `appindicator`
+extensions are package dependencies, not copies. Vitals and system-monitor are gone: the island's System page shows
+CPU, memory, temperature and network.
+
 ## Changing things
 
 | To | Edit |

@@ -1,0 +1,324 @@
+import St from "gi://St";
+import Clutter from "gi://Clutter";
+import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
+
+import { EmojiButton } from "./emojiButton.js";
+
+import { gettext as _ } from "resource:///org/gnome/shell/extensions/extension.js";
+
+export class EmojiSearchItem {
+  constructor(emojiCopy, nbColumns) {
+    this.super_item = new PopupMenu.PopupBaseMenuItem({
+      reactive: false,
+      can_focus: false,
+    });
+    this._nbColumns = nbColumns;
+    this.emojiCopy = emojiCopy;
+    // Emojis picked while the menu is open, see shiftFor()
+    this._pendingRecents = [];
+    this._settings = this.emojiCopy._settings;
+
+    this._defaultHint = _("Type here to search…");
+    this.searchEntry = new St.Entry({
+      name: "searchEntry",
+      can_focus: true,
+      hint_text: this._defaultHint,
+      track_hover: true,
+      x_expand: true,
+    });
+
+    this.searchEntry.get_clutter_text().connect(
+      "text-changed",
+      this._onSearchTextChanged.bind(this),
+    );
+
+    // Listen for skin tone changes and refresh search results. Keep the
+    // handler ids so destroy() can disconnect them: _settings outlives this
+    // item, and firing on a disposed searchEntry segfaults the shell.
+    this._settingsHandlerIds = [];
+    if (this._settings && this._settings.connect) {
+      this._settingsHandlerIds.push(
+        this._settings.connect('changed::skin-tone', () => this._onSearchTextChanged()),
+        this._settings.connect('changed::gender', () => this._onSearchTextChanged()),
+      );
+    }
+
+    this.super_item.add_child(this.searchEntry);
+
+    // initializing the "recently used" buttons
+    this.recentlyUsedItem = this._recentlyUsedInit();
+
+    this.searchEntry.clutter_text.connect("key-press-event", (actor, event) => {
+      const symbol = event.get_key_symbol();
+      const relevantActor = global.stage.get_key_focus();
+
+      if (relevantActor !== this.searchEntry.clutter_text) {
+        return Clutter.EVENT_PROPAGATE;
+      }
+
+      // Ctrl+1..9 picks the Nth emoji of the row, Ctrl+0 the 10th, Ctrl+Shift
+      // appends it like Shift+Enter. Hardware keycodes 10..19 are the 1..0 row
+      // whatever the layout or Shift state.
+      const state = event.get_state();
+      const index = event.get_key_code() - 10;
+      if ((state & Clutter.ModifierType.CONTROL_MASK) && index >= 0 && index <= 9) {
+        const btn = this._recents[index];
+        const emojiToCopy = btn?.super_btn?.label ? btn.getTaggedEmoji() : null;
+        if (emojiToCopy) {
+          this.emojiCopy.sqlite.increment_selection(emojiToCopy);
+          return state & Clutter.ModifierType.SHIFT_MASK
+            ? btn.addToClipboardAndStay(emojiToCopy)
+            : btn.replaceClipboardAndClose(emojiToCopy);
+        }
+      }
+
+      switch (symbol) {
+        // Existing Enter key logic - find first recent/result and activate
+        case Clutter.KEY_Return:
+        case Clutter.KEY_KP_Enter: {
+          let firstRecent = this._recents.find(
+            (btn) =>
+              btn.super_btn && btn.super_btn.visible && btn.super_btn.can_focus
+          );
+
+          if (firstRecent) {
+            firstRecent.onKeyPress(actor, event);
+            return Clutter.EVENT_STOP;
+          }
+
+          return Clutter.EVENT_PROPAGATE;
+        }
+
+        case Clutter.KEY_Down: {
+          let firstFocusableRecent = this._recents.find(
+            (btn) =>
+              btn.super_btn && btn.super_btn.visible && btn.super_btn.can_focus
+          );
+
+          if (firstFocusableRecent) {
+            global.stage.set_key_focus(firstFocusableRecent.super_btn);
+            return Clutter.EVENT_STOP;
+          }
+
+          return Clutter.EVENT_PROPAGATE;
+        }
+
+        case Clutter.KEY_Up: {
+          if (!this.emojiCopy || !this.emojiCopy.emojiCategories) {
+            return Clutter.EVENT_PROPAGATE;
+          }
+
+          let firstFocusableCategoryBtn = this.emojiCopy.emojiCategories.find(
+            (cat) => {
+              const btn = cat.getButton();
+              return btn && btn.visible && btn.can_focus;
+            }
+          );
+
+          if (firstFocusableCategoryBtn) {
+            global.stage.set_key_focus(firstFocusableCategoryBtn.getButton());
+            return Clutter.EVENT_STOP;
+          }
+
+          return Clutter.EVENT_PROPAGATE;
+        }
+
+        default:
+          return Clutter.EVENT_PROPAGATE;
+      }
+    });
+  }
+
+  // Updates the "recently used" buttons content in reaction to a new search
+  // query (the text changed or the category changed).
+  _onSearchTextChanged() {
+    let searchedText = this.searchEntry?.get_text();
+    if (searchedText === null || searchedText === undefined || searchedText === "") {
+      this._buildRecents();
+      this._updateSensitivity();
+      return;
+    }
+    searchedText = searchedText.toLowerCase().trim();
+
+    for (let j = 0; j < this._recents.length; j++) {
+      this._recents[j].super_btn.label = "";
+    }
+
+    // Get results for selected skin tone and for yellow (no skin tone)
+    const selectedTone = this._settings.get_int("skin-tone");
+    const selectedGender = this._settings.get_int("gender");
+
+    // I might move this toneResults/yellowResults logic to emojiCopy.sqlite soon!
+    let results = [];
+    if (selectedTone !== 0) {
+      // First, get only results with the selected skin tone
+      const toneResults = this.emojiCopy.sqlite.search_description(searchedText, selectedTone, selectedGender)
+        .filter(e => e.skin_tone && e.skin_tone !== '');
+      // Then, get yellow (no skin tone) results
+      const yellowResults = this.emojiCopy.sqlite.search_description(searchedText, 0, selectedGender)
+        .filter(e => !e.skin_tone || e.skin_tone === '');
+      // Combine, prioritizing selected tone
+      results = [...toneResults, ...yellowResults];
+    } else {
+      // Only yellow (no skin tone) results as default
+      results = this.emojiCopy.sqlite.search_description(searchedText, 0, selectedGender);
+      // Get this back if needed
+      // .filter(e => !e.skin_tone || e.skin_tone === '');
+    }
+
+    let firstEmptyIndex = 0;
+    for (let i = 0; i < results.length; i++) {
+      if (i < this._recents.length) {
+        this._recents[firstEmptyIndex].super_btn.label = results[i].unicode;
+        this._recents[firstEmptyIndex].super_btn.text = results[i].description;
+        firstEmptyIndex++;
+      }
+    }
+    this._updateSensitivity();
+  }
+
+  _updateSensitivity() {
+    for (let i = 0; i < this._recents.length; i++) {
+      let can_focus = this._recents[i].super_btn.label != "";
+      this._recents[i].super_btn.set_can_focus(can_focus);
+      this._recents[i].super_btn.set_track_hover(can_focus);
+    }
+  }
+
+  // Initializes the container showing the recently used emojis as buttons
+  _recentlyUsedInit() {
+    let recentlyUsed = new PopupMenu.PopupBaseMenuItem({
+      reactive: false,
+      can_focus: false,
+    });
+    // St.BoxLayout "vertical" is deprecated on 48+ and "orientation" doesn't
+    // exist before it, so use a Clutter layout that works on every version.
+    this._recentsContainer = new St.Widget({
+      layout_manager: new Clutter.BoxLayout({
+        orientation: Clutter.Orientation.VERTICAL,
+      }),
+    });
+    recentlyUsed.add_child(this._recentsContainer);
+    this._recents = [];
+    this._rebuildRecentsButtons();
+    return recentlyUsed;
+  }
+
+  // (Re)creates the recents grid to match this._nbColumns and "recent-rows"
+  _rebuildRecentsButtons() {
+    this._recents.forEach((b) => b.destroy());
+    this._recents = [];
+    this._recentsContainer.destroy_all_children();
+
+    const nbRows = this._settings.get_int("recent-rows");
+    for (let r = 0; r < nbRows; r++) {
+      const row = new St.BoxLayout();
+      this._recentsContainer.add_child(row);
+      for (let c = 0; c < this._nbColumns; c++) {
+        const btn = new EmojiButton(this.emojiCopy, "", []);
+        btn.build(null);
+        row.add_child(btn.super_btn);
+        this._recents.push(btn);
+      }
+    }
+
+    this._buildRecents();
+    this.updateStyleRecents();
+  }
+
+  // Updates the number of columns in place, keeping the search entry and
+  // recents row in the menu (recreating the whole item would drop them).
+  setNbCols(nbColumns) {
+    this._nbColumns = nbColumns;
+    this._rebuildRecentsButtons();
+  }
+
+  saveRecents() {
+    let backUp = [];
+    for (let i = 0; i < this._recents.length; i++) {
+      backUp.push(this._recents[i].super_btn.label);
+    }
+    this._settings.set_strv("recently-used", backUp);
+  }
+
+  _buildRecents() {
+    let temp = this._settings.get_strv("recently-used");
+    for (let i = 0; i < this._recents.length; i++) {
+      if (i < temp.length) {
+        this._recents[i].super_btn.label = temp[i];
+      } else {
+        // If the extension was previously set with less "recently used
+        // emojis", we still need to load something in the labels.
+        // It will be a penguin for obvious reasons.
+        this._recents[i].super_btn.label = "🐧";
+      }
+    }
+  }
+
+  updateStyleRecents() {
+    let fontStyle = "font-size: " + this._settings.get_int("emojisize") +
+      "px;";
+    fontStyle += " color: #FFFFFF;";
+    this._recents.forEach(function (b) {
+      b.updateStyle(fontStyle);
+    });
+  }
+
+  shiftFor(currentEmoji) {
+    if (currentEmoji == "") return;
+    // While the menu is open, moving the picked emoji to the front would
+    // reorder the row under the pointer: a second click on the same spot
+    // (right-click, middle-click, "Keep Open on Select") would then hit a
+    // different emoji. Remember the picks and apply them on close instead.
+    if (this.emojiCopy.get_super_btn()?.menu.isOpen) {
+      this._pendingRecents.push(currentEmoji);
+      return;
+    }
+    this._moveToFront([currentEmoji]);
+  }
+
+  // Applies the picks remembered while the menu was open, in pick order.
+  // With updateUI false it only persists them, see disable(): rebuilding the
+  // row there would create widgets in a menu that is being torn down.
+  commitPendingRecents(updateUI = true) {
+    const picks = this._pendingRecents;
+    this._pendingRecents = [];
+    if (picks.length > 0) {
+      this._moveToFront(picks, updateUI);
+    }
+  }
+
+  _moveToFront(emojis, updateUI = true) {
+    let temp = this._settings.get_strv("recently-used");
+    for (const currentEmoji of emojis) {
+      temp = temp.filter((e) => e != currentEmoji);
+      temp.unshift(currentEmoji);
+    }
+    this._settings.set_strv("recently-used", temp);
+    if (!updateUI) return;
+    this._buildRecents();
+    this.saveRecents();
+    this.emojiCopy._onSearchTextChanged();
+  }
+
+  // Shows the emojis waiting to be copied on close ("copy-on-close") in
+  // place of the search hint, since the clipboard isn't updated until then.
+  showPending(text) {
+    this.searchEntry.hint_text = text ?? this._defaultHint;
+  }
+
+  destroy() {
+    if (this._settings && this._settingsHandlerIds) {
+      for (const id of this._settingsHandlerIds) {
+        this._settings.disconnect(id);
+      }
+    }
+    this._settingsHandlerIds = [];
+    // Destroy the wrappers first to cancel pending tooltip timers
+    this._recents.forEach((b) => b.destroy());
+    this._recents = [];
+    this.recentlyUsedItem?.destroy();
+    this.recentlyUsedItem = null;
+    this.super_item?.destroy();
+  }
+}
