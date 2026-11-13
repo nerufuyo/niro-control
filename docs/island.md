@@ -1,3 +1,5 @@
+> Feature guide for the island, from the original project's README. Install and contribution sections are left out: Niro Control installs it (see the repo README).
+
 <div align="center">
 
 # Island
@@ -32,7 +34,6 @@ appear in the same place instead of in the middle of the screen.
 
 - [Features](#features)
 - [Requirements](#requirements)
-- [Installation](#installation)
 - [Usage](#usage)
 - [Settings](#settings)
 - [Voice assistant](#voice-assistant)
@@ -41,9 +42,7 @@ appear in the same place instead of in the middle of the screen.
 - [Resource usage](#resource-usage)
 - [Data & network](#data--network)
 - [Troubleshooting](#troubleshooting)
-- [Uninstalling](#uninstalling)
 - [How it works](#how-it-works)
-- [Contributing](#contributing)
 - [Support](#support)
 - [License](#license)
 
@@ -158,101 +157,6 @@ bar that leaves your windows uncovered.
   one of Claude Code, Codex, Grok, opencode or Antigravity signed in (Codex and the npm
   install of Claude Code need Node.js 18 or newer); see
   [Voice assistant](#voice-assistant).
-
-## Installation
-
-1. Run this in a terminal:
-
-   ```sh
-   curl -fsSL https://raw.githubusercontent.com/zickrian/isle/main/get.sh | bash
-   ```
-
-2. **Log out and back in**: GNOME Shell on Wayland only loads a new
-   extension at login (on GNOME 46 to 48 with X11, press Alt+F2, type `r`
-   and press Enter instead).
-
-That's all. The script downloads the latest release, checks it, and installs
-it for your user only: no root, no compiler and no cloning needed. Run the
-same command again to update; your settings stay as you set them.
-
-The [installation guide](docs/install.md) goes through it step by step, with
-updating, uninstalling, installing offline and what to do if the island does
-not appear.
-
-> [!NOTE]
-> The installer never changes other extensions. When one would fight with
-> the island (Blur my Shell's top bar blur, or an extension that takes the
-> same place in the top bar), it says so and how to turn that off. Island's
-> look is the same on every desktop: a slim top bar with no colour of its
-> own, and the island as a black notch.
-
-### Other ways to install
-
-**Ubuntu and Debian (.deb), Fedora (.rpm).** Each
-[release](../../releases) also has a system-wide package, for every user of
-the computer. Install it, log out and back in (GNOME Shell only finds a new
-extension at login), then turn Island on once as each user, in the Extensions
-app or with `gnome-extensions enable`:
-
-```sh
-sudo apt install ./island_*_amd64.deb        # Ubuntu 24.04 and newer, Debian 13
-sudo dnf install ./island-*.x86_64.rpm       # Fedora 40 and newer
-# Log out and back in, then:
-gnome-extensions enable island@niro.local
-```
-
-**Arch Linux.** Island is not in the AUR yet (`yay -S island-bin` finds
-nothing). Build its package from the `PKGBUILD` in
-[`packaging/aur`](packaging/aur), made from the release tarball, or use the
-one-line install above:
-
-```sh
-sudo pacman -S --needed base-devel git
-git clone --depth 1 https://github.com/zickrian/isle.git
-cd island/packaging/aur
-makepkg -si
-# Log out and back in, then:
-gnome-extensions enable island@niro.local
-```
-
-To update a package, install the new release's package the same way (or run
-`makepkg -si` again with the updated `PKGBUILD`); don't also run the command
-above, which would add a second copy in your home folder.
-
-A copy installed with the command above, in your home folder, takes
-precedence over a system-wide package; `island-uninstall` removes it and the
-package's takes over. Releases can be checked with
-`gh attestation verify <file> --repo zickrian/isle` (see
-[SECURITY.md](SECURITY.md#verifying-a-release)).
-
-<details>
-<summary><b>From the release tarball, or from source</b></summary>
-
-**From a release package.** Download `island-<version>-x86_64-linux.tar.gz`
-from [Releases](../../releases), then:
-
-```sh
-tar -xzf island-*-x86_64-linux.tar.gz
-cd island-*-x86_64-linux
-./install.sh
-```
-
-**From source**, for development or other architectures. You need Rust 1.92
-or newer (1.88 without the shelf helper) ([rustup](https://rustup.rs); Ubuntu 24.04's own `cargo` is too
-old), for the shelf's drag and drop the GTK 4 development files, and for the
-voice assistant's speech recognition (whisper.cpp) cmake, libclang, and for
-the GPU the Vulkan headers and glslc:
-
-```sh
-sudo apt install git build-essential pkg-config libgtk-4-dev cmake libclang-dev libvulkan-dev glslc
-# Fedora: git gcc-c++ pkgconf gtk4-devel cmake clang-devel vulkan-loader-devel glslc
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-git clone https://github.com/zickrian/isle.git
-cd island
-./install.sh
-```
-
-</details>
 
 ## Usage
 
@@ -572,7 +476,7 @@ found"; a busy service retries on its own.
 
 **Files cannot be dragged in or out.** The release package includes the
 drag-and-drop helper; when building from source, install `libgtk-4-dev`
-(Fedora: `gtk4-devel`) and run `./install.sh` again.
+(Fedora: `gtk4-devel`) and rebuild with `make deb`.
 
 **A phone can't open the Shelf.** It must be on the same Wi-Fi as the computer
 (not a guest network that keeps devices apart). A firewall that blocks
@@ -595,26 +499,6 @@ data. Please [open an issue](../../issues) and paste it there.
 
 With a .deb, .rpm or AUR package, Island's commands are in `/usr/bin`: run
 them by name alone (`island-daemon --doctor`, `island-daemon --report`).
-
-## Uninstalling
-
-```sh
-~/.local/bin/island-uninstall
-```
-
-(or `./uninstall.sh` from the release package or the source folder). This
-removes the extension, the programs, the service, the font, the voice
-assistant's speech recognition and Island's caches, and lifts a battery charge
-limit Island set; it also takes Island's hooks out of Claude Code's and Codex's
-settings. Your tasks, calendar events, clipboard history, shelf and
-timer settings stay in `~/.local/share/island` until you delete them.
-
-Remove Island this way, not with the Extensions app's Remove button, which
-deletes only the extension and leaves `island-daemon` and its hooks behind. For a
-system-wide package, each user runs `island-daemon --unhook-all` first (and
-`island-charge-limit 100` if the assistant set a battery charge limit), then
-remove it with `sudo apt remove island`, `sudo dnf remove island` or
-`sudo pacman -R island-bin`.
 
 ## How it works
 
@@ -647,34 +531,6 @@ else lives in Rust behind a D-Bus API.
 | `scripts` | `setup-voice.sh` (installed as `island-setup-voice`), `island-charge-limit`, and `package.sh`, which makes a release. |
 | `docs/product-spec.md` | How the island looks and behaves: sizes, motion, pages, alerts. |
 | `docs/dbus-api.md` | The D-Bus interfaces of `island-daemon` and `island-shelf`. |
-
-## Contributing
-
-Bug reports, ideas and pull requests are welcome. See
-[CONTRIBUTING.md](CONTRIBUTING.md) for how to build, test and send changes,
-and [CHANGELOG.md](CHANGELOG.md) for what changed. Everyone taking part
-follows the [Code of Conduct](CODE_OF_CONDUCT.md); please report security
-problems privately as described in [SECURITY.md](SECURITY.md).
-
-### Contributors
-
-Thanks to everyone who has made Island better:
-
-- [@caffeinepx](https://github.com/caffeinepx): Grok in the voice assistant
-  and on the AI usage page; music from Zen and Firefox that keeps its place;
-  a sun or a moon by each World Clock.
-- [@Ashishranjan980](https://github.com/Ashishranjan980): the Apps page, where
-  your time in each app goes.
-- [@jvspier](https://github.com/jvspier): the island on every display, and a
-  top bar moved to the bottom by another extension.
-- [@AlphaBeast97](https://github.com/AlphaBeast97): opencode 2 in the voice
-  assistant.
-
-## Support
-
-Island is free and always will be. If it makes your desktop nicer, you can
-[buy me a coffee](https://sociabuzz.com/zickrian/tribe). A star, a bug report
-or telling a friend helps just as much.
 
 ## License
 
