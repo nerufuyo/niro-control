@@ -3,7 +3,9 @@ import type St from "gi://St";
 import { SignalManager } from "./signalManager.js";
 const MIN_SCALE = 1.0;
 type Profile = { x: number; w: number; h: number };
-const STIFFNESS = 20; // 1/s; higher = snappier. Frame-rate independent (see _tick).
+const SPRING_K = 170; // stiffness: higher = snappier
+const SPRING_C = 17; // damping: below 2*sqrt(K) ~ 26 leaves a small, natural overshoot
+const POINTER_RATE = 22; // 1/s: how fast the magnified bump follows the pointer
 export class Magnification {
     _signals: SignalManager;
     _container: InstanceType<typeof St.BoxLayout>;
@@ -12,6 +14,8 @@ export class Magnification {
     _falloffDistance: number;
     _timeline: Clutter.Timeline | null = null;
     _lastMs = 0;
+    _velocity: number[] = [];
+    _smoothX: number | null = null;
     _currentScales: number[] = [];
     _pivotX = 0.5;
     _pivotY = 1.0;
@@ -55,6 +59,8 @@ export class Magnification {
             return;
         this._paused = false;
         this._currentScales = [];
+        this._velocity = [];
+        this._smoothX = null;
     }
     start() {
         // The animation loop only runs while the pointer is over the dock or icons are still settling.
@@ -104,7 +110,10 @@ export class Magnification {
         const [px, py] = global.get_pointer();
         const [dx, dy] = this._container.get_position();
         const [, dh] = this._container.get_size();
-        const localX = px - dx;
+        const rawX = px - dx;
+        // The bump trails the pointer a little, so scaling glides instead of snapping from icon to icon.
+        this._smoothX = this._smoothX === null ? rawX : this._smoothX + (rawX - this._smoothX) * (1 - Math.exp(-POINTER_RATE * dt));
+        const localX = this._smoothX;
         const localY = py - dy;
         let pointerNear = localY >= -40 && localY <= dh + 20;
         const widths: number[] = [];
@@ -132,20 +141,27 @@ export class Magnification {
             pointerNear = false;
         while (this._currentScales.length < children.length)
             this._currentScales.push(MIN_SCALE);
-        // Critically-damped style smoothing, independent of the frame rate.
-        const alpha = 1 - Math.exp(-STIFFNESS * dt);
+        // Each icon's scale is a damped spring toward its target (frame-rate independent sub-steps).
+        while (this._velocity.length < children.length) this._velocity.push(0);
+        const sigma = this._falloffDistance * 0.62;
         let settled = true;
+        const steps = Math.max(1, Math.ceil(dt / 0.008));
+        const h = dt / steps;
         for (let i = 0; i < children.length; i++) {
             let target = MIN_SCALE;
             if (pointerNear) {
-                const t = Math.min(1, Math.abs(centers[i] - localX) / this._falloffDistance);
-                target = MIN_SCALE + (this._maxScale - MIN_SCALE) * 0.5 * (1 + Math.cos(Math.PI * t));
+                const d = Math.abs(centers[i] - localX);
+                target = MIN_SCALE + (this._maxScale - MIN_SCALE) * Math.exp(-(d * d) / (2 * sigma * sigma));
             }
-            const prev = this._currentScales[i];
-            const next = prev + (target - prev) * alpha;
-            this._currentScales[i] = next;
-            if (Math.abs(next - MIN_SCALE) > 0.002 || Math.abs(next - target) > 0.002)
-                settled = false;
+            let x = this._currentScales[i];
+            let v = this._velocity[i];
+            for (let k = 0; k < steps; k++) {
+                v += (SPRING_K * (target - x) - SPRING_C * v) * h;
+                x += v * h;
+            }
+            this._currentScales[i] = x;
+            this._velocity[i] = v;
+            if (Math.abs(x - MIN_SCALE) > 0.002 || Math.abs(v) > 0.01 || Math.abs(x - target) > 0.002) settled = false;
         }
         if (!pointerNear && settled) {
             this._snapAllToMin();
@@ -193,6 +209,8 @@ export class Magnification {
             child.translation_x = 0;
         }
         this._currentScales = [];
+        this._velocity = [];
+        this._smoothX = null;
         this._onExtent?.(0, 0, []);
     }
 }
