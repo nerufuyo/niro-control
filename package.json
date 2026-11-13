@@ -2,11 +2,15 @@
   "name": "niro-control",
   "private": true,
   "type": "module",
-  "description": "Niro Control: one look for Island, the dock, the application search and the control panel. TypeScript for what we write.",
+  "version": "1.0.0",
+  "description": "Niro Control: the look of the desktop in one place (island, dock, search, control panel). TypeScript for the shell and the panel, Rust for the island's programs.",
+  "workspaces": [
+    "shell/dock"
+  ],
   "scripts": {
-    "build:island": "tsc -p island/gnome-extension",
-    "build:control": "tsc -p control",
-    "test": "npm run build:island && node --test island/tests/extension/*.test.js"
+    "build": "tsc -p shell/island && tsc -p shell/dock && tsc -p shell/search && tsc -p control",
+    "test": "npm run build && node --test tests/island/*.test.js",
+    "lint": "biome check shell/dock/src"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

@@ -1,6 +1,7 @@
 out/
 node_modules/
-island/build/
+target/
+shell/island/build/
+shell/search/build/
+shell/dock/dist/
 control/build/
-search/build/
-dock/dist/

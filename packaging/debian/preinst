@@ -1,0 +1,7 @@
+#!/bin/sh
+set -e
+# An earlier niro-control kept DigUp's shell in place of dig-up's: give that up.
+if dpkg-divert --list niro-control | grep -q digup-shell; then
+  dpkg-divert --package niro-control --remove --rename /usr/bin/digup-shell || true
+fi
+exit 0

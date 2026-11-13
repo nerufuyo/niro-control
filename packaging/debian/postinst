@@ -1,0 +1,7 @@
+#!/bin/sh
+glib-compile-schemas /usr/share/glib-2.0/schemas
+fc-cache /usr/share/fonts/truetype/island >/dev/null 2>&1 || true
+rm -f /etc/systemd/user/graphical-session.target.wants/isled.service
+systemctl --global enable island-daemon.service >/dev/null 2>&1 || true
+dconf update
+exit 0

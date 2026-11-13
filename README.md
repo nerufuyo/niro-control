@@ -1,26 +1,36 @@
 # Niro Control
 
-The look of the desktop in one place: Island (the island on the top bar), the macOS-style dock, an application search, and
-one control panel that sets them all.
+The look of the desktop in one place: the island on the top bar, the dock, an application search, and one control
+panel that sets them all. One repo, one package (`niro-control`).
 
-- `island/`: the island on the top bar (GNOME Shell extension and its background programs)
-- `dock/`: the dock extension
-- `search/`: Search, the application search (a GNOME Shell extension, Super+Space)
-- `control/`: the control panel (TypeScript on GJS, `niro-control`), the shared schema `org.niro.control` and the desktop defaults
-- `packaging/build.sh`: builds the single package `out/niro-control_<ver>_amd64.deb`
+```
+shell/island/   the island: GNOME Shell extension (TypeScript)         island@niro.local
+shell/dock/     the dock: GNOME Shell extension (TypeScript)           dock@niro.local
+shell/search/   application search, Super+Space (TypeScript)           search@niro.local
+crates/         Rust programs behind the island: island-daemon, island-shelf, island-whisper, island-core
+control/        the control panel (TypeScript on GJS) and the shared schema org.niro.control
+data/           systemd unit, D-Bus services, fonts, dconf defaults
+scripts/        helper scripts shipped in the package
+packaging/      the Debian package: build.sh and the maintainer scripts
+tests/          tests for the island's logic (node --test)
+docs/           how it fits together, how to maintain it, the island's D-Bus API
+```
 
-`./packaging/build.sh`, then `sudo dpkg -i out/niro-control_*.deb`. Log out and in to load changes.
+## Everyday commands
+
+| | |
+|---|---|
+| `make` / `make test` | build the TypeScript, run the island's tests and the Rust tests |
+| `make deb` | build `out/niro-control_<version>+git<commits>_amd64.deb` |
+| `make install` | build the package and install it (log out and in to load the extensions) |
+| `make lint` | check the dock's code with Biome |
+
 `gsettings set org.niro.control opacity 70` does what the panel's slider does.
 
-## Languages
+See `docs/MAINTAINING.md` for how the parts talk to each other and where to change things.
 
-TypeScript for what we write: Island's extension (`island/gnome-extension`, files carry `// @ts-nocheck` until typed one by
-one; the build output is token-identical to the old JavaScript), the dock, the control panel, and the application search. Left as
-upstream has it: Island's Rust daemon (`island/crates`).
+## Credits and licence
 
-`npm install`, `npm test` (builds Island, runs its 70 tests).
-
-## Credits
-
-The island and the dock started as forks of zickrian/isle and vinnytherobot/MacOSDock (both GPL); their licences and
-copyright notices are kept in `island/` and `dock/`. The application search is new.
+GPL-3.0-or-later (`LICENSE`). The island and the dock started as forks of zickrian/isle (GPL-3.0) and
+vinnytherobot/MacOSDock (MIT, `shell/dock/LICENSE`); their copyright notices are kept in the files. The application
+search and the control panel are new. The Inter font is under the SIL OFL (`data/fonts/Inter-LICENSE.txt`).

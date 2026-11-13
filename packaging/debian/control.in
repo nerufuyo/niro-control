@@ -1,0 +1,12 @@
+Package: niro-control
+Version: @VERSION@
+Section: gnome
+Priority: optional
+Architecture: amd64
+Maintainer: nerufuyo <local@localhost>
+Depends: gnome-shell (>= 46), dconf-cli, libgtk-4-1, libvulkan1, fontconfig, gjs, gir1.2-gtk-4.0, gir1.2-adw-1
+Replaces: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults
+Conflicts: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults
+Description: Niro Control: the look of the desktop in one place
+ Island (the island on the top bar), the macOS-style dock, an application search, and one control panel
+ (org.niro.control: tone, opacity, blur) that sets them all. Local build.
