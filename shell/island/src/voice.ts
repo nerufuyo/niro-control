@@ -1030,8 +1030,8 @@ export function openSetUp(model, shortcut = 'Super+I') {
 }
 
 // Runs island-setup-voice ($2…), then says what next ($1); a shell stays open afterwards.
-const SET_UP = 'next="$1"; shift; "$@" && printf "\\nIsle: done. %s\\n" "$next" || ' +
-    'printf "\\nIsle: that did not finish; run island-setup-voice again.\\n"; exec bash';
+const SET_UP = 'next="$1"; shift; "$@" && printf "\\nIsland: done. %s\\n" "$next" || ' +
+    'printf "\\nIsland: that did not finish; run island-setup-voice again.\\n"; exec bash';
 
 /** How each AI CLI signs in, run in a terminal (`agy` and `claude` ask on start). */
 const SIGN_IN = {
@@ -1074,7 +1074,7 @@ function inTerminal(argv) {
 
 // Shows `$1` typed at a bash prompt, run only once Enter is pressed (it can be edited first); a shell stays
 // open afterwards. Passed as an argument, the command is never part of the script itself.
-const TYPED_COMMAND = 'printf "\\033[2mIsle: press Enter to run it, edit it first, or Ctrl+C to cancel.\\033[0m\\n"; ' +
+const TYPED_COMMAND = 'printf "\\033[2mIsland: press Enter to run it, edit it first, or Ctrl+C to cancel.\\033[0m\\n"; ' +
     'read -r -e -i "$1" -p "$ " line && eval "$line"; exec bash';
 
 /** Opens a terminal with `command` typed in, waiting for the user to press Enter. */

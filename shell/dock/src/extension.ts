@@ -1,7 +1,7 @@
 import { Extension } from "resource:///org/gnome/shell/extensions/extension.js";
 import { DockManager } from "./lib/dockManager.js";
 
-export default class MacosDockExtension extends Extension {
+export default class DockExtension extends Extension {
   private _dockManager: DockManager | null = null;
 
   enable(): void {

@@ -5,12 +5,12 @@
       <range min="0" max="100"/>
       <default>80</default>
       <summary>How opaque the surfaces are</summary>
-      <description>One setting for Island's glass, the dock, app windows (blur my shell) and DigUp's panel: 0 is clear, 100 is solid.</description>
+      <description>One setting for Island's glass, the dock, app windows (blur my shell) and the search panel: 0 is clear, 100 is solid.</description>
     </key>
     <key name="blur" type="b">
       <default>true</default>
       <summary>Blur behind surfaces</summary>
-      <description>Frosted glass behind the dock and app windows (DigUp's panel can't blur: it is a full-screen window).</description>
+      <description>Frosted glass behind the dock and app windows.</description>
     </key>
     <key name="blur-strength" type="i">
       <range min="0" max="100"/>

@@ -1948,7 +1948,7 @@ function updateRows(settings, window, version, dir) {
             startUpdate(latest);
         } catch (e) {
             console.warn(`Island: could not start the update: ${e.message}`);
-            GLib.file_set_contents(UPDATE_LOG, `island-update ${latest}\nIsle: the update didn’t start\nisle-update-done 1\n`);
+            GLib.file_set_contents(UPDATE_LOG, `island-update ${latest}\nIsland: the update didn’t start\nisland-update-done 1\n`);
         }
         sync();
     });

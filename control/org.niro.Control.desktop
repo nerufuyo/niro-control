@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Niro Control
-Comment=One look for Island, the dock, DigUp and app windows
+Comment=One look for Island, the dock, the search and app windows
 Exec=niro-control
 Icon=preferences-desktop-theme
 Categories=GNOME;GTK;Settings;DesktopSettings;

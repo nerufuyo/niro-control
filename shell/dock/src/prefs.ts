@@ -5,7 +5,7 @@ import { SignalManager } from "./lib/signalManager.js";
 
 const BIND_FLAGS = 0 | 1 | 2 | 4; // DEFAULT | GET | SET | NO_SENSITIVITY
 
-export default class MacosDockPreferences extends ExtensionPreferences {
+export default class DockPreferences extends ExtensionPreferences {
   private _signals = new SignalManager();
 
   async fillPreferencesWindow(window: Adw.PreferencesWindow): Promise<void> {

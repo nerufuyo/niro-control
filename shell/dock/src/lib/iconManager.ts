@@ -886,8 +886,6 @@ export class IconManager {
       const app = tracker.get_window_app(metaWin);
       if (!app) continue;
       const id = app.get_id();
-      // The search panel (DigUp) is not an app to keep in the dock.
-      if (id === "DigUp.desktop") continue;
       if (seen.has(id)) continue;
       seen.add(id);
       result.push(app);
