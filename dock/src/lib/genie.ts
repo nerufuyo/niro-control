@@ -60,7 +60,7 @@ export function genie(actor: Clutter.Actor, rect: Rect | null, { reverse = false
         const dy = rect.y + rect.height / 2 - (y + h / 2);
         const small = Math.max(0.06, Math.min(0.12, rect.width / w));
         const effect = new GenieEffect() as InstanceType<typeof GenieEffectBase>;
-        clone.add_effect_with_name("macos-dock-genie", effect);
+        clone.add_effect_with_name("dock-genie", effect);
         const hidden = actor.opacity;
         actor.opacity = 0;
         const finish = () => {
@@ -83,7 +83,7 @@ export function genie(actor: Clutter.Actor, rect: Rect | null, { reverse = false
         });
         timeline.start();
     } catch (e) {
-        console.error(`MacOS Dock: genie effect failed: ${e}`);
+        console.error(`Dock: genie effect failed: ${e}`);
         try { clone?.destroy(); } catch (_e) { /* already gone */ }
         actor.opacity = 255;
     }

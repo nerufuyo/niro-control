@@ -1,10 +1,10 @@
-# AGENTS.md — MacOS Dock
+# AGENTS.md — Dock
 
 ## 1. Purpose and Scope
 
-This document defines the mandatory engineering standards, architectural constraints, GNOME Shell compatibility requirements, and review procedures for all AI agents and human contributors working on MacOS Dock.
+This document defines the mandatory engineering standards, architectural constraints, GNOME Shell compatibility requirements, and review procedures for all AI agents and human contributors working on Dock.
 
-MacOS Dock is a GNOME Shell extension written in TypeScript that provides a macOS-inspired dock experience. It targets GNOME Shell 45 and later.
+Dock is a GNOME Shell extension written in TypeScript that provides a macOS-inspired dock experience. It targets GNOME Shell 45 and later.
 
 **Every change must prioritize stability, maintainability, compatibility, resource safety, and consistency with GNOME development standards.**
 
@@ -681,7 +681,7 @@ Visual changes must not compromise keyboard navigation, accessibility, dock inte
 
 All settings are defined in:
 
-`schemas/org.gnome.shell.extensions.macosdock.gschema.xml`
+`schemas/org.gnome.shell.extensions.dock.gschema.xml`
 
 Settings are accessed through `Gio.Settings`, and setting changes are propagated through the existing listeners in `dockManager.ts`.
 
@@ -1081,7 +1081,7 @@ Do not hide known regressions behind a successful build.
 
 **Every change must be implemented, reviewed, validated, and reported as a complete engineering task.**
 
-The goal is not simply to make MacOS Dock work in the immediate case. The goal is to keep it stable, maintainable, efficient, compatible with supported GNOME Shell releases, and suitable for distribution through GNOME Extensions.
+The goal is not simply to make Dock work in the immediate case. The goal is to keep it stable, maintainable, efficient, compatible with supported GNOME Shell releases, and suitable for distribution through GNOME Extensions.
 
 When uncertain, inspect the code, consult the official documentation, test the actual implementation, and explain the uncertainty instead of guessing.
 

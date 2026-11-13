@@ -130,7 +130,7 @@ export class DockVisibility {
 
     this._monitor = Main.layoutManager.primaryMonitor;
     if (!this._monitor) {
-      console.error("[macos-dock] No primary monitor available");
+      console.error("[dock] No primary monitor available");
       return;
     }
 
@@ -146,7 +146,7 @@ export class DockVisibility {
     this._container.translation_y = offsetY;
 
     this._edgeActivator = new St.Widget({
-      name: "macos-dock-edge-activator",
+      name: "dock-edge-activator",
       reactive: true,
       track_hover: true,
       opacity: 0,

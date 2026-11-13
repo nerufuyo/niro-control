@@ -1,4 +1,4 @@
-// Niro Control: one control panel for the look of Isle, the dock, the search and app windows (org.niro.control).
+// Niro Control: one control panel for the look of Island, the dock, the search and app windows (org.niro.control).
 // Runs under `gjs -m`; the gi:// modules come from the system, so they are typed loosely.
 // @ts-nocheck: GJS bindings are not typed here
 import Adw from 'gi://Adw?version=1';
@@ -147,7 +147,7 @@ function lookPage(settings) {
     colourRow(settings, colours, 'Surface tint', 'tint');
     page.add(colours);
 
-    const glass = new Adw.PreferencesGroup({title: 'Glass', description: "Isle, the dock, app windows and the search panel"});
+    const glass = new Adw.PreferencesGroup({title: 'Glass', description: "Island, the dock, app windows and the search panel"});
     scaleRow(settings, glass, 'Opacity', 'opacity', '0 is clear, 100 is solid');
     const blur = new Adw.SwitchRow({title: 'Blur', subtitle: "Frosted glass behind the dock and app windows"});
     settings.bind('blur', blur, 'active', Gio.SettingsBindFlags.DEFAULT);
@@ -237,7 +237,7 @@ function generatedPage(settings, groupOf: (key: string) => string, order: string
     return page;
 }
 
-const isleGroup = (key: string) =>
+const islandGroup = (key: string) =>
     /^(shortcut-|voice-shortcut|super-v)/.test(key) ? 'Shortcuts'
     : /^(voice-|bot-)/.test(key) ? 'Voice assistant'
     : /^usage-/.test(key) ? 'AI usage'
@@ -245,10 +245,10 @@ const isleGroup = (key: string) =>
     : /^(island-|open-|notch-|hover-|auto-hide|top-bar|compact|glass|clock-|track-peek)/.test(key) ? 'Island'
     : 'Features';
 
-function islePage() {
-    const settings = extensionSettings('isle@zickrian.github.io', 'org.gnome.shell.extensions.isle');
-    return settings ? generatedPage(settings, isleGroup, ['Island', 'Alerts', 'Features', 'Voice assistant', 'AI usage', 'Shortcuts'])
-        : missingPage('Isle');
+function islandPage() {
+    const settings = extensionSettings('island@niro.local', 'org.gnome.shell.extensions.island');
+    return settings ? generatedPage(settings, islandGroup, ['Island', 'Alerts', 'Features', 'Voice assistant', 'AI usage', 'Shortcuts'])
+        : missingPage('Island');
 }
 
 const dockGroup = (key: string) =>
@@ -257,7 +257,7 @@ const dockGroup = (key: string) =>
     : 'Behaviour';
 
 function dockPage() {
-    const settings = extensionSettings('macos-dock@vinnytherobot.github.io', 'org.gnome.shell.extensions.macosdock');
+    const settings = extensionSettings('dock@niro.local', 'org.gnome.shell.extensions.dock');
     return settings ? generatedPage(settings, dockGroup, ['Appearance', 'Motion', 'Behaviour']) : missingPage('Dock');
 }
 
@@ -273,7 +273,7 @@ function build(app) {
     const settings = new Gio.Settings({schema_id: SCHEMA});
     const stack = new Adw.ViewStack();
     stack.add_titled_with_icon(lookPage(settings), 'look', 'Look', 'preferences-desktop-theme-symbolic');
-    stack.add_titled_with_icon(islePage(), 'isle', 'Isle', 'view-pin-symbolic');
+    stack.add_titled_with_icon(islandPage(), 'island', 'Island', 'view-pin-symbolic');
     stack.add_titled_with_icon(dockPage(), 'dock', 'Dock', 'view-app-grid-symbolic');
     stack.add_titled_with_icon(searchPage(settings), 'search', 'Search', 'system-search-symbolic');
     const first = GLib.getenv('NIRO_PAGE');

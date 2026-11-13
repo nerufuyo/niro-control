@@ -1,0 +1,4 @@
+[D-BUS Service]
+Name=org.niro.island.Daemon
+Exec=@BINDIR@/island-daemon
+SystemdService=island-daemon.service

@@ -1,4 +1,4 @@
-/* Niro Search: the panel's colour and selection come from org.niro.control (set in code). */
+/* Search: the panel's colour and selection come from org.niro.control (set in code). */
 .niro-search {
   border-radius: 22px;
   border: 1px solid rgba(255, 255, 255, 0.08);

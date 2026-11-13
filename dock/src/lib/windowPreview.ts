@@ -104,7 +104,7 @@ export class WindowPreviewPopup {
   private _createPopup(app: Shell.App, windows: Meta.Window[], iconActor: IconActor): void {
     this._currentApp = app;
     const grid = new St.BoxLayout({
-      style_class: "macos-dock-preview-grid",
+      style_class: "dock-preview-grid",
       vertical: false,
       reactive: true,
     });
@@ -155,7 +155,7 @@ export class WindowPreviewPopup {
     // Build row layout
     for (const rowData of rows) {
       const rowBox = new St.BoxLayout({
-        style_class: "macos-dock-preview-row",
+        style_class: "dock-preview-row",
         vertical: false,
       });
       rowBox.set_style(`spacing: ${thumbSpacing}px;`);
@@ -167,7 +167,7 @@ export class WindowPreviewPopup {
 
     // Create outer popup container
     this._popup = new St.BoxLayout({
-      style_class: "macos-dock-preview-popup",
+      style_class: "dock-preview-popup",
       vertical: true,
       reactive: true,
     });
@@ -197,7 +197,7 @@ export class WindowPreviewPopup {
 
   private _createThumb(app: Shell.App, metaWin: Meta.Window, thumbHeight: number): ThumbData {
     const thumbBox = new St.BoxLayout({
-      style_class: "macos-dock-preview-thumb",
+      style_class: "dock-preview-thumb",
       vertical: true,
       reactive: true,
       x_align: Clutter.ActorAlign.CENTER,
@@ -227,13 +227,13 @@ export class WindowPreviewPopup {
     // Window title
     const title = metaWin.get_title() || "Window";
     const titleLabel = new St.Label({
-      style_class: "macos-dock-preview-title",
+      style_class: "dock-preview-title",
       text: title,
       x_align: Clutter.ActorAlign.CENTER,
     });
     // Close button
     const closeBtn = new St.Button({
-      style_class: "macos-dock-preview-close-btn",
+      style_class: "dock-preview-close-btn",
       y_align: Clutter.ActorAlign.CENTER,
       label: "×",
       reactive: true,
@@ -275,7 +275,7 @@ export class WindowPreviewPopup {
 
     // Highlight focused window
     if (metaWin.has_focus()) {
-      thumbBox.add_style_class_name("macos-dock-preview-focused");
+      thumbBox.add_style_class_name("dock-preview-focused");
     }
 
     // Set size
@@ -374,11 +374,11 @@ export class WindowPreviewPopup {
     for (const thumb of this._thumbs) {
       const isFocused = tracker.focus_app === thumb.app && thumb.metaWindow.has_focus();
       if (isFocused) {
-        if (!thumb.actor.has_style_class_name("macos-dock-preview-focused")) {
-          thumb.actor.add_style_class_name("macos-dock-preview-focused");
+        if (!thumb.actor.has_style_class_name("dock-preview-focused")) {
+          thumb.actor.add_style_class_name("dock-preview-focused");
         }
       } else {
-        thumb.actor.remove_style_class_name("macos-dock-preview-focused");
+        thumb.actor.remove_style_class_name("dock-preview-focused");
       }
     }
   }

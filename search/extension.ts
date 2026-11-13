@@ -1,4 +1,4 @@
-// Niro Search: a centered panel that finds the installed applications as you type (Super+Space).
+// Search: a centered panel that finds the installed applications as you type (Super+Space).
 // Its look follows org.niro.control (tone, opacity) live.
 // @ts-nocheck: GNOME Shell's modules are untyped here
 import Clutter from 'gi://Clutter';

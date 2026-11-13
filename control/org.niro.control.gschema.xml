@@ -5,7 +5,7 @@
       <range min="0" max="100"/>
       <default>80</default>
       <summary>How opaque the surfaces are</summary>
-      <description>One setting for Isle's glass, the dock, app windows (blur my shell) and DigUp's panel: 0 is clear, 100 is solid.</description>
+      <description>One setting for Island's glass, the dock, app windows (blur my shell) and DigUp's panel: 0 is clear, 100 is solid.</description>
     </key>
     <key name="blur" type="b">
       <default>true</default>
@@ -20,7 +20,7 @@
     <key name="accent" type="s">
       <default>'#E8472B'</default>
       <summary>Accent colour</summary>
-      <description>The one accent of the desktop: Isle's highlights, the dock's running dots, the search panel's selection.</description>
+      <description>The one accent of the desktop: Island's highlights, the dock's running dots, the search panel's selection.</description>
     </key>
     <key name="tint" type="s">
       <default>'#1C1C1E'</default>

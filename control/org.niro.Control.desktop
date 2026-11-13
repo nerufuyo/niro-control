@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
 Name=Niro Control
-Comment=One look for Isle, the dock, DigUp and app windows
+Comment=One look for Island, the dock, DigUp and app windows
 Exec=niro-control
 Icon=preferences-desktop-theme
 Categories=GNOME;GTK;Settings;DesktopSettings;
-Keywords=appearance;theme;accent;opacity;blur;transparent;acrylic;isle;dock;
+Keywords=appearance;theme;accent;opacity;blur;transparent;acrylic;island;dock;
 StartupWMClass=org.niro.Control

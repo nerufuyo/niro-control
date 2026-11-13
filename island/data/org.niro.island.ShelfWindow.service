@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.niro.island.ShelfWindow
+Exec=@BINDIR@/island-shelf

@@ -1,0 +1,1755 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+/* Copyright (C) 2026 zickrian */
+
+/* Island. island.js draws the island black; this styles what sits on it (see docs/product-spec.md).
+ * A dark palette: surfaces #1c1c1e #2c2c2e #3a3a3c; accents #30d158 #ff453a #E8472B #ff9f0a #5e5ce6. */
+
+/* ── Shared ───────────────────────────────────────────── */
+
+/* Inter, installed with Island. St takes a single quoted family only: a list stops it reading the
+ * rules that follow. */
+#islandIsland {
+  color: #ffffff;
+  font-family: "Inter Variable";
+}
+
+/* Tabular figures for numbers that change or line up, so they hold still; prose keeps proportional
+ * ones ("11:10" and "island-0.9.1" would space out). */
+.island-compact-clock, .island-compact-date, .island-compact-second-time, .island-header-time, .island-recording-time,
+.island-timer-time, .island-stepper-value, .island-time, .island-volume-text, .island-peek-value,
+.island-call-duration, .island-reminders-count, .island-cal-event-time, .island-cal-day, .island-usage-percent {
+  font-feature-settings: "tnum";
+}
+
+.island-button {
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 6px;
+  transition-duration: 120ms;
+}
+
+.island-button:hover { background-color: rgba(255, 255, 255, 0.12); }
+.island-button:active { background-color: rgba(255, 255, 255, 0.2); }
+.island-button:focus { color: #ffffff; }
+
+.island-button-flat { background-color: transparent; }
+
+.island-button-round { background-color: #2c2c2e; padding: 8px; }
+.island-button-round:hover { background-color: #3a3a3c; }
+.island-button-small { padding: 6px; }
+
+/* Pill button with text (alert actions). */
+.island-pill {
+  font-weight: 600;
+  border-radius: 999px;
+  transition-duration: 120ms;
+}
+
+/* Buttons: grey (solid, so an alert's glow never tints it), white text, lighter under the pointer.
+ * 25 px tall wherever they are: an alert's, a card's, Clear. */
+.island-pill-small {
+  font-size: 12px;
+  padding: 5px 14px;
+  color: #ffffff;
+  background-color: #2c2c2e;
+}
+
+.island-pill-small:hover { background-color: #3a3a3c; }
+.island-pill-small:active { background-color: #48484a; }
+
+/* An alert's one thing to do now (Join), in the accent colour. */
+.island-pill-accent { background-color: #E8472B; }
+.island-pill-accent:hover { background-color: #F2603F; }
+.island-pill-accent:active { background-color: #C93A20; }
+
+.island-art { background-color: #2c2c2e; }
+.island-art-placeholder { color: rgba(255, 255, 255, 0.4); }
+
+.island-level {
+  height: 5px;
+  border-radius: 3px;
+  background-color: rgba(255, 255, 255, 0.18);
+}
+
+.island-level-fill { border-radius: 3px; background-color: #ffffff; }
+
+.island-bars { spacing: 2px; }
+.island-bar { width: 3px; border-radius: 2px; background-color: #ffffff; }
+
+.island-empty { spacing: 4px; }
+.island-empty-icon { color: rgba(255, 255, 255, 0.35); padding-bottom: 4px; }
+.island-empty-title { font-size: 15px; font-weight: 600; letter-spacing: -0.1px; }
+.island-empty-hint { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+
+.island-entry {
+  color: #ffffff;
+  font-size: 13px;
+  border-radius: 999px;
+  padding: 8px 14px;
+  border: none;
+  background-color: #1c1c1e;
+  caret-color: #E8472B;
+  selection-background-color: rgba(10, 132, 255, 0.5);
+  selected-color: #ffffff;
+}
+
+.island-entry:focus { background-color: #2c2c2e; }
+.island-entry StLabel.hint-text { color: rgba(255, 255, 255, 0.45); }
+
+/* Blur my Shell restyles every entry in the shell from an ancestor, with
+ * !important (light entries on a black island); the island's keep theirs. */
+#islandIsland .island-entry { color: #ffffff !important; background-color: #1c1c1e !important; }
+#islandIsland .island-entry:focus {
+  background-color: #2c2c2e !important;
+  box-shadow: none !important;
+}
+#islandIsland .island-entry StLabel.hint-text { color: rgba(255, 255, 255, 0.45) !important; }
+
+/* ── Top bar ──────────────────────────────────────────── */
+
+/* Compact top bar: slimmer than GNOME's 2.2em, so it reads as a thin bezel
+ * around the island. Status icons and the tray stay where they are. */
+#panel.island-compact-bar {
+  height: 26px;
+  font-size: 13px;
+  font-family: "Inter Variable";
+  font-weight: 500;
+}
+
+/* Closed island inside the top bar, like a notch: maximised windows start below the bar, the island as tall
+ * or, with space below it (Settings), a little shorter. Comes after the compact bar's height so it wins. */
+#panel.island-notch-bar { height: 32px; }
+/* A pill inside the bar: 30 px tall, 3 px of bar above and below it, as a notched display's menu bar holds its notch. */
+#panel.island-notch-bar.island-pill-bar { height: 36px; }
+
+/* Island's bar is black or see-through in light and dark style alike: its text and icons stay white,
+ * as GNOME's light style has them over the overview (it makes them near-black otherwise). */
+#panel.island-panel .panel-button { color: #ffffff; }
+#panel.island-panel .panel-button:focus, #panel.island-panel .panel-button:hover { box-shadow: inset 0 0 0 100px rgba(255, 255, 255, 0.17); }
+#panel.island-panel .panel-button:active, #panel.island-panel .panel-button:checked { box-shadow: inset 0 0 0 100px rgba(255, 255, 255, 0.28); }
+#panel.island-panel .panel-button:active:hover, #panel.island-panel .panel-button:checked:hover { box-shadow: inset 0 0 0 100px rgba(255, 255, 255, 0.32); }
+#panel.island-panel .panel-button#panelActivities .workspace-dot { background-color: #ffffff; }
+/* Screen recording and sharing keep GNOME's own red and orange (its dark style's, as the bar is). */
+#panel.island-panel .panel-button.screen-recording-indicator:focus,
+#panel.island-panel .panel-button.screen-recording-indicator:hover { box-shadow: inset 0 0 0 100px #d61f2d; }
+#panel.island-panel .panel-button.screen-recording-indicator:active,
+#panel.island-panel .panel-button.screen-recording-indicator:checked { box-shadow: inset 0 0 0 100px #e02a37; }
+#panel.island-panel .panel-button.screen-recording-indicator:active:hover,
+#panel.island-panel .panel-button.screen-recording-indicator:checked:hover { box-shadow: inset 0 0 0 100px #e13340; }
+#panel.island-panel .panel-button.screen-sharing-indicator:focus,
+#panel.island-panel .panel-button.screen-sharing-indicator:hover { box-shadow: inset 0 0 0 100px #ff861a; }
+#panel.island-panel .panel-button.screen-sharing-indicator:active,
+#panel.island-panel .panel-button.screen-sharing-indicator:checked { box-shadow: inset 0 0 0 100px #ff902e; }
+#panel.island-panel .panel-button.screen-sharing-indicator:active:hover,
+#panel.island-panel .panel-button.screen-sharing-indicator:checked:hover { box-shadow: inset 0 0 0 100px #ff9638; }
+
+/* The glass bar has no colour, so its text and icons carry a soft shadow to
+ * stay readable on a light wallpaper. */
+#panel.island-glass-bar .panel-button {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+  icon-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+
+/* Medium weight, calmer than the theme's bold. */
+#panel.island-compact-bar .panel-button {
+  font-weight: 500;
+  border-width: 2px;
+  -natural-hpadding: 10px;
+  -minimum-hpadding: 5px;
+}
+
+/* ── Compact ──────────────────────────────────────────── */
+
+/* Each side's padding toward the clock is its gap to it; compact.js makes both sides as wide, and sets
+ * the room at the ends from the island's height. */
+.island-compact-start { padding-right: 44px; }
+.island-compact-end { padding-left: 44px; }
+
+.island-compact-clock { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; }
+.island-compact-clock-box { spacing: 6px; }
+/* AM or PM after the time with a 12-hour clock: 80% of its size, a little dimmer, a space's width from it. */
+.island-compact-clock-row { spacing: 4px; }
+.island-compact-meridiem { font-size: 13.6px; font-weight: 600; color: rgba(255, 255, 255, 0.72); }
+/* The day before the time (Settings): as large, quieter, a little further from it than AM or PM. */
+.island-compact-date { font-size: 17px; font-weight: 500; letter-spacing: -0.2px; margin-right: 2px; color: rgba(255, 255, 255, 0.7); }
+
+/* Inside the top bar everything is sized like the bar's own text. */
+.island-compact-in-bar .island-compact-start { padding-right: 28px; }
+.island-compact-in-bar .island-compact-end { padding-left: 28px; }
+.island-compact-in-bar .island-compact-clock { font-size: 15px; letter-spacing: -0.1px; }
+.island-compact-in-bar .island-compact-clock-row { spacing: 3px; }
+.island-compact-in-bar .island-compact-meridiem { font-size: 12px; }
+.island-compact-in-bar .island-compact-date { font-size: 15px; letter-spacing: -0.1px; }
+
+.island-unseen-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background-color: #ffffff;
+}
+
+/* Live activities: privacy dots and screen recording */
+
+.island-privacy-dots { spacing: 4px; padding-left: 4px; }
+/* On the closed island, a tight cluster after the right side's sign. */
+.island-compact-trail .island-privacy-dots { padding-left: 0; }
+
+.island-privacy-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 4px;
+}
+
+.island-privacy-dot.camera { background-color: #34c759; }
+.island-privacy-dot.microphone { background-color: #ff9f0a; }
+.island-privacy-dot.screenShare { background-color: #E8472B; }
+/* Sharing the Shelf with a phone: violet, the bot's glow; no other dot is. */
+.island-privacy-dot.phone { background-color: #bf5af2; }
+
+.island-recording-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  background-color: #ff453a;
+}
+
+/* A call, in green; a red microphone while muted. */
+.island-call-icon { color: #30d158; }
+.island-call-muted { color: #ff453a; }
+/* The closed island's right side: its sign, then the privacy dots. */
+.island-compact-trail { spacing: 6px; }
+/* As large as the clock and on its line: the two times read as one row. */
+.island-compact-second-time { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; }
+.island-compact-in-bar .island-compact-second-time { font-size: 15px; letter-spacing: -0.1px; }
+
+/* ── Alerts (peek) ────────────────────────────────────── */
+
+/* As much room at the sides as above and below the badge (PADDING in peek.js). */
+.island-peek-row { padding: 0 12px; spacing: 10px; }
+/* At the top, as its texts and the assistant beside them are (peek.js); the room below is in its height. */
+.island-peek-row-asks { padding: 12px 12px 0 12px; spacing: 12px; }
+/* Lit along its edges: more room, so the buttons stay clear of the light (GLOW_PADDING in peek.js). */
+.island-peek-row-glow { padding: 16px 16px 0 16px; }
+
+/* The badge's colour comes from the alert (peek.js); a hairline on top
+ * gives it depth. */
+.island-peek-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+/* Inside a level ring: a smaller badge, lit like the others (peek.js). */
+.island-peek-ring-badge {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+}
+
+/* A short state on the right, e.g. Caps Lock "On", in the alert's colour. */
+.island-peek-status {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+.island-peek-title { font-size: 14px; font-weight: 600; }
+.island-peek-subtitle { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+.island-peek-code {
+    font-family: monospace;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.9);
+    margin-top: 6px;
+    padding: 5px 9px;
+    border-radius: 8px;
+    background-color: rgba(255, 255, 255, 0.08);
+}
+/* Its buttons; the space between them is ACTIONS_SPACING in peek.js. */
+.island-peek-actions { padding-top: 10px; }
+/* The × on an alert's icon under the pointer (widgets.js `cornerClose`). */
+.island-corner-close {
+  padding: 0;
+  width: 18px;
+  height: 18px;
+  color: rgba(255, 255, 255, 0.85);
+  background-color: #3a3a3c;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+.island-corner-close:hover { color: #ffffff; background-color: #4a4a4e; }
+.island-corner-close:active { background-color: #5a5a5e; }
+.island-peek-answered { spacing: 6px; padding-top: 9px; }
+.island-peek-answered-text { font-size: 12px; font-weight: 600; }
+.island-peek-allowed { color: #30d158; }
+.island-peek-denied { color: #ff453a; }
+.island-peek-value { font-size: 20px; font-weight: 600; letter-spacing: -0.5px; }
+.island-peek-level-box { spacing: 8px; }
+.island-peek-level-text { font-size: 12px; font-weight: 600; min-width: 30px; text-align: right; }
+
+/* ── Voice assistant ──────────────────────────────────── */
+
+/* The orb on the left, then what was heard above the answer (voice.js sizes them to match). */
+.island-voice-row { padding: 14px 16px 20px 16px; spacing: 12px; }
+.island-voice-orb { border-radius: 999px; }
+.island-voice-heard { font-size: 12px; color: rgba(255, 255, 255, 0.5); padding-bottom: 2px; }
+.island-voice-text { font-size: 15px; font-weight: 500; letter-spacing: -0.1px; }
+.island-voice-text-dim { color: rgba(255, 255, 255, 0.6); }
+.island-voice-text-long { font-size: 14px; font-weight: 400; color: rgba(255, 255, 255, 0.92); }
+.island-voice-hint { font-size: 12px; color: rgba(255, 255, 255, 0.5); padding-top: 4px; }
+.island-voice-steps { spacing: 3px; padding-top: 5px; }
+.island-voice-step { spacing: 6px; }
+.island-voice-step-tick { color: rgba(255, 255, 255, 0.45); }
+.island-voice-step-text { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+.island-voice-sign-in { margin-top: 10px; }
+.island-voice-heard-row { spacing: 4px; }
+.island-voice-heard-button { padding: 0; border-radius: 6px; }
+.island-voice-heard-button:hover .island-voice-heard { color: rgba(255, 255, 255, 0.75); }
+.island-voice-earlier { color: rgba(255, 255, 255, 0.5); }
+.island-voice-still { font-size: 12px; color: rgba(255, 255, 255, 0.46); padding-top: 4px; }
+.island-voice-undo { spacing: 8px; padding-bottom: 6px; }
+.island-voice-ideas { spacing: 6px; padding-top: 8px; }
+.island-voice-idea {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 11px;
+    border-radius: 999px;
+    color: rgba(255, 255, 255, 0.8);
+    background-color: rgba(255, 255, 255, 0.09);
+    border: 1px solid transparent;
+}
+.island-voice-idea:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.13); }
+.island-voice-undo-text { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.island-voice-undo-button { font-size: 12px; padding: 3px 10px; }
+
+/* The command card, set straight on the pill (no box of its own): what it is for, the command coloured as a
+   shell would, then what to know on the left and Deny or Run on the right. */
+.island-card { margin-top: 8px; spacing: 8px; }
+.island-card-ended { spacing: 5px; }
+.island-card-head { spacing: 8px; }
+.island-card-title { font-size: 13px; font-weight: 600; }
+.island-card-subtitle { font-size: 12px; color: rgba(255, 255, 255, 0.5); font-feature-settings: "tnum"; }
+.island-card-terminal { padding: 8px 11px; spacing: 4px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.07); }
+.island-card-ended .island-card-terminal { padding: 5px 10px; background-color: rgba(255, 255, 255, 0.05); }
+.island-card-line { spacing: 10px; }
+.island-copy-button { padding: 0; border-radius: 4px; }
+.island-copy-button:hover .island-card-command, .island-copy-button:hover .island-chat-command-text { color: #ffffff; }
+.island-card-command { font-family: monospace; font-size: 12px; }
+.island-card-output { font-family: monospace; font-size: 11px; color: rgba(255, 255, 255, 0.46); }
+.island-card-output-failed { color: #ff6961; }
+.island-card-sweep { margin-top: 2px; }
+.island-card-foot { spacing: 8px; }
+.island-card-risks { spacing: 6px; }
+.island-card-risk { spacing: 6px; color: #ffb340; }
+.island-card-risk-removes { color: #ff6961; }
+.island-card-risk-text { font-size: 12px; font-weight: 500; }
+.island-card-button { padding: 5px 8px 5px 14px; }
+.island-card-button-plain { padding: 5px 14px; }
+.island-card-button-box { spacing: 8px; }
+.island-card-button-label { font-size: 12px; font-weight: 600; }
+.island-card-key { font-size: 11px; font-weight: 500; padding: 0 1px; }
+.island-card-ghost { color: #ffffff; }
+.island-card-ghost .island-card-key { color: rgba(255, 255, 255, 0.46); }
+.island-card-run, .island-pill-white { color: #000000; background-color: #ffffff; }
+.island-card-run:hover, .island-pill-white:hover { background-color: rgba(255, 255, 255, 0.86); }
+.island-card-run:active, .island-pill-white:active { background-color: rgba(255, 255, 255, 0.72); }
+.island-card-run .island-card-key { color: rgba(0, 0, 0, 0.45); }
+.island-card-status { spacing: 5px; }
+.island-card-status-text { font-size: 11px; font-weight: 600; font-feature-settings: "tnum"; }
+.island-card-done { color: #30d158; }
+.island-card-failed { color: #ff453a; }
+.island-card-denied { color: rgba(255, 255, 255, 0.5); }
+
+/* The conversation, above the pill. */
+.island-chat { padding: 10px 16px 0 16px; spacing: 8px; }
+.island-chat-header { spacing: 6px; }
+.island-chat-title { font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.46); }
+.island-chat-copied, .island-card-copied { color: #30d158; }
+.island-chat-new { padding: 5px; color: rgba(255, 255, 255, 0.75); background-color: rgba(255, 255, 255, 0.08); }
+.island-chat-new:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.16); }
+.island-chat-list { spacing: 10px; padding-top: 6px; padding-bottom: 4px; }
+.island-chat-scroll { -st-vfade-offset: 28px; }
+.island-chat-user { padding: 6px 12px; spacing: 5px; border-radius: 15px; background-color: rgba(255, 255, 255, 0.12); }
+.island-chat-user-text { font-size: 13px; }
+.island-chat-reply { font-size: 13px; color: rgba(255, 255, 255, 0.9); }
+.island-chat-reply-row { spacing: 8px; }
+.island-chat-time { font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.46); font-feature-settings: "tnum"; }
+.island-chat-command { spacing: 8px; }
+.island-chat-command-text { font-family: monospace; font-size: 11px; padding: 5px 9px; border-radius: 8px; background-color: rgba(255, 255, 255, 0.06); }
+/* As wide whatever it says, so the command beside it keeps its width. */
+.island-chat-command-status { min-width: 56px; }
+.island-chat-command-status .island-card-status-text { font-size: 11px; }
+
+/* The round button at the row's end: 32 px with any of its icons (see ACTION_SIZE in voice.js). */
+.island-voice-action { padding: 8px; color: rgba(255, 255, 255, 0.7); background-color: rgba(255, 255, 255, 0.08); }
+.island-voice-action:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.15); }
+.island-voice-action:active { background-color: rgba(255, 255, 255, 0.22); }
+.island-voice-stop { padding: 10px; color: #ffffff; background-color: rgba(255, 255, 255, 0.14); }
+.island-voice-send { padding: 7px; border-radius: 999px; color: #000000; background-color: #ffffff; transition-duration: 150ms; }
+.island-voice-send-mic { color: #ffffff; background-color: rgba(255, 255, 255, 0.14); }
+.island-voice-send-mic:hover { background-color: rgba(255, 255, 255, 0.24); }
+
+/* The typed request: a quiet field, no accent ring (GNOME's and Blur my Shell's, with !important). */
+#islandIsland .island-voice-entry,
+#islandIsland .island-voice-entry:hover,
+#islandIsland .island-voice-entry:focus,
+#islandIsland .island-voice-entry:focus:hover {
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 0;
+  padding: 4px 4px 4px 16px;
+  border-radius: 999px;
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.09) !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+  caret-color: #ffffff;
+  selection-background-color: rgba(255, 255, 255, 0.28);
+  selected-color: #ffffff;
+}
+#islandIsland .island-voice-entry:focus,
+#islandIsland .island-voice-entry:focus:hover { border: 1px solid rgba(255, 255, 255, 0.16) !important; }
+#islandIsland .island-voice-entry StLabel.hint-text { color: rgba(255, 255, 255, 0.45) !important; }
+.island-compact-warning { color: #ff453a; }
+.island-header-mic { padding: 4px; color: rgba(255, 255, 255, 0.6); }
+.island-header-mic:hover { color: #ffffff; }
+
+/* ── Expanded: frame ──────────────────────────────────── */
+
+/* What shows lines up with the pages' 20px edges: the open tab's pill on the left, the settings icon on the right. */
+.island-header { padding: 0 16px 0 20px; }
+.island-header-clock { spacing: 8px; }
+
+/* Tabs to the pages: icons, with the open page's name in a lit pill. */
+.island-tabs { spacing: 2px; }
+
+.island-tab {
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: #ffffff;
+  transition-duration: 150ms;
+}
+
+/* The open tab sits on a dark grey pill; no outlines. */
+.island-tab:hover,
+.island-tab:focus { background-color: rgba(255, 255, 255, 0.05); color: #ffffff; }
+.island-tab:checked { background-color: rgba(255, 255, 255, 0.09); }
+.island-tab-box { spacing: 0; min-height: 18px; }
+/* The gap from the icon is the name's own margin, so a closed name takes no room (expanded.js). Its 17 px
+ * line plus 1: every tab an even 26 px, centred to the pixel in the bar, the name on the clock's line. */
+.island-tab-label { font-size: 13px; font-weight: 600; margin-left: 6px; padding-bottom: 1px; }
+
+/* A dot on a tab whose page has news. */
+.island-tab-badge {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  background-color: #ff453a;
+}
+.island-header-date { font-size: 13px; color: rgba(255, 255, 255, 0.9); }
+.island-header-time { font-size: 13px; font-weight: 600; }
+.island-header-time-box { spacing: 3px; }
+.island-header-meridiem { font-size: 10.4px; font-weight: 600; color: rgba(255, 255, 255, 0.72); }
+.island-header-settings { padding: 4px; color: rgba(255, 255, 255, 0.6); }
+.island-header-settings:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.1); }
+.island-header-status { spacing: 10px; }
+
+.island-recording-pill {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background-color: rgba(255, 69, 58, 0.18);
+}
+
+.island-recording-pill:hover { background-color: rgba(255, 69, 58, 0.32); }
+.island-recording-pill-box { spacing: 6px; }
+.island-recording-time { font-size: 12px; font-weight: 700; color: #ff6961; }
+
+/* Pages line up with the header's edges, as far in as the room below them (BOTTOM_PADDING in expanded.js). */
+.island-page { padding: 6px 20px 0 20px; }
+
+/* ── Music ────────────────────────────────────────────── */
+
+.island-player { spacing: 20px; }
+.island-player-column { spacing: 4px; }
+.island-player-head { spacing: 8px; }
+.island-player-modes { spacing: 2px; }
+.island-player-modes .island-button { padding: 5px; color: rgba(255, 255, 255, 0.75); }
+.island-player-top { spacing: 14px; }
+.island-player-texts { spacing: 1px; }
+.island-track-title { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; }
+.island-track-subtitle { font-size: 13px; color: rgba(255, 255, 255, 0.55); }
+/* The playing app's icon on the cover's corner, ringed in black. */
+.island-app-badge {
+  padding: 2px;
+  border-radius: 999px;
+  background-color: #000000;
+}
+
+.island-player-progress { spacing: 10px; padding-top: 6px; }
+
+.island-time {
+  font-size: 12px;
+  font-weight: 500;
+  min-width: 34px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.island-time-end { text-align: right; }
+
+.island-slider { height: 16px; }
+.island-slider-track { border-radius: 2px; background-color: rgba(255, 255, 255, 0.2); }
+.island-slider-fill { border-radius: 2px; background-color: #ffffff; }
+.island-slider-knob { border-radius: 6px; background-color: #ffffff; }
+
+.island-transport { spacing: 20px; }
+.island-play { padding: 6px; }
+.island-mode-toggle.on { background-color: rgba(255, 255, 255, 0.16); }
+
+/* Volume and outputs */
+
+.island-audio-layout { spacing: 8px; padding-top: 2px; }
+/* Its speaker over the outputs' icons, the slider from where their names start (.island-output-button). */
+.island-volume-row { spacing: 6px; padding-left: 6px; }
+.island-volume-text { font-size: 12px; font-weight: 600; min-width: 46px; text-align: right; color: rgba(255, 255, 255, 0.85); }
+.island-output-list { spacing: 4px; }
+
+.island-output-button {
+  border-radius: 12px;
+  padding: 6px 12px;
+  color: #ffffff;
+  transition-duration: 120ms;
+}
+
+.island-output-button:hover { background-color: #1c1c1e; }
+.island-output-button.active { background-color: #1c1c1e; }
+.island-output-row { spacing: 12px; }
+.island-output-name { font-size: 13px; font-weight: 600; }
+.island-output-detail { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+
+/* Lyrics: the player in a column beside the words. */
+
+.island-lyrics-layout { spacing: 26px; }
+.island-lyrics-side { width: 232px; spacing: 8px; }
+.island-lyrics-side .island-player-top { spacing: 12px; }
+.island-lyrics-side .island-player-progress { padding-top: 2px; }
+.island-lyrics-controls { spacing: 4px; }
+.island-lyrics-controls .island-transport { spacing: 14px; }
+.island-lyrics-controls .island-mode-toggle { color: rgba(255, 255, 255, 0.75); }
+.island-side-title { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; }
+.island-side-artist { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.island-side-bars { padding-top: 5px; }
+
+/* Lines fade at the edges as they scroll; room below lets the last ones
+ * reach the reading line. */
+.island-lyrics-scroll { -st-vfade-offset: 26px; }
+.island-lyrics-column, .island-lyrics-block { spacing: 2px; }
+.island-lyrics-end { height: 72px; }
+
+/* Size, brightness and scale per line are set in lyrics.js. */
+.island-lyric-line {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  padding: 3px 0;
+  color: #ffffff;
+}
+
+.island-lyric-line.plain {
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+/* A pause in the singing. */
+.island-lyric-dots { spacing: 6px; padding: 9px 2px; }
+.island-lyric-dot { width: 7px; height: 7px; border-radius: 4px; background-color: #ffffff; }
+
+/* No lines: loading, not found, instrumental, or the service unreachable. */
+.island-lyrics-state { spacing: 3px; }
+.island-lyrics-state-icon { color: rgba(255, 255, 255, 0.4); padding-bottom: 5px; }
+.island-lyrics-state-dots { padding: 4px 0 8px 0; }
+.island-lyrics-state-dots .island-lyric-dot { background-color: rgba(255, 255, 255, 0.6); }
+.island-lyrics-state-title { font-size: 14px; font-weight: 600; color: rgba(255, 255, 255, 0.85); }
+.island-lyrics-state-hint { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+
+/* ── Call ─────────────────────────────────────────────── */
+
+/* The call's window; call.js rounds its corners and draws a hairline edge. */
+.island-call-preview { background-color: #1c1c1e; border-radius: 14px; }
+.island-call-preview-button { border-radius: 14px; }
+.island-call-preview-button:focus { color: #ffffff; }
+.island-call-placeholder { spacing: 8px; }
+.island-call-hint { font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, 0.5); }
+
+/* Over the preview under the pointer: where a click goes. */
+.island-call-preview-hover {
+  padding: 9px;
+  border-radius: 999px;
+  color: #ffffff;
+  background-color: rgba(0, 0, 0, 0.55);
+}
+
+.island-call-side { spacing: 2px; }
+.island-call-head { spacing: 8px; }
+.island-call-name { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; }
+.island-call-status { spacing: 5px; padding-left: 1px; }
+.island-call-kind { font-size: 13px; color: rgba(255, 255, 255, 0.55); }
+.island-call-duration { font-size: 13px; font-weight: 600; color: #30d158; }
+
+/* Round buttons with captions; mute turns white while on. */
+.island-call-controls { spacing: 18px; padding-top: 14px; }
+.island-call-control-box { spacing: 5px; }
+
+.island-call-control {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  color: #ffffff;
+  background-color: #2c2c2e;
+  transition-duration: 120ms;
+}
+
+.island-call-control:hover { background-color: #3a3a3c; }
+.island-call-control:focus { color: #ffffff; }
+.island-call-control:checked { color: #000000; background-color: #ffffff; }
+.island-call-control:checked:hover { background-color: #e6e6e6; }
+.island-call-control-label { font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, 0.6); }
+
+/* The Call tab's phone is green, like the call itself. */
+.island-tab-call StIcon { color: #30d158; }
+
+/* ── Focus ────────────────────────────────────────────── */
+
+/* The Focus page (timer.js): a ring with the time and the phase, steppers for the lengths, and Start. */
+.island-timer-time { font-size: 24px; font-weight: 600; letter-spacing: -0.5px; }
+.island-timer-phase { font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, 0.55); }
+
+/* "Work  25  −  +", as a pill. */
+.island-steppers { spacing: 8px; }
+.island-stepper { padding: 3px 4px 3px 12px; spacing: 4px; border-radius: 999px; background-color: #1c1c1e; }
+.island-stepper-name { font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, 0.55); width: 40px; }
+.island-stepper-value { font-size: 15px; font-weight: 600; letter-spacing: -0.1px; width: 26px; text-align: right; padding-right: 6px; }
+/* The length is a field as well: quiet until the pointer is on it or it is being typed in. */
+#islandIsland .island-stepper-entry,
+#islandIsland .island-stepper-entry:hover,
+#islandIsland .island-stepper-entry:focus,
+#islandIsland .island-stepper-entry:focus:hover {
+  /* Room for three digits ("180"), in step with the text's size: a field scrolls what it can't fit. */
+  width: 2.4em;
+  min-height: 0;
+  padding: 0 6px 0 0;
+  border: none !important;
+  border-radius: 6px;
+  color: #ffffff !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  caret-color: #ffffff;
+  selection-background-color: rgba(255, 255, 255, 0.28);
+  selected-color: #ffffff;
+}
+#islandIsland .island-stepper-entry:hover { background-color: rgba(255, 255, 255, 0.08) !important; }
+#islandIsland .island-stepper-entry:focus,
+#islandIsland .island-stepper-entry:focus:hover { background-color: rgba(255, 255, 255, 0.16) !important; }
+.island-stepper-button { padding: 6px; border-radius: 999px; color: rgba(255, 255, 255, 0.8); }
+.island-stepper-button:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.1); }
+/* While a session runs the lengths are locked (timer.js): each reads on in grey, its − / + faint. */
+#islandIsland .island-stepper-locked .island-stepper-entry { color: rgba(255, 255, 255, 0.6) !important; }
+
+/* Reset as tall as Start beside it. */
+.island-timer-controls { spacing: 8px; }
+.island-timer-controls .island-button-round { padding: 10px; }
+.island-start-pill { padding: 8px 18px; border-radius: 999px; color: #ffffff; background-color: #2c2c2e; }
+.island-start-pill:hover { background-color: #3a3a3c; }
+.island-start-pill-box { spacing: 7px; }
+.island-start-pill-label { font-size: 14px; font-weight: 600; }
+
+/* ── Lists (notifications, calendar) ──────────────────── */
+
+/* Lists fade out at an edge that scrolls on, instead of being cut. */
+.island-task-scroll { padding: 6px 0; -st-vfade-offset: 18px; }
+.island-task-add-icon { color: rgba(255, 255, 255, 0.5); padding-right: 4px; }
+.island-task-remove { padding: 3px; color: rgba(255, 255, 255, 0.7); }
+
+/* ── Reminders ────────────────────────────────────────── */
+
+/* Reminders: an orange title and count (as large as the timer's caption beside it), rows of a ring and a title
+ * over a hairline. A 24 px header and 24 px rows fit five whole rows in the 144 px page. */
+.island-reminders-header { height: 25px; padding: 0; spacing: 8px; }
+.island-reminders-title { font-size: 17px; font-weight: 600; color: #ff9f0a; letter-spacing: -0.2px; }
+.island-reminders-count { font-size: 17px; font-weight: 600; letter-spacing: -0.2px; color: #ff9f0a; padding-right: 2px; }
+
+/* Lists fade out at an edge that scrolls on, instead of being cut. */
+.island-reminder-scroll { -st-vfade-offset: 14px; }
+.island-reminder { min-height: 24px; spacing: 10px; }
+/* The ring by the first line; a wrapped title gets a little air above and below. */
+.island-reminder .island-reminder-check { margin-top: 3px; }
+.island-reminder-new .island-reminder-check { margin-top: 0; }
+.island-reminder-title-box { padding: 3px 0; }
+
+/* An 18 px ring; ticked, it turns orange with a 10 px dot inside. */
+.island-reminder-check {
+  width: 10px;
+  height: 10px;
+  padding: 2.5px;
+  border-radius: 99px;
+  border: 1.5px solid rgba(255, 255, 255, 0.32);
+  transition-duration: 160ms;
+}
+
+.island-reminder-check:hover { border-color: rgba(255, 255, 255, 0.6); }
+.island-reminder-check:checked { border-color: #ff9f0a; }
+.island-reminder-check.faint { border-color: rgba(255, 255, 255, 0.14); }
+.island-reminder-dot { border-radius: 99px; background-color: #ff9f0a; }
+
+.island-reminder-content { spacing: 6px; padding-right: 2px; }
+/* The hairline runs under the text, from the title to the edge. */
+.island-reminder-line { height: 1px; background-color: rgba(255, 255, 255, 0.1); }
+.island-reminder-title { font-size: 13px; color: #ffffff; transition-duration: 200ms; }
+.island-reminder-title.done { color: rgba(255, 255, 255, 0.38); }
+.island-reminder-strike { height: 1.5px; background-color: rgba(255, 255, 255, 0.45); }
+.island-reminder-remove { padding: 3px; border-radius: 99px; color: rgba(255, 255, 255, 0.5); }
+.island-reminder-remove:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.1); }
+
+.island-reminders-empty { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.55); padding-top: 22px; }
+
+/* Plain text fields, inside the row (Blur my Shell restyles entries with !important). */
+#islandIsland .island-reminder-field,
+#islandIsland .island-reminder-field:focus {
+  font-size: 13px;
+  padding: 0;
+  border: none;
+  color: #ffffff !important;
+  background-color: transparent !important;
+  box-shadow: none !important;
+  caret-color: #ffffff;
+  /* Not the theme's accent (orange on Ubuntu): a quiet selection, as the assistant's field has. */
+  selection-background-color: rgba(255, 255, 255, 0.28);
+  selected-color: #ffffff;
+}
+
+/* GNOME indents the placeholder (more since 49); here it lines up with the titles above. In the other
+ * fields it starts just past the cursor, which would cross its first letter. */
+#islandIsland .island-reminder-field StLabel.hint-text { color: rgba(255, 255, 255, 0.45); margin-left: 0; padding-left: 0; }
+#islandIsland .island-entry StLabel.hint-text, #islandIsland .island-voice-entry StLabel.hint-text { margin-left: 6px; padding-left: 0; }
+/* The Calendar's on the events' titles below it, as the Reminders' field is. */
+#islandIsland .island-cal-add StLabel.hint-text { margin-left: 0; }
+
+/* ── Calendar ─────────────────────────────────────────── */
+
+/* The month, as a calendar widget shows it. */
+.island-cal-month { width: 196px; spacing: 2px; }
+.island-cal-month-header { spacing: 0; padding-bottom: 2px; }
+.island-cal-month-title { padding: 1px 4px; border-radius: 6px; }
+.island-cal-month-title:hover { background-color: rgba(255, 255, 255, 0.06); }
+.island-cal-month-title-box { spacing: 5px; }
+/* No letter-spacing: St rounds it to whole pixels (none at 100%, 1px at 200%), and Pango then cut the
+ * name at the width St measured for it ("OCTOB…"). */
+.island-cal-month-name { font-size: 12px; font-weight: 700; color: #ff453a; }
+.island-cal-year { font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.5); }
+.island-cal-arrow { padding: 4px; color: rgba(255, 255, 255, 0.75); }
+
+.island-cal-weekdays { padding-bottom: 1px; }
+.island-cal-weekday {
+  width: 28px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.55);
+}
+.island-cal-weekday.weekend { color: rgba(255, 255, 255, 0.5); }
+
+.island-cal-cell { width: 28px; }
+
+.island-cal-day {
+  width: 19px;
+  height: 19px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ffffff;
+  transition-duration: 120ms;
+}
+
+.island-cal-day:hover { background-color: rgba(255, 255, 255, 0.12); }
+.island-cal-day:focus { background-color: rgba(255, 255, 255, 0.1); color: #ffffff; }
+.island-cal-day.weekend { color: rgba(255, 255, 255, 0.55); }
+.island-cal-day.selected { background-color: rgba(255, 255, 255, 0.22); }
+.island-cal-day.today { background-color: #ff453a; font-weight: 700; }
+.island-cal-day.today:hover { background-color: #ff5f55; }
+/* Six weeks in a month have 17 px rows: smaller days, still round. */
+.island-cal-six-weeks .island-cal-day { width: 17px; height: 17px; border-radius: 9px; }
+/* A taller page (Settings → Size: Large): larger days, as many weeks in its rows. */
+.island-cal-tall .island-cal-day { width: 24px; height: 24px; border-radius: 12px; font-size: 13px; }
+.island-cal-tall.island-cal-six-weeks .island-cal-day { width: 22px; height: 22px; border-radius: 11px; font-size: 12px; }
+/* Its dot kept in the circle's bottom edge, the rows taller than the days: (row − day) / 2 above the row's bottom. */
+.island-cal-tall .island-cal-dot { margin-bottom: 5px; }
+.island-cal-tall.island-cal-six-weeks .island-cal-dot { margin-bottom: 3px; }
+
+/* A day with events: a dot just under its number. */
+.island-cal-dot {
+  width: 3px;
+  height: 3px;
+  margin-bottom: 1px;
+  border-radius: 2px;
+  background-color: rgba(255, 255, 255, 0.55);
+}
+.island-cal-dot.on-today { background-color: #ffffff; }
+
+/* The day's events. */
+.island-cal-agenda { spacing: 5px; }
+.island-cal-day-header { spacing: 8px; }
+.island-cal-day-name { font-size: 14px; font-weight: 600; letter-spacing: -0.1px; }
+
+.island-cal-today {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 9px;
+  border-radius: 999px;
+  color: #ffffff;
+  background-color: #2c2c2e;
+}
+
+.island-cal-today:hover { background-color: #3a3a3c; }
+/* Its + over the rows' dots and icons, its text where their titles start (.island-cal-event-dot). */
+/* 30 px however its text measures, its text centred in it (as the Shelf's search field). */
+.island-cal-add { height: 30px; min-height: 0; padding: 0 12px 0 11px; font-size: 13px; }
+/* Where a new event goes, inside the field: the calendar's colour, its name and a chevron. */
+/* The end of the add field: when the line takes place, then the calendar chip. */
+.island-cal-field-end { spacing: 8px; }
+.island-cal-preview { font-size: 12px; font-weight: 500; color: rgba(255, 255, 255, 0.55); font-feature-settings: "tnum"; }
+.island-cal-target { spacing: 5px; padding: 2px 7px 2px 6px; border-radius: 999px; background-color: rgba(255, 255, 255, 0.08); }
+.island-cal-target:hover, .island-cal-target:checked { background-color: rgba(255, 255, 255, 0.16); }
+.island-cal-target-dot { width: 7px; height: 7px; border-radius: 4px; }
+.island-cal-target-name { font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.8); max-width: 96px; }
+.island-cal-target-arrow { color: rgba(255, 255, 255, 0.55); }
+/* The calendars to pick from, a row each: colour, name, its account in grey, a tick. */
+.island-cal-target-row { border-radius: 8px; padding: 5px 10px; }
+.island-cal-target-row:hover { background-color: rgba(255, 255, 255, 0.06); }
+.island-cal-target-row-box { spacing: 8px; }
+.island-cal-target-row-name { font-size: 13px; font-weight: 600; }
+.island-cal-target-row-account { font-size: 12px; color: rgba(255, 255, 255, 0.46); max-width: 190px; }
+.island-cal-target-tick { color: #ffffff; }
+.island-cal-scroll { -st-vfade-offset: 14px; }
+.island-cal-events { spacing: 3px; padding-bottom: 2px; }
+
+/* An event: its calendar's colour as a dot (set in
+ * calendar.js), on a row like the world clocks'. */
+.island-cal-event {
+  spacing: 8px;
+  padding: 0 8px 0 10px;
+  min-height: 26px;
+  border-radius: 7px;
+  background-color: rgba(255, 255, 255, 0.07);
+}
+
+/* In a 16 px slot, as the world clocks' icons, so every row's title starts at the same place. */
+.island-cal-event-dot, .island-cal-target-row .island-cal-target-dot { width: 7px; height: 7px; border-radius: 4px; margin: 0 5px 0 4px; }
+/* Kept in Island until its calendar is in reach: a ring of that one's colour. */
+.island-cal-event-dot.waiting { width: 4px; height: 4px; border: 1.5px solid transparent; background-color: transparent; }
+.island-cal-event-title { font-size: 13px; font-weight: 600; }
+.island-cal-event-time { font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, 0.65); }
+/* World clocks, in place of the events: as their rows, untinted. */
+.island-cal-world-toggle { padding: 4px; border-radius: 999px; transition-duration: 120ms; }
+.island-cal-world-toggle:hover { background-color: rgba(255, 255, 255, 0.1); }
+.island-cal-world-toggle:checked { background-color: rgba(255, 255, 255, 0.18); }
+.island-cal-world-row {
+  spacing: 8px;
+  padding: 0 10px;
+  min-height: 26px;
+  border-radius: 7px;
+  background-color: rgba(255, 255, 255, 0.07);
+}
+.island-cal-world-icon { icon-size: 16px; color: rgba(255, 255, 255, 0.9); }
+.island-cal-world-city { font-size: 13px; font-weight: 600; }
+.island-cal-world-meta { font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, 0.55); }
+.island-cal-world-time { font-size: 13px; font-weight: 600; font-feature-settings: "tnum"; }
+.island-cal-world-strip {
+  padding: 3px 2px 0 2px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  transition-duration: 120ms;
+}
+.island-cal-world-strip:hover .island-cal-world-chip-city { color: rgba(255, 255, 255, 0.8); }
+.island-cal-world-strip-box { spacing: 14px; }
+.island-cal-world-chip { spacing: 5px; }
+.island-cal-world-chip-city { font-size: 11px; font-weight: 500; color: rgba(255, 255, 255, 0.55); }
+.island-cal-world-chip-time { font-size: 11px; font-weight: 600; font-feature-settings: "tnum"; }
+.island-cal-empty { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.55); }
+.island-cal-accounts { font-size: 12px; color: rgba(10, 132, 255, 1); padding: 4px 8px; border-radius: 8px; }
+.island-cal-accounts:hover { background-color: rgba(255, 255, 255, 0.08); }
+.island-cal-accounts:focus { color: #ffffff; }
+
+/* ── Notifications ────────────────────────────────────── */
+
+/* As the rows' insides: the heading over their icons, Clear over their times. */
+.island-notifications-bar { spacing: 6px; padding: 0 10px 6px 10px; }
+.island-notifications-heading { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.6); }
+.island-notifications-clear { font-size: 12px; font-weight: 600; padding: 5px 12px; }
+.island-dnd-toggle:checked { color: #ffffff; background-color: #5e5ce6; }
+.island-dnd-toggle:checked:hover { background-color: #6e6cf0; }
+.island-notifications-dnd-note { spacing: 6px; padding: 0 10px 8px 10px; }
+.island-notifications-dnd-text { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+.island-notification-list { spacing: 6px; padding-bottom: 8px; }
+
+/* A card each, apart from the next: the app's icon, who in white and what in grey under it, then when;
+ * its buttons under them. */
+.island-notification-row {
+  border-radius: 12px;
+  background-color: rgba(255, 255, 255, 0.05);
+  transition-duration: 120ms;
+}
+
+.island-notification-row:hover { background-color: rgba(255, 255, 255, 0.09); }
+.island-notification { spacing: 10px; padding: 8px 10px; }
+.island-notification-texts { spacing: 2px; }
+.island-notification-title { font-size: 13px; font-weight: 600; }
+.island-notification-body { font-size: 13px; color: rgba(255, 255, 255, 0.55); }
+.island-notification-tools { spacing: 6px; }
+/* A notification's buttons, under its line, from where the title starts. */
+.island-notification-actions { padding-top: 6px; }
+.island-notification-action { font-size: 11px; padding: 3px 10px; }
+.island-notification-dismiss { padding: 4px; border-radius: 999px; color: rgba(255, 255, 255, 0.7); background-color: #3a3a3c; }
+
+/* A system notification's symbolic icon, on a tile the size of an app icon. */
+.island-notification-glyph {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  background-color: #2c2c2e;
+  color: #ffffff;
+}
+.island-notification-time { font-size: 12px; color: rgba(255, 255, 255, 0.46); padding-left: 8px; }
+
+.island-dnd-moon { color: rgba(255, 255, 255, 0.85); }
+
+/* ── Shelf ────────────────────────────────────────────── */
+
+/* Shelf: tabs, filters and search in one bar, cards below */
+
+.island-shelf-bar { spacing: 8px; }
+.island-shelf-controls { spacing: 8px; }
+
+/* A segmented control: the chosen segment is a raised pill,
+ * lit from above with a soft shadow beneath (no outline). */
+.island-segmented {
+  padding: 3px;
+  spacing: 2px;
+  border-radius: 999px;
+  background-color: #1c1c1e;
+}
+
+.island-segment {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.6);
+  transition-duration: 120ms;
+}
+
+.island-segment:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.05); }
+.island-segment:checked {
+  color: #ffffff;
+  background-gradient-direction: vertical;
+  background-gradient-start: #4a4a4d;
+  background-gradient-end: #3a3a3c;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55);
+}
+/* Icons in segments as tall as the text ones (13 + 5 + 5 = 23): the filters and the tabs line up at 29. */
+.island-segmented-icons .island-segment { padding: 5px 7px; }
+
+/* As tall as the tabs beside it (3 + 23 + 3), however its text measures: the row never grows as it opens. */
+.island-shelf-field { height: 29px; min-height: 0; padding: 0 12px; font-size: 12px; }
+.island-shelf-field-icon { padding-right: 6px; }
+.island-shelf-confirm { padding: 5px 12px; }
+.island-shelf-hint { font-size: 12px; color: rgba(255, 255, 255, 0.55); transition-duration: 180ms; }
+/* While a file is on its way in. */
+.island-shelf-hint.active { color: #ffffff; font-weight: 600; }
+
+.island-clips-scroll { -st-hfade-offset: 18px; }
+.island-clips { spacing: 8px; }
+
+.island-clip {
+  width: 136px;
+  /* 107 with its border, as the row has always given it: its own height now, so a taller page (Settings → Size)
+   * leaves the cards as they are (their pictures are made for it, #24). */
+  height: 103px;
+  border-radius: 12px;
+  border: 2px solid transparent;
+  background-color: #1c1c1e;
+  color: #ffffff;
+}
+
+.island-clip:hover { background-color: #242426; }
+/* The keyboard's choice, for Enter to paste. */
+.island-clip:selected { border-color: #ffffff; }
+
+.island-clip-header { padding: 7px 9px; spacing: 5px; }
+.island-clip-age { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+.island-clip-body { padding: 28px 10px 8px 10px; spacing: 2px; }
+.island-clip-text { font-size: 12px; }
+.island-clip-code { font-family: monospace; font-size: 12px; }
+.island-clip-host { font-size: 13px; font-weight: 700; }
+.island-clip-url { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+.island-clip-file-name { font-size: 12px; font-weight: 600; padding-top: 4px; }
+.island-clip-subtle { font-size: 12px; color: rgba(255, 255, 255, 0.5); }
+
+/* Images fill the card; header and size sit on dark pills over them. */
+.island-clip-thumb { border-radius: 12px; background-size: cover; background-color: #2c2c2e; }
+.island-clip-image .island-clip-header {
+  margin: 5px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background-color: rgba(0, 0, 0, 0.6);
+}
+
+.island-clip-badge { margin: 5px; padding: 2px 6px; border-radius: 999px; background-color: rgba(0, 0, 0, 0.6); }
+.island-clip-badge-label { font-size: 11px; font-weight: 600; }
+
+.island-clip-actions { padding: 5px; spacing: 4px; }
+.island-clip-action { padding: 4px; background-color: #3a3a3c; }
+.island-clip-action:hover { background-color: #4a4a4c; }
+
+.island-clip-feedback { border-radius: 12px; background-color: rgba(28, 28, 30, 0.95); }
+.island-clip-feedback-label { font-size: 12px; font-weight: 700; padding-top: 4px; }
+
+/* Files tab. The shelf helper's window draws this tab when installed; its
+ * style.css mirrors these sizes and colours so the two look the same. */
+
+/* While a file is on its way, a dashed outline (drawn in files.js) marks it as one rounded area. */
+.island-shelf-files { border-radius: 16px; }
+
+/* In 1 px at the sides, as the helper's row inside its drop area's 1 px border (crates/island-shelf/src/style.css): the
+ * window's tiles land on these exactly. */
+.island-shelf-tiles { spacing: 6px; padding: 0 1px; }
+
+.island-shelf-tile {
+  padding: 6px 0;
+  border-radius: 14px;
+  color: #ffffff;
+  transition-duration: 120ms;
+}
+
+.island-shelf-tile:hover { background-color: #1c1c1e; }
+.island-shelf-tile:focus { background-color: rgba(255, 255, 255, 0.1); }
+.island-shelf-tile-box { spacing: 4px; }
+/* Two lines high, a shorter name in the middle, as the drag-and-drop helper's (crates/island-shelf). */
+.island-shelf-name { font-size: 12px; text-align: center; }
+.island-shelf-name-lines { font-size: 12px; height: 2.5em; }
+
+.island-shelf-preview { border-radius: 12px; }
+.island-shelf-preview.thumbnail { background-color: #2c2c2e; background-size: cover; }
+/* A document's page, whole on a clear square, as in Files. */
+.island-shelf-preview.thumbnail.whole { background-color: transparent; border-radius: 0; }
+
+.island-shelf-copied { border-radius: 12px; background-color: rgba(0, 0, 0, 0.6); }
+
+/* Always there, so a file can always be taken off the shelf. */
+.island-shelf-remove {
+  padding: 0;
+  border-radius: 9px;
+  color: #ffffff;
+  background-color: #3a3a3c;
+}
+
+.island-shelf-remove:hover { background-color: #5a5a5e; }
+
+/* ── Shelf: sharing with a phone ─────────────────────── */
+
+.island-shelf-column { spacing: 8px; }
+.island-shelf-phone { padding: 5px 12px 5px 10px; }
+.island-shelf-phone-box { spacing: 5px; }
+/* The Phone tab: one column from the top, every block 6 px under the one before (its own bottom padding). */
+.island-phone { spacing: 0; }
+.island-phone-title { font-size: 15px; font-weight: 600; letter-spacing: -0.1px; padding-bottom: 6px; }
+.island-phone-steps { spacing: 2px; padding-bottom: 6px; }
+.island-phone-step { spacing: 8px; }
+.island-phone-step-number { width: 16px; height: 16px; border-radius: 8px; background-color: rgba(255, 255, 255, 0.14); }
+/* A pixel over the digit: the font's line keeps room below it that digits never use. */
+.island-phone-step-digit { font-size: 10px; font-weight: 700; font-feature-settings: "tnum"; padding-top: 1px; }
+.island-phone-step-text { font-size: 12px; color: rgba(255, 255, 255, 0.82); }
+.island-phone-warning { color: #ff9f0a; }
+.island-phone-hint,
+.island-phone-copy-text { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+.island-phone-rows { spacing: 0; }
+.island-phone-row { padding-bottom: 6px; }
+.island-phone-status { spacing: 8px; }
+.island-phone-dot { width: 7px; height: 7px; border-radius: 4px; background-color: rgba(255, 255, 255, 0.35); }
+.island-phone-dot.on { background-color: #30d158; }
+.island-phone-status-text { font-size: 12px; font-weight: 600; }
+.island-phone-leaving .island-phone-status-text,
+.island-phone-away .island-phone-status-text { font-weight: 400; color: rgba(255, 255, 255, 0.55); }
+.island-phone-ask { spacing: 8px; }
+.island-phone-note { spacing: 6px; color: #ff9f0a; padding-bottom: 6px; }
+.island-phone-note-icon { padding-top: 1px; }
+.island-phone-note-text { font-size: 12px; color: #ff9f0a; }
+.island-phone-copy { spacing: 8px; }
+.island-phone-code-text { font-size: 13px; font-weight: 700; font-feature-settings: "tnum"; }
+.island-phone-remove { padding: 4px; border-radius: 999px; background-color: #2c2c2e; }
+.island-phone-remove:hover { background-color: #3a3a3c; }
+#islandIsland.island-translucent .island-phone-remove { background-color: rgba(255, 255, 255, 0.14); }
+#islandIsland.island-translucent .island-phone-remove:hover { background-color: rgba(255, 255, 255, 0.22); }
+#islandIsland.island-translucent .island-phone-hint,
+#islandIsland.island-translucent .island-phone-copy-text,
+#islandIsland.island-translucent .island-phone-leaving .island-phone-status-text,
+#islandIsland.island-translucent .island-phone-away .island-phone-status-text { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-phone-step-text { color: rgba(255, 255, 255, 0.9); }
+#islandIsland.island-translucent .island-phone-step-number { background-color: rgba(255, 255, 255, 0.2); }
+/* Signal colours a quarter towards white on glass. */
+#islandIsland.island-translucent .island-phone-dot.on { background-color: rgb(100, 220, 130); }
+#islandIsland.island-translucent .island-phone-note,
+#islandIsland.island-translucent .island-phone-note-text,
+#islandIsland.island-translucent .island-phone-warning { color: rgb(255, 183, 71); }
+
+/* ── Usage ────────────────────────────────────────────── */
+
+/* One provider at a time (usage.js): its mark, name and plan, then a line and a bar per limit;
+ * dots on the right move between providers, as in a widget stack. */
+.island-usage-content { spacing: 14px; padding: 0 0 4px 0; }
+.island-usage-head { spacing: 8px; }
+.island-usage-mark { width: 10px; height: 10px; border-radius: 5px; }
+.island-usage-name { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; }
+.island-usage-plan {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 99px;
+  color: rgba(255, 255, 255, 0.7);
+  background-color: rgba(255, 255, 255, 0.1);
+}
+.island-usage-stamp { font-size: 11px; color: rgba(255, 255, 255, 0.55); }
+.island-usage-stamp.warning { color: rgba(255, 255, 255, 0.8); }
+.island-usage-limits { spacing: 11px; }
+.island-usage-limit { spacing: 5px; }
+.island-usage-line { spacing: 10px; }
+.island-usage-window { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.9); }
+.island-usage-reset { font-size: 11px; color: rgba(255, 255, 255, 0.55); }
+.island-usage-percent { font-size: 13px; font-weight: 700; min-width: 40px; text-align: right; }
+.island-usage-percent.critical { color: #ff453a; }
+.island-usage-track { height: 5px; border-radius: 3px; background-color: rgba(255, 255, 255, 0.1); }
+.island-usage-fill { height: 5px; border-radius: 3px; }
+.island-usage-fill.critical { background-color: #ff453a; }
+.island-usage-empty { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
+
+.island-usage-dots { spacing: 6px; padding-left: 14px; }
+.island-usage-dot { width: 6px; height: 6px; border-radius: 3px; background-color: rgba(255, 255, 255, 0.22); transition-duration: 200ms; }
+.island-usage-dot:hover { background-color: rgba(255, 255, 255, 0.45); }
+.island-usage-dot.shown { height: 16px; background-color: #ffffff; }
+
+/* Apps: time in each application, today or over the last seven days */
+
+/* On the page's edges, as the rows below: the heading over their icons, the periods over their times. */
+.island-apps-bar { spacing: 10px; padding: 0 0 6px 0; }
+.island-apps-heading { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.6); }
+.island-apps-total { font-size: 11px; color: rgba(255, 255, 255, 0.46); }
+.island-apps-scroll { padding: 2px 0 6px 0; -st-vfade-offset: 16px; }
+.island-apps-list { spacing: 8px; }
+.island-apps-row { spacing: 10px; }
+.island-apps-name { font-size: 13px; color: rgba(255, 255, 255, 0.92); }
+.island-apps-track { width: 120px; height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.1); }
+.island-apps-fill { height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.8); }
+.island-apps-time { font-size: 12px; color: rgba(255, 255, 255, 0.6); min-width: 44px; text-align: right; }
+
+/* ── Devices ──────────────────────────────────────────── */
+
+/* A card per connected device, every one alike, a shade lighter than the island: the device's icon in white on a
+ * grey tile, its name in white and "Connected" in grey under it (a green dot first; "Low battery" in red), then its
+ * battery on its side, filled from the left to the level in green, and the level, right-aligned in a fixed width so
+ * the batteries line up; both red when low. The battery and the level keep their width, the name gives way. 52 px
+ * tall, the tile 10 px from the card's edge (its 8 px corners within the card's 12); three rows to the page take
+ * 42 px, a touch denser (`island-devices-dense`). How the cards sit is devices.js's. */
+.island-device-card { spacing: 12px; padding: 0 14px 0 10px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.07); }
+.island-device-tile { width: 32px; height: 32px; border-radius: 8px; background-color: rgba(255, 255, 255, 0.14); }
+.island-device-icon { icon-size: 16px; color: #ffffff; }
+.island-device-texts { spacing: 2px; }
+.island-device-name { font-size: 14px; font-weight: 600; color: #ffffff; }
+.island-device-status { spacing: 6px; font-size: 12px; }
+.island-device-dot { width: 6px; height: 6px; border-radius: 3px; background-color: #30d158; }
+.island-device-connected, .island-device-none { color: rgba(255, 255, 255, 0.55); }
+.island-device-none { font-size: 12px; }
+.island-device-power { spacing: 8px; }
+.island-device-battery { spacing: 1px; }
+.island-device-battery-body {
+  width: 22px;
+  height: 11px;
+  padding: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 4px;
+}
+.island-device-battery-fill { border-radius: 2px; background-color: #30d158; }
+.island-device-battery-nub { width: 2px; height: 4px; border-radius: 0 1px 1px 0; background-color: rgba(255, 255, 255, 0.45); }
+.island-device-level { min-width: 34px; font-size: 13px; font-weight: 600; color: #ffffff; text-align: right; font-feature-settings: "tnum"; }
+.island-device-card.low .island-device-battery-fill,
+.island-device-card.low .island-device-dot { background-color: #ff453a; }
+.island-device-card.low .island-device-level,
+.island-device-card.low .island-device-connected { color: #ff453a; }
+
+/* Three rows to the page: 42 px cards, the tile 7 px from the edge. */
+.island-devices-dense .island-device-card { spacing: 10px; padding: 0 12px 0 7px; }
+.island-devices-dense .island-device-tile { width: 28px; height: 28px; border-radius: 7px; }
+.island-devices-dense .island-device-icon { icon-size: 14px; }
+.island-devices-dense .island-device-texts { spacing: 0; }
+.island-devices-dense .island-device-name { font-size: 13px; }
+.island-devices-dense .island-device-status, .island-devices-dense .island-device-none { font-size: 11px; }
+.island-devices-dense .island-device-level { min-width: 32px; font-size: 12px; }
+.island-devices-scroll { -st-vfade-offset: 16px; }
+
+/* Focused (from the keyboard), a button lights up: no ring around it. */
+.island-pill:focus, .island-pill-small:focus, .island-notification-row:focus, .island-output-button:focus,
+.island-cal-today:focus, .island-cal-month-title:focus, .island-segment:focus, .island-usage-dot:focus,
+.island-recording-pill:focus {
+  color: #ffffff;
+}
+
+/* ── Glass theme ──────────────────────────────────────── */
+
+/* island-theme "glass" (theme.js, glass.js): a see-through island, all on it the same material. Greys
+ * a + 33% of the rest; rows 8% with a lit rim; buttons 14% lit along the top; wells 20% black; on is the accent. */
+
+/* Text, generated from the rules above (each grey, and the states of the same elements, in their order). */
+#islandIsland.island-translucent .island-button:focus { color: #ffffff; }
+#islandIsland.island-translucent .island-art-placeholder { color: rgba(255, 255, 255, 0.6); }
+#islandIsland.island-translucent .island-empty-icon { color: rgba(255, 255, 255, 0.56); }
+#islandIsland.island-translucent .island-empty-hint,
+#islandIsland.island-translucent .island-peek-subtitle,
+#islandIsland.island-translucent .island-voice-heard { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-voice-text-dim { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-voice-hint { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-voice-step-tick { color: rgba(255, 255, 255, 0.63); }
+#islandIsland.island-translucent .island-voice-step-text { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-voice-heard-button:hover .island-voice-heard { color: rgba(255, 255, 255, 0.83); }
+#islandIsland.island-translucent .island-voice-earlier { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-voice-still { color: rgba(255, 255, 255, 0.64); }
+#islandIsland.island-translucent .island-voice-undo-text { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-card-subtitle { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-card-output,
+#islandIsland.island-translucent .island-card-ghost .island-card-key { color: rgba(255, 255, 255, 0.64); }
+#islandIsland.island-translucent .island-card-denied { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-chat-title { color: rgba(255, 255, 255, 0.64); }
+#islandIsland.island-translucent .island-chat-new { color: rgba(255, 255, 255, 0.83); }
+#islandIsland.island-translucent .island-chat-new:hover { color: #ffffff; }
+#islandIsland.island-translucent .island-chat-time { color: rgba(255, 255, 255, 0.64); }
+#islandIsland.island-translucent .island-voice-action { color: rgba(255, 255, 255, 0.8); }
+#islandIsland.island-translucent .island-voice-action:hover { color: #ffffff; }
+#islandIsland.island-translucent .island-header-mic { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-header-mic:hover { color: #ffffff; }
+#islandIsland.island-translucent .island-header-settings { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-header-settings:hover { color: #ffffff; }
+#islandIsland.island-translucent .island-player-modes .island-button { color: rgba(255, 255, 255, 0.83); }
+#islandIsland.island-translucent .island-track-subtitle { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-time { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-output-detail { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-lyrics-controls .island-mode-toggle { color: rgba(255, 255, 255, 0.83); }
+#islandIsland.island-translucent .island-side-artist { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-lyrics-state-icon { color: rgba(255, 255, 255, 0.6); }
+#islandIsland.island-translucent .island-lyrics-state-hint { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-call-hint { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-call-kind { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-call-control-label { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-timer-phase,
+#islandIsland.island-translucent .island-stepper-name { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-task-add-icon { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-task-remove { color: rgba(255, 255, 255, 0.8); }
+#islandIsland.island-translucent .island-reminder-title.done { color: rgba(255, 255, 255, 0.58); }
+#islandIsland.island-translucent .island-reminder-remove { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-reminder-remove:hover { color: #ffffff; }
+#islandIsland.island-translucent .island-reminders-empty { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-cal-year { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-cal-arrow { color: rgba(255, 255, 255, 0.83); }
+#islandIsland.island-translucent .island-cal-weekday { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-cal-weekday.weekend { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-cal-day.weekend,
+#islandIsland.island-translucent .island-cal-preview,
+#islandIsland.island-translucent .island-cal-target-arrow { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-cal-target-row-account { color: rgba(255, 255, 255, 0.64); }
+#islandIsland.island-translucent .island-cal-event-time { color: rgba(255, 255, 255, 0.77); }
+#islandIsland.island-translucent .island-compact-date { color: rgba(255, 255, 255, 0.8); }
+#islandIsland.island-translucent .island-cal-world-meta,
+#islandIsland.island-translucent .island-cal-world-chip-city,
+#islandIsland.island-translucent .island-cal-empty { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-notifications-heading { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-notifications-dnd-text { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-notification-body { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-notification-dismiss { color: rgba(255, 255, 255, 0.8); }
+#islandIsland.island-translucent .island-notification-time { color: rgba(255, 255, 255, 0.64); }
+#islandIsland.island-translucent .island-segment { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-segment:hover,
+#islandIsland.island-translucent .island-segment:checked { color: #ffffff; }
+#islandIsland.island-translucent .island-shelf-hint { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-shelf-hint.active { color: #ffffff; }
+#islandIsland.island-translucent .island-clip-age { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-clip-url { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-clip-subtle { color: rgba(255, 255, 255, 0.67); }
+#islandIsland.island-translucent .island-usage-plan { color: rgba(255, 255, 255, 0.8); }
+#islandIsland.island-translucent .island-usage-stamp { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-usage-stamp.warning { color: rgba(255, 255, 255, 0.8); }
+#islandIsland.island-translucent .island-usage-reset,
+#islandIsland.island-translucent .island-usage-empty { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-apps-heading { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-apps-total { color: rgba(255, 255, 255, 0.64); }
+#islandIsland.island-translucent .island-apps-time { color: rgba(255, 255, 255, 0.73); }
+#islandIsland.island-translucent .island-device-card { background-color: rgba(255, 255, 255, 0.08); }
+#islandIsland.island-translucent .island-device-tile { background-color: rgba(255, 255, 255, 0.14); }
+#islandIsland.island-translucent .island-device-connected,
+#islandIsland.island-translucent .island-device-none { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-device-battery-body { border-color: rgba(255, 255, 255, 0.6); }
+#islandIsland.island-translucent .island-device-battery-nub { background-color: rgba(255, 255, 255, 0.6); }
+#islandIsland.island-translucent .island-device-dot,
+#islandIsland.island-translucent .island-device-battery-fill { background-color: #6fe08f; }
+#islandIsland.island-translucent .island-device-card.low .island-device-battery-fill,
+#islandIsland.island-translucent .island-device-card.low .island-device-dot { background-color: #ff968d; }
+#islandIsland.island-translucent .island-device-card.low .island-device-level,
+#islandIsland.island-translucent .island-device-card.low .island-device-connected { color: #ff968d; }
+#islandIsland.island-glass-dark .island-device-card { background-color: rgba(255, 255, 255, 0.1); }
+#islandIsland.island-glass-dark .island-device-tile { background-color: rgba(255, 255, 255, 0.1); }
+#islandIsland.island-translucent .island-segment:focus { color: #ffffff; }
+
+/* Icon buttons: no fill until the pointer is on them (first: the buttons below have their own). */
+#islandIsland.island-translucent .island-button:hover,
+#islandIsland.island-translucent .island-header-settings:hover,
+#islandIsland.island-translucent .island-stepper-button:hover,
+#islandIsland.island-translucent .island-reminder-remove:hover,
+#islandIsland.island-translucent .island-cal-world-toggle:hover { background-color: rgba(255, 255, 255, 0.16); }
+#islandIsland.island-translucent .island-button:active { background-color: rgba(255, 255, 255, 0.24); }
+
+/* Buttons: frosted, lit along the top. */
+#islandIsland.island-translucent .island-button-round,
+#islandIsland.island-translucent .island-pill-small,
+#islandIsland.island-translucent .island-call-control,
+#islandIsland.island-translucent .island-start-pill,
+#islandIsland.island-translucent .island-cal-today,
+#islandIsland.island-translucent .island-chat-new,
+#islandIsland.island-translucent .island-voice-action {
+  background-color: rgba(255, 255, 255, 0.14);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+#islandIsland.island-translucent .island-button-round:hover,
+#islandIsland.island-translucent .island-pill-small:hover,
+#islandIsland.island-translucent .island-call-control:hover,
+#islandIsland.island-translucent .island-start-pill:hover,
+#islandIsland.island-translucent .island-cal-today:hover,
+#islandIsland.island-translucent .island-chat-new:hover,
+#islandIsland.island-translucent .island-voice-action:hover { background-color: rgba(255, 255, 255, 0.2); }
+#islandIsland.island-translucent .island-button-round:active,
+#islandIsland.island-translucent .island-pill-small:active,
+#islandIsland.island-translucent .island-call-control:active,
+#islandIsland.island-translucent .island-start-pill:active,
+#islandIsland.island-translucent .island-voice-action:active { background-color: rgba(255, 255, 255, 0.26); }
+#islandIsland.island-translucent .island-voice-stop { background-color: rgba(255, 255, 255, 0.2); }
+#islandIsland.island-translucent .island-voice-send-mic { background-color: rgba(255, 255, 255, 0.16); }
+#islandIsland.island-translucent .island-voice-send-mic:hover { background-color: rgba(255, 255, 255, 0.24); }
+/* Small round buttons over a row or a picture, a step brighter so they stand off it. */
+#islandIsland.island-translucent .island-notification-dismiss,
+#islandIsland.island-translucent .island-clip-action,
+#islandIsland.island-translucent .island-corner-close { background-color: rgba(255, 255, 255, 0.2); }
+#islandIsland.island-translucent .island-notification-dismiss:hover,
+#islandIsland.island-translucent .island-clip-action:hover,
+#islandIsland.island-translucent .island-corner-close:hover { background-color: rgba(255, 255, 255, 0.28); }
+#islandIsland.island-translucent .island-corner-close:active { background-color: rgba(255, 255, 255, 0.34); }
+
+/* Rows and cards: a pane of the same glass, a fill alone (a rim would read as a box drawn round it). */
+#islandIsland.island-translucent .island-notification-row,
+#islandIsland.island-translucent .island-cal-event,
+#islandIsland.island-translucent .island-cal-world-row,
+#islandIsland.island-translucent .island-clip,
+#islandIsland.island-translucent .island-output-button.active {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+#islandIsland.island-translucent .island-notification-row:hover,
+#islandIsland.island-translucent .island-clip:hover { background-color: rgba(255, 255, 255, 0.12); }
+#islandIsland.island-translucent .island-output-button:hover,
+#islandIsland.island-translucent .island-shelf-tile:hover,
+#islandIsland.island-translucent .island-cal-target-row:hover,
+#islandIsland.island-translucent .island-cal-month-title:hover { background-color: rgba(255, 255, 255, 0.1); }
+#islandIsland.island-translucent .island-output-button.active:hover { background-color: rgba(255, 255, 255, 0.12); }
+#islandIsland.island-translucent .island-shelf-tile:focus { background-color: rgba(255, 255, 255, 0.14); }
+#islandIsland.island-translucent .island-chat-user { background-color: rgba(255, 255, 255, 0.15); }
+#islandIsland.island-translucent .island-voice-idea {
+  color: rgba(255, 255, 255, 0.86);
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: transparent;
+}
+#islandIsland.island-translucent .island-voice-idea:hover { color: #ffffff; background-color: rgba(255, 255, 255, 0.16); }
+#islandIsland.island-translucent .island-cal-target { background-color: rgba(255, 255, 255, 0.12); }
+#islandIsland.island-translucent .island-cal-target:hover,
+#islandIsland.island-translucent .island-cal-target:checked { background-color: rgba(255, 255, 255, 0.18); }
+#islandIsland.island-translucent .island-cal-accounts:hover { background-color: rgba(255, 255, 255, 0.12); }
+#islandIsland.island-translucent .island-usage-plan { background-color: rgba(255, 255, 255, 0.14); }
+
+/* Pictures and tiles that wait for a picture: frosted. */
+#islandIsland.island-translucent .island-art,
+#islandIsland.island-translucent .island-clip-thumb,
+#islandIsland.island-translucent .island-shelf-preview.thumbnail { background-color: rgba(255, 255, 255, 0.1); }
+#islandIsland.island-translucent .island-shelf-preview.thumbnail.whole { background-color: transparent; }
+#islandIsland.island-translucent .island-notification-glyph { background-color: rgba(255, 255, 255, 0.14); }
+#islandIsland.island-translucent .island-app-badge { background-color: #16171c; }
+#islandIsland.island-translucent .island-clip-feedback { background-color: rgba(20, 20, 26, 0.9); }
+#islandIsland.island-translucent .island-call-preview { background-color: rgba(0, 0, 0, 0.3); }
+
+/* Wells: a command or code sunk into the glass. */
+#islandIsland.island-translucent .island-card-terminal,
+#islandIsland.island-translucent .island-peek-code,
+#islandIsland.island-translucent .island-chat-command-text {
+  background-color: rgba(0, 0, 0, 0.2);
+}
+#islandIsland.island-translucent .island-card-ended .island-card-terminal { background-color: rgba(0, 0, 0, 0.14); }
+
+/* Tabs: the open one a frosted pill. */
+#islandIsland.island-translucent .island-tab:hover,
+#islandIsland.island-translucent .island-tab:focus { background-color: rgba(255, 255, 255, 0.08); }
+#islandIsland.island-translucent .island-tab:checked {
+  background-color: rgba(255, 255, 255, 0.16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* A segmented control and a stepper: a frosted channel, the choice raised in it. */
+#islandIsland.island-translucent .island-segmented,
+#islandIsland.island-translucent .island-stepper { background-color: rgba(255, 255, 255, 0.08); }
+#islandIsland.island-translucent .island-segment:hover { background-color: rgba(255, 255, 255, 0.08); }
+#islandIsland.island-translucent .island-segment:checked {
+  background-gradient-direction: none;
+  background-color: rgba(255, 255, 255, 0.24);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Fields: a pane, no rim; focused, the accent's ring. */
+#islandIsland.island-translucent .island-entry { background-color: rgba(255, 255, 255, 0.1) !important; }
+#islandIsland.island-translucent .island-entry:focus {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow: inset 0 0 0 2px rgba(53, 132, 228, 0.7) !important;
+}
+#islandIsland.island-translucent .island-voice-entry,
+#islandIsland.island-translucent .island-voice-entry:hover {
+  background-color: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid transparent !important;
+}
+#islandIsland.island-translucent .island-voice-entry:focus,
+#islandIsland.island-translucent .island-voice-entry:focus:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+}
+/* The timer's typed lengths: quiet, a step brighter under the pointer and while typed in, the accent's caret. */
+#islandIsland.island-translucent .island-stepper-entry:hover { background-color: rgba(255, 255, 255, 0.12) !important; }
+#islandIsland.island-translucent .island-stepper-entry:focus,
+#islandIsland.island-translucent .island-stepper-entry:focus:hover { background-color: rgba(255, 255, 255, 0.2) !important; }
+#islandIsland.island-translucent .island-entry StLabel.hint-text,
+#islandIsland.island-translucent .island-voice-entry StLabel.hint-text,
+#islandIsland.island-translucent .island-reminder-field StLabel.hint-text { color: rgba(255, 255, 255, 0.72) !important; }
+
+/* Lines, tracks and rings a step brighter, to hold on lighter glass. */
+#islandIsland.island-translucent .island-reminder-line { background-color: rgba(255, 255, 255, 0.16); }
+#islandIsland.island-translucent .island-cal-world-strip { border-top-color: rgba(255, 255, 255, 0.16); }
+#islandIsland.island-translucent .island-reminder-strike { background-color: rgba(255, 255, 255, 0.6); }
+#islandIsland.island-translucent .island-reminder-check { border-color: rgba(255, 255, 255, 0.46); }
+#islandIsland.island-translucent .island-reminder-check:hover { border-color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-reminder-check:checked { border-color: #ff9f0a; }
+#islandIsland.island-translucent .island-reminder-check.faint { border-color: rgba(255, 255, 255, 0.22); }
+#islandIsland.island-translucent .island-level { background-color: rgba(255, 255, 255, 0.22); }
+#islandIsland.island-translucent .island-slider-track { background-color: rgba(255, 255, 255, 0.24); }
+#islandIsland.island-translucent .island-usage-track,
+#islandIsland.island-translucent .island-apps-track { background-color: rgba(255, 255, 255, 0.16); }
+#islandIsland.island-translucent .island-usage-dot { background-color: rgba(255, 255, 255, 0.3); }
+#islandIsland.island-translucent .island-usage-dot:hover { background-color: rgba(255, 255, 255, 0.55); }
+#islandIsland.island-translucent .island-usage-dot.shown { background-color: #ffffff; }
+#islandIsland.island-translucent .island-cal-dot { background-color: rgba(255, 255, 255, 0.68); }
+#islandIsland.island-translucent .island-cal-dot.on-today { background-color: #ffffff; }
+#islandIsland.island-translucent .island-cal-day:hover { background-color: rgba(255, 255, 255, 0.16); }
+#islandIsland.island-translucent .island-cal-day.selected { background-color: rgba(255, 255, 255, 0.26); }
+#islandIsland.island-translucent .island-cal-day.today { background-color: #ff453a; }
+#islandIsland.island-translucent .island-cal-day.today:hover { background-color: #ff5f55; }
+
+/* Signal colours lifted for the lighter grey, so they read without glaring: red, green, orange text and icons, links. */
+#islandIsland.island-translucent .island-recording-time,
+#islandIsland.island-translucent .island-peek-denied,
+#islandIsland.island-translucent .island-card-output-failed,
+#islandIsland.island-translucent .island-card-risk-removes,
+#islandIsland.island-translucent .island-card-failed,
+#islandIsland.island-translucent .island-call-muted,
+#islandIsland.island-translucent .island-compact-warning,
+#islandIsland.island-translucent .island-cal-month-name,
+#islandIsland.island-translucent .island-usage-percent.critical { color: #ff968d; }
+#islandIsland.island-translucent .island-call-icon,
+#islandIsland.island-translucent .island-call-duration,
+#islandIsland.island-translucent .island-tab-call StIcon,
+#islandIsland.island-translucent .island-peek-allowed,
+#islandIsland.island-translucent .island-card-done,
+#islandIsland.island-translucent .island-chat-copied,
+#islandIsland.island-translucent .island-card-copied { color: #64dc82; }
+#islandIsland.island-translucent .island-reminders-title,
+#islandIsland.island-translucent .island-reminders-count { color: #ffb340; }
+#islandIsland.island-translucent .island-cal-accounts { color: #8cc4ff; }
+/* The closed island's dots, lifted a quarter towards white as the alerts' signs (Theme.semantic). */
+#islandIsland.island-translucent .island-recording-dot { background-color: #ff7369; }
+#islandIsland.island-translucent .island-privacy-dot.camera { background-color: #67d582; }
+#islandIsland.island-translucent .island-privacy-dot.microphone { background-color: #ffb748; }
+#islandIsland.island-translucent .island-privacy-dot.screenShare { background-color: #47a3ff; }
+#islandIsland.island-translucent .island-privacy-dot.phone { background-color: #cf83f5; }
+/* A locked length a step brighter than on black, as all the greys here. */
+#islandIsland.island-translucent .island-stepper-locked .island-stepper-entry { color: rgba(255, 255, 255, 0.72) !important; }
+/* Text picked in a field: the accent, as in GNOME's own fields. */
+#islandIsland.island-translucent .island-voice-entry,
+#islandIsland.island-translucent .island-voice-entry:focus:hover,
+#islandIsland.island-translucent .island-reminder-field { selection-background-color: rgba(53, 132, 228, 0.6); }
+
+/* Darker tints (controller.js adds the class by Settings' tint): the controls settle into GNOME Shell's own dark
+ * menus — flat, in its lighter greys — so on the dark glass nothing looks pasted on. Middle tint first, then dark. */
+#islandIsland.island-glass-mid .island-button-round,
+#islandIsland.island-glass-mid .island-pill-small,
+#islandIsland.island-glass-mid .island-call-control,
+#islandIsland.island-glass-mid .island-start-pill,
+#islandIsland.island-glass-mid .island-cal-today,
+#islandIsland.island-glass-mid .island-chat-new,
+#islandIsland.island-glass-mid .island-voice-action {
+  background-color: rgba(255, 255, 255, 0.115);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+#islandIsland.island-glass-mid .island-button-round:hover,
+#islandIsland.island-glass-mid .island-pill-small:hover,
+#islandIsland.island-glass-mid .island-call-control:hover,
+#islandIsland.island-glass-mid .island-start-pill:hover,
+#islandIsland.island-glass-mid .island-cal-today:hover,
+#islandIsland.island-glass-mid .island-chat-new:hover,
+#islandIsland.island-glass-mid .island-voice-action:hover { background-color: rgba(255, 255, 255, 0.17); }
+#islandIsland.island-glass-mid .island-tab:checked {
+  background-color: rgba(255, 255, 255, 0.13);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+#islandIsland.island-glass-mid .island-segment:checked { background-color: rgba(255, 255, 255, 0.19); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); }
+
+#islandIsland.island-glass-dark .island-button:hover { background-color: rgba(255, 255, 255, 0.1); }
+#islandIsland.island-glass-dark .island-button-round,
+#islandIsland.island-glass-dark .island-pill-small,
+#islandIsland.island-glass-dark .island-call-control,
+#islandIsland.island-glass-dark .island-start-pill,
+#islandIsland.island-glass-dark .island-cal-today,
+#islandIsland.island-glass-dark .island-chat-new,
+#islandIsland.island-glass-dark .island-voice-action {
+  background-color: rgba(255, 255, 255, 0.1);
+  box-shadow: none;
+}
+#islandIsland.island-glass-dark .island-button-round:hover,
+#islandIsland.island-glass-dark .island-pill-small:hover,
+#islandIsland.island-glass-dark .island-call-control:hover,
+#islandIsland.island-glass-dark .island-start-pill:hover,
+#islandIsland.island-glass-dark .island-cal-today:hover,
+#islandIsland.island-glass-dark .island-chat-new:hover,
+#islandIsland.island-glass-dark .island-voice-action:hover { background-color: rgba(255, 255, 255, 0.15); }
+#islandIsland.island-glass-dark .island-button-round:active,
+#islandIsland.island-glass-dark .island-pill-small:active,
+#islandIsland.island-glass-dark .island-call-control:active,
+#islandIsland.island-glass-dark .island-start-pill:active,
+#islandIsland.island-glass-dark .island-voice-action:active { background-color: rgba(255, 255, 255, 0.2); }
+#islandIsland.island-glass-dark .island-notification-dismiss,
+#islandIsland.island-glass-dark .island-clip-action,
+#islandIsland.island-glass-dark .island-corner-close { background-color: rgba(255, 255, 255, 0.14); }
+#islandIsland.island-glass-dark .island-notification-dismiss:hover,
+#islandIsland.island-glass-dark .island-clip-action:hover,
+#islandIsland.island-glass-dark .island-corner-close:hover { background-color: rgba(255, 255, 255, 0.2); }
+#islandIsland.island-glass-dark .island-notification-row,
+#islandIsland.island-glass-dark .island-cal-event,
+#islandIsland.island-glass-dark .island-cal-world-row,
+#islandIsland.island-glass-dark .island-clip,
+#islandIsland.island-glass-dark .island-output-button.active { background-color: rgba(255, 255, 255, 0.1); }
+#islandIsland.island-glass-dark .island-notification-row:hover,
+#islandIsland.island-glass-dark .island-clip:hover { background-color: rgba(255, 255, 255, 0.15); }
+#islandIsland.island-glass-dark .island-chat-user,
+#islandIsland.island-glass-dark .island-usage-plan { background-color: rgba(255, 255, 255, 0.1); }
+#islandIsland.island-glass-dark .island-voice-idea,
+#islandIsland.island-glass-dark .island-cal-target,
+#islandIsland.island-glass-dark .island-art,
+#islandIsland.island-glass-dark .island-clip-thumb,
+#islandIsland.island-glass-dark .island-shelf-preview.thumbnail,
+#islandIsland.island-glass-dark .island-notification-glyph { background-color: rgba(255, 255, 255, 0.08); }
+#islandIsland.island-glass-dark .island-shelf-preview.thumbnail.whole { background-color: transparent; }
+#islandIsland.island-glass-dark .island-tab:hover,
+#islandIsland.island-glass-dark .island-tab:focus { background-color: rgba(255, 255, 255, 0.06); }
+#islandIsland.island-glass-dark .island-tab:checked { background-color: rgba(255, 255, 255, 0.1); box-shadow: none; }
+#islandIsland.island-glass-dark .island-segmented,
+#islandIsland.island-glass-dark .island-stepper { background-color: rgba(255, 255, 255, 0.07); }
+#islandIsland.island-glass-dark .island-segment:hover { background-color: rgba(255, 255, 255, 0.06); }
+#islandIsland.island-glass-dark .island-segment:checked { background-color: rgba(255, 255, 255, 0.16); box-shadow: none; }
+#islandIsland.island-glass-dark .island-entry { background-color: rgba(255, 255, 255, 0.08) !important; }
+#islandIsland.island-glass-dark .island-entry:focus { background-color: rgba(255, 255, 255, 0.12) !important; }
+#islandIsland.island-glass-dark .island-voice-entry,
+#islandIsland.island-glass-dark .island-voice-entry:hover { background-color: rgba(255, 255, 255, 0.08) !important; }
+#islandIsland.island-glass-dark .island-voice-entry:focus,
+#islandIsland.island-glass-dark .island-voice-entry:focus:hover { background-color: rgba(255, 255, 255, 0.12) !important; }
+#islandIsland.island-glass-dark .island-slider-track { background-color: rgba(255, 255, 255, 0.18); }
+#islandIsland.island-glass-dark .island-level { background-color: rgba(255, 255, 255, 0.16); }
+#islandIsland.island-glass-dark .island-usage-track,
+#islandIsland.island-glass-dark .island-apps-track { background-color: rgba(255, 255, 255, 0.12); }
+#islandIsland.island-glass-dark .island-reminder-line { background-color: rgba(255, 255, 255, 0.12); }
+#islandIsland.island-glass-dark .island-cal-world-strip { border-top-color: rgba(255, 255, 255, 0.12); }
+
+/* An OK stays the white pill it is on black, its text black. */
+#islandIsland.island-translucent .island-pill-white { background-color: #ffffff; box-shadow: none; }
+#islandIsland.island-translucent .island-pill-white:hover { background-color: rgba(255, 255, 255, 0.86); }
+#islandIsland.island-translucent .island-pill-white:active { background-color: rgba(255, 255, 255, 0.72); }
+
+/* GNOME's accent: an answer (Allow, Run, Join), a toggle that is on, the scrubber, the caret; an OK stays white. */
+#islandIsland.island-translucent .island-pill-accent,
+#islandIsland.island-translucent .island-card-run,
+#islandIsland.island-translucent .island-pill-decision,
+#islandIsland.island-translucent .island-voice-send,
+#islandIsland.island-translucent .island-call-control:checked,
+#islandIsland.island-translucent .island-mode-toggle.on,
+#islandIsland.island-translucent .island-cal-world-toggle:checked,
+#islandIsland.island-translucent .island-dnd-toggle:checked {
+  color: #ffffff;
+  background-color: #3584e4;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+#islandIsland.island-translucent .island-pill-accent:hover,
+#islandIsland.island-translucent .island-card-run:hover,
+#islandIsland.island-translucent .island-pill-decision:hover,
+#islandIsland.island-translucent .island-voice-send:hover,
+#islandIsland.island-translucent .island-call-control:checked:hover,
+#islandIsland.island-translucent .island-mode-toggle.on:hover,
+#islandIsland.island-translucent .island-cal-world-toggle:checked:hover,
+#islandIsland.island-translucent .island-dnd-toggle:checked:hover { background-color: #4a90e8; }
+#islandIsland.island-translucent .island-pill-accent:active,
+#islandIsland.island-translucent .island-card-run:active,
+#islandIsland.island-translucent .island-pill-decision:active,
+#islandIsland.island-translucent .island-mode-toggle.on:active { background-color: #2a76d3; }
+#islandIsland.island-translucent .island-card-run .island-card-key { color: rgba(255, 255, 255, 0.7); }
+#islandIsland.island-translucent .island-slider-fill { background-color: #3584e4; }
+#islandIsland.island-translucent .island-entry,
+#islandIsland.island-translucent .island-stepper-entry { caret-color: #3584e4; selection-background-color: #3584e4; }
+
+/* GNOME 47 and later: the accent the user picked in Settings → Appearance (controller.js adds the class). */
+#islandIsland.island-accent-system .island-pill-accent,
+#islandIsland.island-accent-system .island-card-run,
+#islandIsland.island-accent-system .island-pill-decision,
+#islandIsland.island-accent-system .island-voice-send,
+#islandIsland.island-accent-system .island-call-control:checked,
+#islandIsland.island-accent-system .island-mode-toggle.on,
+#islandIsland.island-accent-system .island-cal-world-toggle:checked,
+#islandIsland.island-accent-system .island-dnd-toggle:checked,
+#islandIsland.island-accent-system .island-slider-fill { color: -st-accent-fg-color; background-color: -st-accent-color; }
+#islandIsland.island-accent-system .island-pill-accent:hover,
+#islandIsland.island-accent-system .island-card-run:hover,
+#islandIsland.island-accent-system .island-pill-decision:hover,
+#islandIsland.island-accent-system .island-voice-send:hover,
+#islandIsland.island-accent-system .island-call-control:checked:hover,
+#islandIsland.island-accent-system .island-mode-toggle.on:hover,
+#islandIsland.island-accent-system .island-cal-world-toggle:checked:hover,
+#islandIsland.island-accent-system .island-dnd-toggle:checked:hover { background-color: st-lighten(-st-accent-color, 5%); }
+#islandIsland.island-accent-system .island-pill-accent:active,
+#islandIsland.island-accent-system .island-card-run:active,
+#islandIsland.island-accent-system .island-pill-decision:active,
+#islandIsland.island-accent-system .island-mode-toggle.on:active { background-color: st-darken(-st-accent-color, 5%); }
+#islandIsland.island-accent-system .island-entry,
+#islandIsland.island-accent-system .island-stepper-entry { caret-color: -st-accent-color; selection-background-color: -st-accent-color; }
+#islandIsland.island-accent-system .island-entry:focus { box-shadow: inset 0 0 0 2px st-transparentize(-st-accent-color, 0.3) !important; }
+#islandIsland.island-accent-system .island-voice-entry,
+#islandIsland.island-accent-system .island-voice-entry:focus:hover,
+#islandIsland.island-accent-system .island-reminder-field { selection-background-color: st-transparentize(-st-accent-color, 0.4); }
+#islandIsland.island-accent-system .island-cal-accounts { color: st-lighten(-st-accent-color, 25%); }
+
+/* Dark tint: the accent flat, as GNOME's own toggles. */
+#islandIsland.island-glass-dark .island-pill-accent,
+#islandIsland.island-glass-dark .island-card-run,
+#islandIsland.island-glass-dark .island-pill-decision,
+#islandIsland.island-glass-dark .island-voice-send,
+#islandIsland.island-glass-dark .island-call-control:checked,
+#islandIsland.island-glass-dark .island-mode-toggle.on,
+#islandIsland.island-glass-dark .island-cal-world-toggle:checked,
+#islandIsland.island-glass-dark .island-dnd-toggle:checked { box-shadow: none; }
+
+/* ── Quick settings, simple Island look ─────────────────────── */
+.quick-settings, .popup-menu-content.quick-settings, StBoxLayout.quick-settings { background: #000000 !important; background-color: #000000 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 22px !important; padding: 12px !important; box-shadow: none !important; -arrow-background-color: #000000; -arrow-border-color: rgba(255,255,255,0.08); -arrow-border-width: 1px; -arrow-border-radius: 22px; -arrow-base: 0px; -arrow-rise: 0px; }
+.quick-settings-grid { spacing-rows: 8px; spacing-columns: 8px; }
+/* the outer wrapper of toggles with a submenu draws a capsule: remove it */
+.quick-settings .quick-menu-toggle { background: none !important; background-color: transparent !important; box-shadow: none !important; border: none !important; }
+/* every toggle: quiet dark tile, dim text */
+.quick-settings .quick-toggle, .quick-settings .quick-menu-toggle .quick-toggle, .quick-settings StButton.quick-toggle { background: #1c1c1e !important; background-color: #1c1c1e !important; color: #8e8e93; border-radius: 14px !important; box-shadow: none !important; }
+.quick-settings .quick-toggle:hover, .quick-settings .quick-menu-toggle .quick-toggle:hover { background: #2c2c2e !important; background-color: #2c2c2e !important; }
+/* on: slightly lighter tile, white text, accent icon (Island keeps its accent for the icon, not the whole tile) */
+.quick-settings .quick-toggle:checked, .quick-settings .quick-menu-toggle .quick-toggle:checked, .quick-settings StButton.quick-toggle:checked { background: #2c2c2e !important; background-color: #2c2c2e !important; color: #ffffff; }
+.quick-settings .quick-toggle:checked .quick-toggle-icon, .quick-settings .quick-menu-toggle .quick-toggle:checked .quick-toggle-icon { color: #E8472B !important; background-color: transparent !important; }
+.quick-settings .quick-toggle .quick-toggle-icon { background-color: transparent !important; min-width: 0 !important; min-height: 0 !important; }
+.quick-settings .quick-menu-toggle .quick-toggle:ltr, .quick-settings .quick-menu-toggle .quick-toggle:ltr:last-child { border-radius: 14px 0 0 14px !important; }
+.quick-settings .quick-menu-toggle .quick-toggle-arrow, .quick-settings .quick-menu-toggle .quick-toggle-arrow:ltr { background: #1c1c1e !important; background-color: #1c1c1e !important; color: #8e8e93; border-radius: 0 14px 14px 0 !important; box-shadow: none !important; margin: 0 0 0 1px !important; }
+.quick-settings .quick-menu-toggle .quick-toggle-arrow:checked { background: #2c2c2e !important; background-color: #2c2c2e !important; color: #ffffff; }
+.quick-settings .quick-slider { background: #1c1c1e !important; background-color: #1c1c1e !important; border-radius: 14px !important; box-shadow: none !important; }
+.quick-settings .icon-button { background: #1c1c1e !important; background-color: #1c1c1e !important; border-radius: 12px !important; box-shadow: none !important; }
+/* shared popup surface: same black card everywhere */
+.popup-menu-content, .popup-menu-boxpointer .popup-menu-content { background: #000000 !important; background-color: #000000 !important; border: 1px solid rgba(255,255,255,0.08) !important; border-radius: 22px !important; box-shadow: none !important; }
+/* quick settings card background lives on the popup's boxpointer */
+.popup-menu-boxpointer { -arrow-background-color: #000000; -arrow-border-color: rgba(255,255,255,0.08); -arrow-border-width: 1px; -arrow-border-radius: 22px; -arrow-rise: 0px; }
+.quick-settings, StBoxLayout.quick-settings { margin: 0 !important; }
+/* ── Quick settings: minimal and compact ─────────────────── */
+.quick-settings, StBoxLayout.quick-settings { padding: 8px !important; margin: 0 !important; border-radius: 18px !important; }
+.popup-menu-boxpointer { -arrow-border-radius: 18px; }
+.quick-settings-grid { spacing-rows: 5px; spacing-columns: 5px; }
+.quick-settings .quick-toggle, .quick-settings .quick-menu-toggle .quick-toggle { min-height: 0 !important; padding: 6px 8px !important; border-radius: 11px !important; }
+.quick-settings .quick-menu-toggle .quick-toggle { min-width: 0 !important; max-width: none !important; border-radius: 11px 0 0 11px !important; }
+.quick-settings .quick-menu-toggle .quick-toggle-arrow, .quick-settings .quick-menu-toggle .quick-toggle-arrow:ltr { padding: 0 4px; min-width: 0 !important; border-radius: 0 11px 11px 0 !important; }
+.quick-settings .quick-toggle > StBoxLayout { spacing: 6px; padding: 0 !important; }
+.quick-settings .quick-toggle .quick-toggle-icon { icon-size: 13px !important; }
+.quick-settings .quick-toggle .quick-toggle-title { font-size: 12px; font-weight: 600; }
+.quick-settings .quick-toggle StBoxLayout > .quick-toggle-subtitle { font-size: 10px; }
+.quick-settings .quick-slider { padding: 0.35em 0.5em !important; border-radius: 11px !important; }
+.quick-settings .quick-slider .slider { -barlevel-height: 4px; }
+.quick-settings .icon-button { padding: 5px !important; border-radius: 10px !important; }
+.quick-settings .icon-button StIcon { icon-size: 14px !important; }
+/* fixed pixel width so the card shrinks to fit (em units were ignored by the theme) */
+.quick-settings, StBoxLayout.quick-settings { width: 288px !important; min-width: 0 !important; max-width: 288px !important; }
+.quick-settings-grid { min-width: 0 !important; width: 272px; }
+
+/* equal tiles: same height, same width (both columns share the card evenly), no subtitle */
+.quick-settings .quick-toggle, .quick-settings .quick-menu-toggle .quick-toggle { min-height: 44px !important; height: 44px !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+.quick-settings .quick-menu-toggle .quick-toggle-arrow { min-height: 44px !important; height: 44px !important; padding: 0 6px; }
+.quick-settings .quick-toggle StBoxLayout > .quick-toggle-subtitle, .quick-settings .quick-toggle-subtitle { font-size: 0px; height: 0; min-height: 0; max-height: 0; margin: 0; padding: 0; }
+.quick-settings .quick-toggle > StBoxLayout { spacing: 7px; }
+.quick-settings .quick-toggle { padding-left: 10px !important; padding-right: 8px !important; }
+.quick-settings .quick-menu-toggle { min-height: 44px !important; height: 44px !important; }
+.quick-settings .quick-toggle { min-height: 44px !important; height: 44px !important; }
+.quick-settings .quick-toggle, .quick-settings .quick-menu-toggle, .quick-settings .quick-menu-toggle .quick-toggle, .quick-settings .quick-menu-toggle .quick-toggle-arrow { max-height: 44px !important; min-height: 44px !important; height: 44px !important; }
+.quick-settings .quick-toggle > StBoxLayout, .quick-settings .quick-toggle-icon { max-height: 44px; margin-top: 0; margin-bottom: 0; }
+.quick-settings .quick-toggle:insensitive, .quick-settings .quick-toggle:disabled { padding-top: 0 !important; padding-bottom: 0 !important; margin: 0 !important; border-width: 0 !important; min-height: 44px !important; height: 44px !important; max-height: 44px !important; }
+.quick-settings .quick-toggle StBoxLayout, .quick-settings .quick-toggle StIcon, .quick-settings .quick-toggle StLabel { min-height: 0 !important; max-height: 44px !important; margin-top: 0 !important; margin-bottom: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; }
+.quick-settings .quick-toggle, .quick-settings .quick-toggle:insensitive { border: none !important; border-width: 0 !important; -st-natural-height: 44px; }
+.quick-settings .quick-toggle .quick-toggle-icon { min-width: 0 !important; min-height: 0 !important; }
+
+/* subtitles stay hidden (must come last) */
+.quick-settings .quick-toggle StLabel.quick-toggle-subtitle, .quick-settings .quick-toggle StBoxLayout > .quick-toggle-subtitle { font-size: 0px !important; height: 0 !important; min-height: 0 !important; max-height: 0 !important; margin: 0 !important; padding: 0 !important; }
+/* every direct child of the grid (including Night Light) gets the same box */
+.quick-settings-grid > .quick-toggle, .quick-settings-grid > .quick-menu-toggle { min-height: 44px !important; max-height: 44px !important; height: 44px !important; margin-top: 0 !important; margin-bottom: 0 !important; }
+.quick-settings-grid > .quick-toggle, .quick-settings-grid > StButton { padding-top: 0 !important; padding-bottom: 0 !important; border-width: 0 !important; }
+/* gap between the top bar and popup cards */
+.popup-menu-boxpointer, .candidate-popup-boxpointer { -boxpointer-gap: 8px; }
+/* ── Split top bar: a pill on the left, a pill on the right, the middle stays clear for the island ── */
+#panel, #panel.island-panel, #panel.island-glass-bar, #panel.island-black-bar, #panel.island-panel.island-black-bar { background: transparent !important; background-color: transparent !important; box-shadow: none !important; border-image: none !important; }
+#panel.island-panel #panelLeft, #panel.island-panel #panelRight { background-color: #000000 !important; border: 1px solid rgba(255,255,255,0.07); border-radius: 14px; margin: 3px 10px; padding: 0 4px; }
+#panel.island-panel #panelLeft .panel-button, #panel.island-panel #panelRight .panel-button { text-shadow: none; icon-shadow: none; }
+/* hang from the top edge like the island: no gap above, rounded bottom corners only */
+#panel.island-panel #panelLeft, #panel.island-panel #panelRight { margin: 0 10px !important; border-top-width: 0 !important; border-radius: 0 0 14px 14px !important; }
+/* attach to the screen sides: the left pill joins the left edge, the right pill the right edge; only the inner bottom corner is rounded */
+#panel.island-panel #panelLeft { margin: 0 !important; border-left-width: 0 !important; border-radius: 0 0 14px 0 !important; padding-left: 10px; }
+#panel.island-panel #panelRight { margin: 0 !important; border-right-width: 0 !important; border-radius: 0 0 0 14px !important; padding-right: 10px; }
+/* left pill hidden (the workspace dots) */
+#panel.island-panel #panelLeft { background-color: transparent !important; border-width: 0 !important; padding: 0 !important; margin: 0 !important; min-width: 0 !important; width: 0 !important; }
+#panel.island-panel #panelLeft .panel-button, #panel.island-panel #panelActivities { opacity: 0 !important; width: 0 !important; min-width: 0 !important; max-width: 0 !important; padding: 0 !important; margin: 0 !important; border-width: 0 !important; -natural-hpadding: 0px; -minimum-hpadding: 0px; }
+#panel.island-panel .panel-button#panelActivities .workspace-dot, #panel.island-panel .panel-button#panelActivities .workspace-dots, #panel.island-panel #panelLeft .workspace-dot, #panel.island-panel #panelLeft .workspace-dots { background-color: transparent !important; width: 0 !important; height: 0 !important; min-width: 0 !important; min-height: 0 !important; margin: 0 !important; padding: 0 !important; border-radius: 0; box-shadow: none !important; }
+#panel.island-panel .panel-button#panelActivities, #panel.island-panel .panel-button#panelActivities:hover, #panel.island-panel .panel-button#panelActivities:active { background-color: transparent !important; box-shadow: none !important; }
+
+/* ── System page (local addition) ─────────────────────────── */
+.island-sys-grid { spacing: 14px; padding: 2px 0 0 0; }
+.island-sys-row { spacing: 22px; }
+.island-sys-cell { spacing: 6px; }
+.island-sys-top { spacing: 8px; }
+.island-sys-name { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
+.island-sys-value { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.94); }
+.island-sys-track { height: 4px; border-radius: 2px; background-color: rgba(255, 255, 255, 0.1); }
+.island-sys-fill { height: 4px; border-radius: 2px; background-color: #E8472B; }
+
+/* right pill hidden: its stats live on the System page, the status icons on Quick Settings (Super+S) */
+#panel.island-panel #panelRight { background-color: transparent !important; border-width: 0 !important; padding: 0 !important; margin: 0 !important; min-width: 0 !important; width: 0 !important; }
+#panel.island-panel #panelRight .panel-button, #panel.island-panel #panelRight StBoxLayout, #panel.island-panel #panelRight StLabel, #panel.island-panel #panelRight StIcon { width: 0 !important; min-width: 0 !important; max-width: 0 !important; padding: 0 !important; margin: 0 !important; border-width: 0 !important; -natural-hpadding: 0px; -minimum-hpadding: 0px; font-size: 0px; icon-size: 0px !important; background-color: transparent !important; box-shadow: none !important; }
+
+/* ── Power page (local addition) ──────────────────────────── */
+.island-power-row { spacing: 8px; padding: 6px 0 12px 0; }
+.island-power-heading { padding-top: 2px; }
+.island-power-action, .island-power-switch { text-align: center; }
+.island-power-danger { color: #E8472B; }
+.island-power-on { background-color: #E8472B; color: #ffffff; }

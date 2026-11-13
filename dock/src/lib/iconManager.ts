@@ -229,7 +229,7 @@ export class IconManager {
   private _createIconTexture(app: Shell.App): InstanceType<typeof St.Icon> {
     const icon = app.create_icon_texture(this._getTextureSize()) as InstanceType<typeof St.Icon>;
     icon.set_size(this._iconSize, this._iconSize);
-    icon.add_style_class_name("macos-dock-icon-gicon");
+    icon.add_style_class_name("dock-icon-gicon");
     icon.x_align = Clutter.ActorAlign.CENTER;
     icon.y_align = Clutter.ActorAlign.CENTER;
     return icon;
@@ -313,7 +313,7 @@ export class IconManager {
 
     // Initialize tooltip - add to top chrome layer like the dock
     this._tooltipText = new St.Label({
-      style_class: "macos-dock-tooltip",
+      style_class: "dock-tooltip",
       text: "",
       visible: false,
     });
@@ -598,7 +598,7 @@ export class IconManager {
     if (this._icons.has(appId)) return;
 
     const actor = new St.BoxLayout({
-      style_class: "macos-dock-icon",
+      style_class: "dock-icon",
       reactive: true,
       track_hover: true,
       vertical: true,
@@ -611,7 +611,7 @@ export class IconManager {
     const icon = this._createIconTexture(app);
 
     const iconWrapper = new St.Widget({
-      style_class: "macos-dock-icon-wrapper",
+      style_class: "dock-icon-wrapper",
       layout_manager: new Clutter.FixedLayout(),
       x_align: Clutter.ActorAlign.CENTER,
       width: this._iconSize,
@@ -624,7 +624,7 @@ export class IconManager {
 
     // Container for running indicator dots (or a single bar).
     const indicatorBox = new St.BoxLayout({
-      style_class: "macos-dock-indicator-box",
+      style_class: "dock-indicator-box",
       x_align: Clutter.ActorAlign.CENTER,
       y_align: Clutter.ActorAlign.CENTER,
     });
@@ -784,7 +784,7 @@ export class IconManager {
 
     if (isPlaying && !data.mediaIndicator) {
       const badge = new St.Widget({
-        style_class: "macos-dock-media-indicator",
+        style_class: "dock-media-indicator",
         layout_manager: new Clutter.BinLayout(),
         x_align: Clutter.ActorAlign.CENTER,
         y_align: Clutter.ActorAlign.CENTER,
@@ -792,7 +792,7 @@ export class IconManager {
       const noteIcon = new St.Icon({
         icon_name: "folder-music-symbolic",
         icon_size: 8,
-        style_class: "macos-dock-media-indicator-icon",
+        style_class: "dock-media-indicator-icon",
         x_align: Clutter.ActorAlign.CENTER,
         y_align: Clutter.ActorAlign.CENTER,
       });
@@ -855,7 +855,7 @@ export class IconManager {
       // Add or remove dots to match window count.
       while (indicatorBox.get_n_children() < needed) {
         const dot = new St.Widget({
-          style_class: "macos-dock-indicator-dot",
+          style_class: "dock-indicator-dot",
         });
         indicatorBox.add_child(dot);
       }
@@ -866,7 +866,7 @@ export class IconManager {
     } else {
       // Horizontal bar style.
       const bar = new St.Widget({
-        style_class: "macos-dock-indicator-bar",
+        style_class: "dock-indicator-bar",
       });
       indicatorBox.add_child(bar);
     }
@@ -1205,7 +1205,7 @@ export class IconManager {
     }
 
     if (!this._dropIndicator) {
-      this._dropIndicator = new St.Widget({ style_class: "macos-dock-drop-indicator" });
+      this._dropIndicator = new St.Widget({ style_class: "dock-drop-indicator" });
       // Keep the indicator out of stage picking so it can never become the
       // drop target itself.
       Shell.util_set_hidden_from_pick(this._dropIndicator, true);
@@ -1350,7 +1350,7 @@ export class IconManager {
 
     const menu = new PopupMenu.PopupMenu(actor, 0.5, St.Side.TOP);
     (menu as unknown as { blockSourceEvents: boolean }).blockSourceEvents = true;
-    menu.box.add_style_class_name("macos-dock-popup-menu");
+    menu.box.add_style_class_name("dock-popup-menu");
     Main.uiGroup.add_child(menu.actor);
     this._contextMenu = menu;
     this._menuSignals = new SignalManager();
@@ -1444,7 +1444,7 @@ export class IconManager {
     if (this._separator) return;
 
     this._separator = new St.Widget({
-      style_class: "macos-dock-separator",
+      style_class: "dock-separator",
       width: 1,
       height: 32,
       x_align: Clutter.ActorAlign.CENTER,
@@ -1478,7 +1478,7 @@ export class IconManager {
     const padded = this._iconSize + 12;
 
     const appButton = new St.BoxLayout({
-      style_class: "macos-dock-app-button",
+      style_class: "dock-app-button",
       reactive: true,
       track_hover: true,
       vertical: true,
@@ -1492,7 +1492,7 @@ export class IconManager {
     this._appButtonIcon = new St.Icon({
       icon_name: "view-app-grid-symbolic",
       icon_size: this._iconSize,
-      style_class: "macos-dock-app-button-icon",
+      style_class: "dock-app-button-icon",
     });
     appButton.add_child(this._appButtonIcon);
 

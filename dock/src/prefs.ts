@@ -132,7 +132,7 @@ export default class MacosDockPreferences extends ExtensionPreferences {
     });
     const customCssHelp = new Gtk.Label({
       label:
-        "Use dock selectors such as .macos-dock-container, .macos-dock-icon, and .macos-dock-app-button.",
+        "Use dock selectors such as .dock-container, .dock-icon, and .dock-app-button.",
       wrap: true,
       xalign: 0,
     });

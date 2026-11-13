@@ -66,7 +66,7 @@ export class DockManager {
     this._hideDefaultDash();
 
     this._container = new St.BoxLayout({
-      style_class: "macos-dock-container",
+      style_class: "dock-container",
       vertical: false,
       reactive: true,
       x_align: Clutter.ActorAlign.CENTER,
@@ -76,7 +76,7 @@ export class DockManager {
     Main.layoutManager.addTopChrome(this._container);
 
     // Separate background actor so the dock "shelf" can grow with the magnified icons.
-    this._bg = new St.Widget({ style_class: "macos-dock-bg", reactive: false });
+    this._bg = new St.Widget({ style_class: "dock-bg", reactive: false });
     Main.layoutManager.addTopChrome(this._bg);
     this._container.get_parent()?.set_child_below_sibling(this._bg, this._container);
     for (const prop of ["x", "y", "width", "height", "opacity", "visible", "translation-x", "translation-y"])
@@ -694,7 +694,7 @@ export class DockManager {
     const checksum = GLib.compute_checksum_for_string(GLib.ChecksumType.SHA256, css, -1);
     if (!checksum) return;
 
-    const directoryPath = GLib.build_filenamev([GLib.get_user_cache_dir(), "macos-dock"]);
+    const directoryPath = GLib.build_filenamev([GLib.get_user_cache_dir(), "dock"]);
     const directory = Gio.File.new_for_path(directoryPath);
     const file = Gio.File.new_for_path(GLib.build_filenamev([directoryPath, `${checksum}.css`]));
     let stylesheetLoaded = false;
@@ -709,7 +709,7 @@ export class DockManager {
       if (!this._theme.load_stylesheet(file)) {
         this._deleteCustomCssFile(file);
         if (!this._customCssFile) this._removeCustomCssDirectory();
-        console.error("MacOS Dock: GNOME Shell could not load the custom CSS stylesheet.");
+        console.error("Dock: GNOME Shell could not load the custom CSS stylesheet.");
         return;
       }
       stylesheetLoaded = true;
@@ -724,7 +724,7 @@ export class DockManager {
     } catch (error) {
       if (!stylesheetLoaded) this._deleteCustomCssFile(file);
       if (!this._customCssFile) this._removeCustomCssDirectory();
-      console.error(`MacOS Dock: Failed to apply custom CSS: ${error}`);
+      console.error(`Dock: Failed to apply custom CSS: ${error}`);
     }
   }
 
@@ -748,7 +748,7 @@ export class DockManager {
     try {
       if (file.query_exists(null)) file.delete(null);
     } catch (error) {
-      console.error(`MacOS Dock: Failed to remove cached custom CSS: ${error}`);
+      console.error(`Dock: Failed to remove cached custom CSS: ${error}`);
     }
   }
 
@@ -759,7 +759,7 @@ export class DockManager {
       if (this._customCssDirectory.query_exists(null)) this._customCssDirectory.delete(null);
       this._customCssDirectory = null;
     } catch (error) {
-      console.error(`MacOS Dock: Failed to remove custom CSS cache directory: ${error}`);
+      console.error(`Dock: Failed to remove custom CSS cache directory: ${error}`);
     }
   }
 

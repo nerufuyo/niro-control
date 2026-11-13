@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="assets/MacOSDock-logo.png" alt="MacOS Dock Logo" width="128">
+  <img src="assets/dock-logo.png" alt="Dock Logo" width="128">
 </p>
 
-<h1 align="center">MacOS Dock for GNOME Shell</h1>
+<h1 align="center">Dock for GNOME Shell</h1>
 
 <p align="center">
   A macOS-style dock extension for GNOME Shell featuring smooth magnification, configurable animations, and native-like behavior.
 </p>
 
 <p align="center">
-  <img src="assets/MacOSDock-demo.gif" alt="MacOS Dock Demo" width="600">
+  <img src="assets/dock-demo.gif" alt="Dock Demo" width="600">
 </p>
 
 ## Features
@@ -43,7 +43,7 @@ cd MacOSDock
 make install
 ```
 
-The extension will be installed to `~/.local/share/gnome-shell/extensions/macos-dock@vinnytherobot.github.io/`.
+The extension will be installed to `~/.local/share/gnome-shell/extensions/dock@niro.local/`.
 
 ### Restart GNOME Shell
 
@@ -53,7 +53,7 @@ The extension will be installed to `~/.local/share/gnome-shell/extensions/macos-
 ### Enable the Extension
 
 ```bash
-gnome-extensions enable macos-dock@vinnytherobot.github.io
+gnome-extensions enable dock@niro.local
 ```
 
 ## Configuration
@@ -61,7 +61,7 @@ gnome-extensions enable macos-dock@vinnytherobot.github.io
 Access the extension preferences through GNOME Extensions app or:
 
 ```bash
-gnome-extensions prefs macos-dock@vinnytherobot.github.io
+gnome-extensions prefs dock@niro.local
 ```
 
 ### Settings
@@ -103,7 +103,7 @@ Keyboard navigation is disabled by default so GNOME's own shortcuts remain avail
 
 ### Custom CSS
 
-Open **Preferences → Background → Custom CSS** to write and apply a stylesheet. The editor accepts GNOME Shell CSS selectors. Useful dock classes include `.macos-dock-container`, `.macos-dock-icon`, `.macos-dock-app-button`, `.macos-dock-indicator-dot`, and `.macos-dock-indicator-bar`. Scope rules to these classes to avoid changing unrelated Shell elements. Use `!important` when overriding a property set directly by the extension, such as dock background color or corner radius.
+Open **Preferences → Background → Custom CSS** to write and apply a stylesheet. The editor accepts GNOME Shell CSS selectors. Useful dock classes include `.dock-container`, `.dock-icon`, `.dock-app-button`, `.dock-indicator-dot`, and `.dock-indicator-bar`. Scope rules to these classes to avoid changing unrelated Shell elements. Use `!important` when overriding a property set directly by the extension, such as dock background color or corner radius.
 
 ## Development
 

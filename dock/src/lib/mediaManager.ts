@@ -130,7 +130,7 @@ export class MediaManager {
           [names] = bus.call_finish(res).deepUnpack() as [string[]];
         } catch (e) {
           if (!cancellable.is_cancelled()) {
-            console.error("[macos-dock][media] discover error:", e);
+            console.error("[dock][media] discover error:", e);
           }
           return;
         }
@@ -159,7 +159,7 @@ export class MediaManager {
         null,
       );
     } catch (e) {
-      console.error(`[macos-dock] Failed to add player ${busName}:`, e);
+      console.error(`[dock] Failed to add player ${busName}:`, e);
       return;
     }
 

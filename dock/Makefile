@@ -1,4 +1,4 @@
-UUID = macos-dock@vinnytherobot.github.io
+UUID = dock@niro.local
 INSTALL_DIR = $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 VERSION = $(shell node -p "require('./package.json').version")
 # GNOME Shell < 45 cannot load ES-module extensions; install the legacy build there.

@@ -1,6 +1,6 @@
-# Contributing to MacOS Dock
+# Contributing to Dock
 
-Thank you for considering contributing to MacOS Dock. This document provides guidelines and instructions for contributing.
+Thank you for considering contributing to Dock. This document provides guidelines and instructions for contributing.
 
 ## Code of Conduct
 

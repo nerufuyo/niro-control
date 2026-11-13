@@ -2,11 +2,11 @@
   "name": "niro-control",
   "private": true,
   "type": "module",
-  "description": "Niro Control: one look for Isle, the dock, the application search and the control panel. TypeScript for what we write.",
+  "description": "Niro Control: one look for Island, the dock, the application search and the control panel. TypeScript for what we write.",
   "scripts": {
-    "build:isle": "tsc -p isle/gnome-extension",
+    "build:island": "tsc -p island/gnome-extension",
     "build:control": "tsc -p control",
-    "test": "npm run build:isle && node --test isle/tests/extension/*.test.js"
+    "test": "npm run build:island && node --test island/tests/extension/*.test.js"
   },
   "devDependencies": {
     "typescript": "^5.7.0"
