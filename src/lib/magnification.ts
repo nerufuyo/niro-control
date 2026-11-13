@@ -168,20 +168,34 @@ export class Magnification {
             this._stopTimeline();
             return;
         }
-        this._apply(children, widths);
+        // The bar's growth is the same wherever the pointer is: what the bell would add in the middle of the row.
+        // Where fewer neighbours are magnified (the ends), the slack is spread evenly over the gaps instead.
+        const mid = Math.floor(children.length / 2);
+        let ideal = 0;
+        for (let i = 0; i < children.length; i++) {
+            const d = centers[i] - centers[mid];
+            ideal += (this._maxScale - MIN_SCALE) * widths[i] * Math.exp(-(d * d) / (2 * sigma * sigma));
+        }
+        let peakScale = MIN_SCALE;
+        for (const sc of this._currentScales) peakScale = Math.max(peakScale, sc);
+        const progress = Math.max(0, Math.min(1, (peakScale - MIN_SCALE) / (this._maxScale - MIN_SCALE)));
+        this._apply(children, widths, ideal * progress);
     }
     // Apply scales and push neighbours apart so enlarged icons never overlap; row stays centred.
-    _apply(children: InstanceType<typeof St.BoxLayout>[], widths: number[]) {
+    _apply(children: InstanceType<typeof St.BoxLayout>[], widths: number[], growth = 0) {
         let total = 0;
         for (let i = 0; i < children.length; i++)
             total += (this._currentScales[i] - MIN_SCALE) * widths[i];
+        const barGrowth = Math.max(growth, total);
+        const slack = barGrowth - total;
         let left = 0;
         for (let i = 0; i < children.length; i++) {
             const s = this._currentScales[i];
             const extra = (s - MIN_SCALE) * widths[i];
             children[i].scale_x = s;
             children[i].scale_y = s;
-            children[i].translation_x = left + extra / 2 - total / 2;
+            const stretch = slack * ((i + 0.5) / children.length - 0.5);
+            children[i].translation_x = left + extra / 2 - total / 2 + stretch;
             left += extra;
         }
         // Tell the dock how much its background must grow (width: total extra, height: tallest icon's growth).
@@ -200,7 +214,7 @@ export class Magnification {
                 h,
             });
         }
-        this._onExtent?.(total, peak, profile);
+        this._onExtent?.(barGrowth, peak, profile);
     }
     _snapAllToMin() {
         for (const child of (this._container.get_children() as InstanceType<typeof St.BoxLayout>[])) {
