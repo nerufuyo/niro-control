@@ -25,20 +25,25 @@ export function glassAlpha(opacity: number): number {
     return o <= 80 ? 0.2 + 0.3 * (o / 80) : 0.5 + 0.5 * ((o - 80) / 20);
 }
 
-export function tokens(scheme: Scheme, opacity: number, tint?: string): Tokens {
+/** Solidity of the surfaces, 0 to 100 each (see appearance.ts for the floors that keep text readable). */
+export interface Surfaces {sidebar: number; content: number; elevated: number}
+export const DEFAULT_SURFACES: Surfaces = {sidebar: 70, content: 85, elevated: 92};
+
+export function tokens(scheme: Scheme, opacity: number, tint?: string, surfaces: Surfaces = DEFAULT_SURFACES): Tokens {
     const L = (rgb: RGB, a: number): Layer => ({rgb, a});
+    const sb = clamp(surfaces.sidebar, 0, 100) / 100, ct = clamp(surfaces.content, 0, 100) / 100, el = clamp(surfaces.elevated, 0, 100) / 100;
     if (scheme === 'dark') {
         const t = hexToRgb(tint ?? '');
         return {
             glass: L(t && luminance(t) < 0.12 ? t : [20, 20, 24], glassAlpha(opacity)),
-            sidebar: L([18, 18, 22], 0.65), content: L([16, 16, 20], 0.82), group: L([28, 28, 34], 0.85), elevated: L([35, 35, 42], 0.90), hover: L([255, 255, 255], 0.07),
+            sidebar: L([18, 18, 22], sb), content: L([16, 16, 20], ct), group: L([28, 28, 34], el), elevated: L([35, 35, 42], Math.min(1, el + 0.02)), hover: L([255, 255, 255], 0.07),
             text1: L([255, 255, 255], 0.96), text2: L([255, 255, 255], 0.75), text3: L([255, 255, 255], 0.60), textDisabled: L([255, 255, 255], 0.42),
             divider: L([255, 255, 255], 0.10), border: L([255, 255, 255], 0.08),
         };
     }
     return {
         glass: L([244, 244, 248], glassAlpha(opacity)),
-        sidebar: L([238, 238, 243], 0.70), content: L([250, 250, 252], 0.86), group: L([255, 255, 255], 0.92), elevated: L([255, 255, 255], 0.96), hover: L([0, 0, 0], 0.06),
+        sidebar: L([238, 238, 243], sb), content: L([250, 250, 252], ct), group: L([255, 255, 255], el), elevated: L([255, 255, 255], Math.min(1, el + 0.02)), hover: L([0, 0, 0], 0.06),
         text1: L([0, 0, 0], 0.90), text2: L([0, 0, 0], 0.70), text3: L([0, 0, 0], 0.56), textDisabled: L([0, 0, 0], 0.38),
         divider: L([0, 0, 0], 0.10), border: L([0, 0, 0], 0.10),
     };
@@ -64,8 +69,8 @@ export function textContrast(t: Tokens, text: keyof Tokens, wallpaper: RGB, wher
 const rgba = (l: Layer) => `rgba(${l.rgb.join(', ')}, ${+l.a.toFixed(3)})`;
 
 /** GTK 4 CSS: named colours for the tokens, libadwaita's foreground colours pointed at them, and the rules for the layers. */
-export function stylesheet(scheme: Scheme, opacity: number, tint?: string): string {
-    const t = tokens(scheme, opacity, tint);
+export function stylesheet(scheme: Scheme, opacity: number, tint?: string, surfaces: Surfaces = DEFAULT_SURFACES): string {
+    const t = tokens(scheme, opacity, tint, surfaces);
     return `
 @define-color niro_glass ${rgba(t.glass)};
 @define-color niro_sidebar ${rgba(t.sidebar)};

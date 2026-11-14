@@ -62,3 +62,13 @@ test('the dark tint is used for the glass only when it is dark; a light tint fal
 });
 
 test('contrast helper: black on white is 21', () => assert.equal(Math.round(contrast([0, 0, 0], [255, 255, 255])), 21));
+
+import {FLOORS} from '../../control/build/appearance.js';
+test('even at the lowest allowed surface solidity, text reaches AA over black, white and mid wallpapers at every glass opacity', () => {
+    const floor = {sidebar: FLOORS.sidebar, content: FLOORS.content, elevated: FLOORS.elevated};
+    for (const scheme of ['dark', 'light']) for (const o of OPACITIES) for (const [name, w] of Object.entries(WALLPAPERS)) {
+        const t = tokens(scheme, o, undefined, floor);
+        for (const where of ['group', 'content', 'sidebar']) for (const text of ['text1', 'text2'])
+            assert.ok(textContrast(t, text, w, where) >= 4.5, `${scheme} ${o}% ${name} ${where} ${text} ${textContrast(t, text, w, where).toFixed(2)}`);
+    }
+});

@@ -18,7 +18,7 @@ const value = id => engine.readItem(CATALOG.find(i => i.id === id));
 const captured = engine.capture();
 eq(Object.keys(captured).length, CATALOG.filter(i => !i.managed).length, 'captured settings');
 for (const m of CATALOG.filter(i => i.managed)) if (!(m.managed in captured)) fail(`${m.id} is not covered by ${m.managed}`);
-eq(CATALOG.length, 132, 'registered settings');
+eq(CATALOG.length, 143, 'registered settings');
 
 // built-in profiles are listed first, protected, and resolve through extends
 const names = engine.list().map(p => p.name);

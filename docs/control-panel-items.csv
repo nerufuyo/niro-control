@@ -1,9 +1,20 @@
 menu,group,item,control,choices_or_range,default,help,key,id
-Look,Glass,Opacity,slider,0–100,80,"How see-through the surfaces are, from 0 (clear) to 100 (solid): the island's glass, the dock, application windows and the search panel.",opacity,niro.opacity
+Look,Glass,Opacity,slider,0–100,80,"How see-through the glass is, from 0 (clear) to 100 (solid): the background material of the island, the dock, the search panel and the control panel.",opacity,niro.opacity
 Look,Glass,Blur,switch,,true,Frosted glass behind the dock and application windows.,blur,niro.blur
 Look,Glass,Blur strength,slider,0–100,30,How strong the blur is: the blur radius of the windows' default blur pipeline.,blur-strength,niro.blur-strength
 Look,Tone,Accent colour,color,,#E8472B,"The one accent of the desktop: the island's highlights, the dock's running dots and the search panel's selection.",accent,niro.accent
 Look,Tone,Surface tint,color,,#1C1C1E,The colour of the dark surfaces: the dock and the search panel.,tint,niro.tint
+Look,Universal Appearance,Enable system-wide appearance,switch,,true,"Off puts every part of Universal Appearance to rest: the panel, the GNOME Shell parts and the GTK theme integration go back to their own look.",universal-enabled,niro.universal-enabled
+Look,Universal Appearance,Appearance preset,select,Balanced / Crystal / Solid / Performance / Custom,balanced,"Balanced glass: subtle transparency, strong readability.",preset,niro.preset
+Look,Universal Appearance,Sidebar opacity,stepper,62–100,70,"How solid sidebars are over the glass, from 62 to 100.",sidebar-opacity,niro.sidebar-opacity
+Look,Universal Appearance,Content surface opacity,stepper,70–100,85,"How solid the main content area is over the glass, from 70 to 100.",content-opacity,niro.content-opacity
+Look,Universal Appearance,Elevated surface opacity,stepper,80–100,92,"How solid raised things (groups, cards, previews) are, from 80 to 100.",elevated-opacity,niro.elevated-opacity
+Look,Universal Appearance,Light or dark,select,System / Dark / Light,system,The scheme of the control panel and of the GTK theme integration.,color-scheme,niro.color-scheme
+Look,Universal Appearance,Performance mode,switch,,false,Fewer effects for battery and weaker hardware: the blur is left out and surfaces are more solid.,performance-mode,niro.performance-mode
+Look,Universal Appearance,Apply to GNOME Shell parts,switch,,true,"The island, the dock and the search panel follow the shared look.",affect-shell,niro.affect-shell
+Look,Universal Appearance,Apply to GTK applications,switch,,true,"Used by the GTK theme integration (installed from Compatibility, never without your consent) and by the control panel.",affect-gtk,niro.affect-gtk
+Look,Universal Appearance,Window-level effects for other applications,switch,,false,"Whole-window transparency for applications that cannot be styled from inside (browsers, Electron, Qt).",affect-thirdparty,niro.affect-thirdparty
+Look,Universal Appearance,Safe mode,switch,,false,"Solid surfaces and no compositor effects, whatever else is set.",safe-mode,niro.safe-mode
 Search,Application Search,Search shortcut,shortcut,,['<Super>space'],Opens the application search.,search-shortcut,niro.search-shortcut
 Island,Appearance and Behavior,Top bar style,select,Glass / Black,glass,"“glass”: see-through, with no colour of its own, with the island as a black notch hanging from the top of the screen.",top-bar-style,island.top-bar-style
 Island,Appearance and Behavior,The island's look,select,Black / Glass,black,black: Island's own black island.,island-theme,island.island-theme

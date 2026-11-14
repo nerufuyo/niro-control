@@ -7,7 +7,7 @@ export const INDEX = [
   "menu": "Look",
   "group": "Glass",
   "title": "Opacity",
-  "help": "How see-through the surfaces are, from 0 (clear) to 100 (solid): the island's glass, the dock, application windows and the search panel.",
+  "help": "How see-through the glass is, from 0 (clear) to 100 (solid): the background material of the island, the dock, the search panel and the control panel.",
   "key": "opacity",
   "kind": "slider",
   "managed": false
@@ -50,6 +50,116 @@ export const INDEX = [
   "help": "The colour of the dark surfaces: the dock and the search panel.",
   "key": "tint",
   "kind": "color",
+  "managed": false
+ },
+ {
+  "id": "niro.universal-enabled",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Enable system-wide appearance",
+  "help": "Off puts every part of Universal Appearance to rest: the panel, the GNOME Shell parts and the GTK theme integration go back to their own look.",
+  "key": "universal-enabled",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.preset",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Appearance preset",
+  "help": "Balanced glass: subtle transparency, strong readability.",
+  "key": "preset",
+  "kind": "select",
+  "managed": false
+ },
+ {
+  "id": "niro.sidebar-opacity",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Sidebar opacity",
+  "help": "How solid sidebars are over the glass, from 62 to 100.",
+  "key": "sidebar-opacity",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "niro.content-opacity",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Content surface opacity",
+  "help": "How solid the main content area is over the glass, from 70 to 100.",
+  "key": "content-opacity",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "niro.elevated-opacity",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Elevated surface opacity",
+  "help": "How solid raised things (groups, cards, previews) are, from 80 to 100.",
+  "key": "elevated-opacity",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "niro.color-scheme",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Light or dark",
+  "help": "The scheme of the control panel and of the GTK theme integration.",
+  "key": "color-scheme",
+  "kind": "select",
+  "managed": false
+ },
+ {
+  "id": "niro.performance-mode",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Performance mode",
+  "help": "Fewer effects for battery and weaker hardware: the blur is left out and surfaces are more solid.",
+  "key": "performance-mode",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.affect-shell",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Apply to GNOME Shell parts",
+  "help": "The island, the dock and the search panel follow the shared look.",
+  "key": "affect-shell",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.affect-gtk",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Apply to GTK applications",
+  "help": "Used by the GTK theme integration (installed from Compatibility, never without your consent) and by the control panel.",
+  "key": "affect-gtk",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.affect-thirdparty",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Window-level effects for other applications",
+  "help": "Whole-window transparency for applications that cannot be styled from inside (browsers, Electron, Qt).",
+  "key": "affect-thirdparty",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.safe-mode",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Safe mode",
+  "help": "Solid surfaces and no compositor effects, whatever else is set.",
+  "key": "safe-mode",
+  "kind": "switch",
   "managed": false
  },
  {

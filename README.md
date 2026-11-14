@@ -16,7 +16,7 @@ Built for **Ubuntu 24.04 / GNOME Shell 46** (Wayland). The extensions declare su
 | **Rounded corners** | Round corners and shadows for every window, including Chrome and Electron apps. |
 | **Emoji, Emulator** | An emoji picker; keeps the Android Emulator window on top. |
 | **Profiles** | Save the whole desktop as a profile and switch with one action: four built-ins (Everyday, Deep Work, Creative, Gaming), preview before applying, backups, rollback, import and export. |
-| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 132 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
+| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 143 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
 
 Opacity, blur, blur strength, accent and tint are set once, in **Look**, and the island, dock, search and windows follow.
 Light and dark appearance both work, and the panel adapts to narrow windows.

@@ -5,12 +5,12 @@
       <range min="0" max="100"/>
       <default>80</default>
       <summary>Opacity</summary>
-      <description>How see-through the surfaces are, from 0 (clear) to 100 (solid): the island&apos;s glass, the dock, application windows and the search panel.</description>
+      <description>How see-through the glass is, from 0 (clear) to 100 (solid): the background material of the island, the dock, the search panel and the control panel. Text and controls are never made see-through by it.</description>
     </key>
     <key name="blur" type="b">
       <default>true</default>
       <summary>Blur</summary>
-      <description>Frosted glass behind the dock and application windows.</description>
+      <description>Frosted glass behind the dock and application windows. Only visible where the window itself is see-through.</description>
     </key>
     <key name="blur-strength" type="i">
       <range min="0" max="100"/>
@@ -26,6 +26,81 @@
       <default>'#1C1C1E'</default>
       <summary>Surface tint</summary>
       <description>The colour of the dark surfaces: the dock and the search panel.</description>
+    </key>
+    <key name="universal-enabled" type="b">
+      <default>true</default>
+      <summary>Enable system-wide appearance</summary>
+      <description>Off puts every part of Universal Appearance to rest: the panel, the GNOME Shell parts and the GTK theme integration go back to their own look. Your settings are kept.</description>
+    </key>
+    <key name="preset" type="s">
+      <choices>
+        <choice value="balanced"/>
+        <choice value="crystal"/>
+        <choice value="solid"/>
+        <choice value="performance"/>
+        <choice value="custom"/>
+      </choices>
+      <default>'balanced'</default>
+      <summary>Appearance preset</summary>
+      <description>Balanced glass: subtle transparency, strong readability. Crystal glass: more see-through, stronger blur. Solid: opaque surfaces, no effects. Performance: reduced effects. Changing any value below makes it custom.</description>
+    </key>
+    <key name="sidebar-opacity" type="i">
+      <range min="62" max="100"/>
+      <default>70</default>
+      <summary>Sidebar opacity</summary>
+      <description>How solid sidebars are over the glass, from 62 to 100. Applies to the control panel and, with the GTK theme integration, to GTK applications.</description>
+    </key>
+    <key name="content-opacity" type="i">
+      <range min="70" max="100"/>
+      <default>85</default>
+      <summary>Content surface opacity</summary>
+      <description>How solid the main content area is over the glass, from 70 to 100. Keep it above 80 for comfortable reading over bright wallpapers.</description>
+    </key>
+    <key name="elevated-opacity" type="i">
+      <range min="80" max="100"/>
+      <default>92</default>
+      <summary>Elevated surface opacity</summary>
+      <description>How solid raised things (groups, cards, previews) are, from 80 to 100.</description>
+    </key>
+    <key name="color-scheme" type="s">
+      <choices>
+        <choice value="system"/>
+        <choice value="dark"/>
+        <choice value="light"/>
+      </choices>
+      <default>'system'</default>
+      <summary>Light or dark</summary>
+      <description>The scheme of the control panel and of the GTK theme integration. System follows GNOME.</description>
+    </key>
+    <key name="performance-mode" type="b">
+      <default>false</default>
+      <summary>Performance mode</summary>
+      <description>Fewer effects for battery and weaker hardware: the blur is left out and surfaces are more solid.</description>
+    </key>
+    <key name="affect-shell" type="b">
+      <default>true</default>
+      <summary>Apply to GNOME Shell parts</summary>
+      <description>The island, the dock and the search panel follow the shared look.</description>
+    </key>
+    <key name="affect-gtk" type="b">
+      <default>true</default>
+      <summary>Apply to GTK applications</summary>
+      <description>Used by the GTK theme integration (installed from Compatibility, never without your consent) and by the control panel.</description>
+    </key>
+    <key name="affect-thirdparty" type="b">
+      <default>false</default>
+      <summary>Window-level effects for other applications</summary>
+      <description>Whole-window transparency for applications that cannot be styled from inside (browsers, Electron, Qt). It fades their text and controls with the background, so it is off unless you turn it on for an application under Compatibility.</description>
+    </key>
+    <key name="safe-mode" type="b">
+      <default>false</default>
+      <summary>Safe mode</summary>
+      <description>Solid surfaces and no compositor effects, whatever else is set. Use it if something is hard to read.</description>
+    </key>
+    <key name="app-rules" type="s">
+      <default>'{}'</default>
+      <summary>Per-application rules</summary>
+      <description>Internal: the per-application rules of the Compatibility page, as JSON keyed by application id.</description>
     </key>
     <key name="search-shortcut" type="as">
       <default>['&lt;Super&gt;space']</default>
