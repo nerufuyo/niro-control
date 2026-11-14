@@ -90,3 +90,19 @@ test('one edge treatment: the Search palette and the shell surfaces share radius
     assert.match(shell, new RegExp(`\\.popup-menu-content[^}]*border-radius: ${EDGE.radiusPopup}px`));
     assert.ok(shell.includes(EDGE.shadowDark) && shell.includes(EDGE.borderDark));
 });
+
+import {isThemeTranslucent} from '../../control/build/shellTheme.js';
+test('a theme that draws a surface see-through on purpose keeps it: only accents are added there', () => {
+    assert.equal(isThemeTranslucent(0), true);
+    assert.equal(isThemeTranslucent(0.5), true);
+    assert.equal(isThemeTranslucent(1), false);
+    const glass = shellStylesheet({...look, own: {panel: true, popup: false, quick: true, overview: false}});
+    assert.ok(!/#panel/.test(glass), 'the glass panel is left alone');
+    assert.ok(!/\.quick-settings/.test(glass), 'glass Quick Settings are left alone');
+    assert.ok(!/\.popup-menu-content/.test(glass), 'menus are left alone when Quick Settings is glass: it is a menu too');
+    assert.match(glass, /\.notification-banner/);
+    assert.match(glass, /\.search-entry/);
+    assert.match(glass, /\.quick-toggle:checked/);                       // the accent still applies
+    const all = shellStylesheet({...look, own: {panel: true, popup: true, quick: true, overview: true}});
+    assert.ok(!/background-color: rgba\((28|36|250|255)/.test(all.replace(/-barlevel[^;]*;/, '')), 'no surface is repainted when the theme owns them all');
+});

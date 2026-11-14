@@ -8,7 +8,7 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {effective, gtk3Scheme, migrateLegacy, PRESET_KEYS, resolveScheme} from './appearance.js';
-import {isDarkSurface, shellStylesheet} from './shellTheme.js';
+import {isDarkSurface, isThemeTranslucent, shellStylesheet} from './shellTheme.js';
 import {refresh as refreshGtk} from './gtkAdapter.js';
 import {setBlurRadius} from './blurPipeline.js';
 
@@ -47,6 +47,12 @@ export class NiroSync {
         // signals, not polling: GNOME's colour scheme and high contrast
         this._ifaceId = this._iface.connect('changed::color-scheme', () => this._queueGtk());
         this._themeId = this._iface.connect('changed::gtk-theme', () => this._queueGtk());
+        // the shell theme can change: measure it again (user-theme's name, GNOME's colour scheme)
+        const again = () => { this._remeasure = true; this._queueShell(); };
+        this._schemeShellId = this._iface.connect('changed::color-scheme', again);
+        const ut = Gio.SettingsSchemaSource.get_default()?.lookup('org.gnome.shell.extensions.user-theme', true);
+        this._userTheme = ut ? new Gio.Settings({schema_id: 'org.gnome.shell.extensions.user-theme'}) : null;
+        this._userThemeId = this._userTheme?.connect('changed::name', again) ?? 0;
         this._a11yId = this._a11y.connect('changed::high-contrast', () => this._apply());
         this._migrate();
         this._surfaces();
@@ -103,7 +109,7 @@ export class NiroSync {
             if (!on) { this._unloadShellStyle(); return; }
             const values = Object.fromEntries(PRESET_KEYS.map(k => [k, typeof this._shared.get_value(k).unpack() === 'boolean' ? this._shared.get_boolean(k) : this._shared.get_int(k)]));
             const e = effective(values, {safeMode: this._flag('safe-mode', false), highContrast: false});
-            const css = shellStylesheet({accent: this._shared.get_string('accent'), tint: this._shared.get_string('tint'), sidebar: e.sidebar, content: e.content, elevated: e.elevated, dark: this._shellDark()});
+            const css = shellStylesheet({accent: this._shared.get_string('accent'), tint: this._shared.get_string('tint'), sidebar: e.sidebar, content: e.content, elevated: e.elevated, ...this._shellMeasured()});
             if (css === this._shellCss && this._shellFile) return;
             const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'niro']);
             GLib.mkdir_with_parents(dir, 0o755);
@@ -117,14 +123,37 @@ export class NiroSync {
         } catch (e) { console.error(`Island: shell stylesheet not applied: ${e.message}`); }
     }
 
-    /** Which surfaces the shell theme draws light text on, measured from the live actors (their own colour, not ours: we set none). */
-    _shellDark() {
-        const dark = actor => { try { return isDarkSurface(this._rgb(actor.get_theme_node().get_foreground_color())); } catch (_e) { return true; } };
+    /**
+     * What the shell theme itself draws: which groups of surfaces have light text (so get a dark surface) and which are already
+     * see-through on purpose (a glass theme: left alone). Measured with Niro's stylesheet unloaded, only when the theme could have
+     * changed (first use, the user-theme name, GNOME's scheme), not on every rebuild.
+     */
+    _measureShell() {
         const sa = Main.panel.statusArea;
-        return {panel: dark(sa.dateMenu?._clockDisplay ?? Main.panel), popup: dark(sa.dateMenu?.menu?.actor ?? Main.panel), quick: dark(sa.quickSettings?.menu?.actor ?? Main.panel), overview: dark(Main.overview.searchEntry ?? Main.panel)};
+        const actors = {panel: sa.dateMenu?._clockDisplay ?? Main.panel, popup: sa.dateMenu?.menu?.box, quick: sa.quickSettings?.menu?.box, overview: Main.overview.searchEntry};
+        // the actor that carries the surface's own class, found rather than assumed
+        const withClass = (root, cls) => { const seen = [root]; for (let i = 0; i < seen.length && i < 200; i++) { const a = seen[i]; if (a?.has_style_class_name?.(cls)) return a; seen.push(...(a?.get_children?.() ?? [])); } return null; };
+        const bgActors = {panel: Main.panel, popup: withClass(sa.dateMenu?.menu?.actor, 'popup-menu-content') ?? sa.dateMenu?.menu?.box, quick: withClass(sa.quickSettings?.menu?.actor, 'quick-settings') ?? sa.quickSettings?.menu?.box, overview: Main.overview.searchEntry};
+        const dark = {}, own = {};
+        for (const k of Object.keys(actors)) {
+            try { dark[k] = isDarkSurface(this._rgb((actors[k] ?? Main.panel).get_theme_node().get_foreground_color())); } catch (_e) { dark[k] = true; }
+            try { own[k] = isThemeTranslucent(bgActors[k].get_theme_node().get_background_color().alpha / 255); } catch (_e) { own[k] = false; }
+        }
+        return {dark, own};
     }
 
     _rgb(c) { return {r: c.red / 255, g: c.green / 255, b: c.blue / 255}; }
+
+    _shellMeasured() {
+        if (!this._measure || this._remeasure) {
+            const was = this._shellFile;
+            if (was) St.ThemeContext.get_for_stage(global.stage).get_theme().unload_stylesheet(was);
+            this._measure = this._measureShell();
+            this._remeasure = false;
+            if (was) St.ThemeContext.get_for_stage(global.stage).get_theme().load_stylesheet(was);
+        }
+        return this._measure;
+    }
 
     _unloadShellStyle() {
         if (!this._shellFile) return;
@@ -225,6 +254,9 @@ export class NiroSync {
         this._id = 0;
         if (this._ifaceId) this._iface.disconnect(this._ifaceId);
         this._unloadShellStyle();
+        if (this._schemeShellId) this._iface.disconnect(this._schemeShellId);
+        if (this._userThemeId) this._userTheme.disconnect(this._userThemeId);
+        this._schemeShellId = this._userThemeId = 0;
         if (this._themeId) this._iface.disconnect(this._themeId);
         if (this._a11yId) this._a11y.disconnect(this._a11yId);
         this._ifaceId = this._themeId = this._a11yId = 0;

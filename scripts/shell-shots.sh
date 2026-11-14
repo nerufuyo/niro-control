@@ -10,7 +10,7 @@ for e in "$HOME"/.local/share/*; do [ "$(basename "$e")" = gnome-shell ] || ln -
 for u in island blur; do cp -r /usr/share/gnome-shell/extensions/$u@niro.local "$EXTS/"; chmod -R u+w "$EXTS/$u@niro.local"; done
 cp shell/island/build/src/{niroSync,appearance,appearanceTokens,gtkAdapter,shellTheme}.js "$EXTS/island@niro.local/src/"
 SCHEMAS="$WORK/schemas"; mkdir "$SCHEMAS"; cp control/org.niro.control.gschema.xml "$SCHEMAS/"; glib-compile-schemas "$SCHEMAS"
-export WORK OUT EXTS
+export WORK OUT EXTS SHELL_THEME
 timeout 400 dbus-run-session -- env XDG_DATA_HOME="$WORK/share" XDG_CACHE_HOME="$WORK/cache" XDG_CONFIG_HOME="$WORK/config" GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$SCHEMAS" bash -c '
 gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-sh --virtual-monitor 1440x900 > /dev/null 2>&1 & SP=$!
 sleep 22
@@ -26,6 +26,10 @@ take() { # suffix
   ev "Main.overview.hide(); 1"; sleep 1
 }
 [ "${SCHEME:-light}" = dark ] && { ev "new imports.gi.Gio.Settings({schema_id: \"org.gnome.desktop.interface\"}).set_string(\"color-scheme\", \"prefer-dark\"); 1"; sleep 4; }
+if [ -n "${SHELL_THEME:-}" ]; then   # an installed shell theme, in this private session only (the user-theme extension, settings in memory)
+  ev "Main.extensionManager.enableExtension(\"user-theme@gnome-shell-extensions.gcampax.github.com\"); 1"; sleep 3
+  ev "new imports.gi.Gio.Settings({schema_id: \"org.gnome.shell.extensions.user-theme\"}).set_string(\"name\", \"$SHELL_THEME\"); 1"; sleep 5
+fi
 take before
 ev "global.__N = new imports.gi.Gio.Settings({schema_id: \"org.niro.control\"}); global.__N.set_boolean(\"shell-surfaces\", true); 1"
 ev "import(\"file://$EXTS/island@niro.local/src/niroSync.js\").then(m => { const G=imports.gi.Gio; const src=G.SettingsSchemaSource.new_from_directory(\"$EXTS/island@niro.local/schemas\", G.SettingsSchemaSource.get_default(), false); global.__ns = new m.NiroSync(new G.Settings({settings_schema: src.lookup(\"org.gnome.shell.extensions.island\", false)})); }); 1"
