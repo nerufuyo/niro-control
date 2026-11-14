@@ -21,6 +21,18 @@ Built for **Ubuntu 24.04 / GNOME Shell 46** (Wayland). The extensions declare su
 Opacity, blur, blur strength, accent and tint are set once, in **Look**, and the island, dock, search and windows follow.
 Light and dark appearance both work, and the panel adapts to narrow windows.
 
+## Screenshots
+
+Taken from a headless GNOME Shell with the installed package (`scripts/screenshots.sh` regenerates them).
+
+| Home and Settings Health | Profiles |
+|---|---|
+| ![Home](docs/images/panel-home.png) | ![Profiles](docs/images/panel-profiles.png) |
+| **Look** | **Search: settings** |
+| ![Look](docs/images/panel-look.png) | ![Search for a setting](docs/images/search-settings.png) |
+| **Search: calculator** | **Search: profiles** |
+| ![Calculator](docs/images/search-calculator.png) | ![Profiles in Search](docs/images/search-profiles.png) |
+
 ## Install
 
 ```sh
