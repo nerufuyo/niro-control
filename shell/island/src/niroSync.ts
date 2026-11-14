@@ -5,8 +5,10 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
+import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {effective, gtk3Scheme, migrateLegacy, PRESET_KEYS, resolveScheme} from './appearance.js';
+import {isDarkSurface, shellStylesheet} from './shellTheme.js';
 import {refresh as refreshGtk} from './gtkAdapter.js';
 import {setBlurRadius} from './blurPipeline.js';
 
@@ -48,6 +50,7 @@ export class NiroSync {
         this._a11yId = this._a11y.connect('changed::high-contrast', () => this._apply());
         this._migrate();
         this._surfaces();
+        this._shellStyle();
         this._queueGtk();
         try {
             this._applyAccent(this._shared.get_string('accent'));
@@ -92,6 +95,43 @@ export class NiroSync {
         } catch (e) { console.error(`Island: shell surfaces not synced: ${e.message}`); }
     }
 
+    /** The Shell stylesheet (see shellTheme.ts): loaded when shell-surfaces is on, never in high contrast, unloaded when off. Rewritten only when its text changes. */
+    _shellStyle() {
+        try {
+            const theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
+            const on = this._flag('shell-surfaces', false) && this._flag('universal-enabled', true) && this._flag('affect-shell', true) && !this._a11y.get_boolean('high-contrast');
+            if (!on) { this._unloadShellStyle(); return; }
+            const values = Object.fromEntries(PRESET_KEYS.map(k => [k, typeof this._shared.get_value(k).unpack() === 'boolean' ? this._shared.get_boolean(k) : this._shared.get_int(k)]));
+            const e = effective(values, {safeMode: this._flag('safe-mode', false), highContrast: false});
+            const css = shellStylesheet({accent: this._shared.get_string('accent'), tint: this._shared.get_string('tint'), sidebar: e.sidebar, content: e.content, elevated: e.elevated, dark: this._shellDark()});
+            if (css === this._shellCss && this._shellFile) return;
+            const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'niro']);
+            GLib.mkdir_with_parents(dir, 0o755);
+            const path = GLib.build_filenamev([dir, 'shell-appearance.css']);
+            GLib.file_set_contents(`${path}.tmp`, css);
+            Gio.File.new_for_path(`${path}.tmp`).move(Gio.File.new_for_path(path), Gio.FileCopyFlags.OVERWRITE, null, null);
+            if (this._shellFile) theme.unload_stylesheet(this._shellFile);
+            this._shellFile = Gio.File.new_for_path(path);
+            theme.load_stylesheet(this._shellFile);
+            this._shellCss = css;
+        } catch (e) { console.error(`Island: shell stylesheet not applied: ${e.message}`); }
+    }
+
+    /** Which surfaces the shell theme draws light text on, measured from the live actors (their own colour, not ours: we set none). */
+    _shellDark() {
+        const dark = actor => { try { return isDarkSurface(this._rgb(actor.get_theme_node().get_foreground_color())); } catch (_e) { return true; } };
+        const sa = Main.panel.statusArea;
+        return {panel: dark(sa.dateMenu?._clockDisplay ?? Main.panel), popup: dark(sa.dateMenu?.menu?.actor ?? Main.panel), quick: dark(sa.quickSettings?.menu?.actor ?? Main.panel), overview: dark(Main.overview.searchEntry ?? Main.panel)};
+    }
+
+    _rgb(c) { return {r: c.red / 255, g: c.green / 255, b: c.blue / 255}; }
+
+    _unloadShellStyle() {
+        if (!this._shellFile) return;
+        St.ThemeContext.get_for_stage(global.stage).get_theme().unload_stylesheet(this._shellFile);
+        this._shellFile = null; this._shellCss = null;
+    }
+
     /** One rewrite at a time, shortly after the last change; refreshGtk skips files whose content would not change. */
     _queueGtk() {
         if (this._gtkTimer) return;
@@ -130,6 +170,7 @@ export class NiroSync {
     _apply() {
         this._migrate();
         this._surfaces();
+        this._shellStyle();
         this._queueGtk();
         // Universal Appearance: switched off (or off for the shell), the island, dock and search keep the values they have;
         // safe mode and performance mode make the glass solid and drop the blur (mirrors effective() in control/src/appearance.ts)
@@ -177,6 +218,7 @@ export class NiroSync {
             this._shared.disconnect(this._id);
         this._id = 0;
         if (this._ifaceId) this._iface.disconnect(this._ifaceId);
+        this._unloadShellStyle();
         if (this._themeId) this._iface.disconnect(this._themeId);
         if (this._a11yId) this._a11y.disconnect(this._a11yId);
         this._ifaceId = this._themeId = this._a11yId = 0;

@@ -27,6 +27,16 @@ Adapters (each separate, each with its own off switch):
 - **Profiles carry the per-application rules** (`niro.app-rules`, a registered setting): saved, applied, undone, validated on import (an invalid rule is an import error), shown as "N rules" in the preview, and a profile that would remove one of your exclusions says so before it is applied. Profile format version 1 is unchanged.
 - **Compatibility manager**: per application the id (window class, never the title), family, status, when a change reaches it (live, restart, login), what can be set, filters, undo per application.
 
+## 2.1: GNOME Shell surfaces
+
+`control/src/shellTheme.ts` (pure, tested) generates one narrow stylesheet, loaded by `NiroSync` when **Look > Universal Appearance > Style the top bar, menus, notifications, Quick Settings and Overview** is on (off by default: it overrides parts of your shell theme). It touches only these selectors: `#panel`, `.popup-menu-content`, `.candidate-popup-content`, `.quick-settings`, `.datemenu-popover`, `.notification-banner`, `.message-list .message`, `.search-entry`, `.app-folder-dialog`, `.switcher-list`, `.workspace-thumbnails .workspace-thumbnail`, and the accent on `.quick-toggle:checked`, `.popup-menu-item:focus/:active` and `.slider`. Backgrounds, borders, shadows and corner radii only: no text colour, no opacity, no transition.
+
+- **Light or dark follows the shell theme, measured.** The extension reads the text colour the shell theme actually draws on each group of surfaces (top bar clock, date menu, Quick Settings, Overview search) and picks a dark or light surface to match, so a theme's text is never put on a background it was not made for (the first attempt, always dark, made a light shell's notification unreadable: that is why). The top bar keeps a dark bar when its own text is light.
+- **Solid when it must be**: surfaces are fully opaque in safe mode and the Solid preset; with GNOME high contrast the stylesheet is unloaded and GNOME's own look is left alone; reduced motion needs nothing because the stylesheet has no motion.
+- **Accent and tint**: the Look accent colours the checked toggles, the focused menu item and sliders; the Look tint is the dark surface colour when it is dark.
+- Verified in a headless shell with the stock Yaru shell, light and dark (`scripts/shell-shots.sh`, `reports/ui/shell`, `reports/ui/shell-dark`) and by `tests/shell/niroSync.sh`. **Not verified**: your own shell theme (MacTahoe-Dark), the date menu and the app grid in the screenshots beyond a look, workspace thumbnails beyond the radius, other extensions' surfaces.
+- Island, dock and search already follow the shared opacity, tint and accent; their corner radii and shadows were not changed here.
+
 ## Presets
 
 Balanced glass (default), Crystal glass, Solid, Performance; any hand edit makes it "custom". They are ordinary settings, so Niro Profiles carry them. Per-application rules are not part of profiles.

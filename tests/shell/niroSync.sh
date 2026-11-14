@@ -8,7 +8,7 @@ WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 EXTS="$WORK/share/gnome-shell/extensions"; mkdir -p "$EXTS" "$WORK/config"
 for e in "$HOME"/.local/share/*; do [ "$(basename "$e")" = gnome-shell ] || ln -s "$e" "$WORK/share/$(basename "$e")"; done
 for u in island blur; do cp -r /usr/share/gnome-shell/extensions/$u@niro.local "$EXTS/"; chmod -R u+w "$EXTS/$u@niro.local"; done
-cp shell/island/build/src/{niroSync,appearance,appearanceTokens,gtkAdapter}.js "$EXTS/island@niro.local/src/"
+cp shell/island/build/src/{niroSync,appearance,appearanceTokens,gtkAdapter,shellTheme}.js "$EXTS/island@niro.local/src/"
 cp shell/blur/components/applications/index.js "$EXTS/blur@niro.local/components/applications/index.js"
 SCHEMAS="$WORK/schemas"; mkdir "$SCHEMAS"; cp control/org.niro.control.gschema.xml "$SCHEMAS/"; glib-compile-schemas "$SCHEMAS"
 cat > "$WORK/install.js" <<J
@@ -18,7 +18,7 @@ J
 gjs -m "$WORK/install.js" || { echo "could not prepare the GTK config"; exit 1; }
 FAILS=0; OUT="$WORK/out.txt"; : > "$OUT"
 has() { if grep -q "$2" "$OUT"; then echo "ok   $1"; else echo "FAIL $1 (wanted: $2)"; FAILS=$((FAILS+1)); fi; }
-timeout 200 dbus-run-session -- env XDG_DATA_HOME="$WORK/share" XDG_CONFIG_HOME="$WORK/config" GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$SCHEMAS" bash -c '
+timeout 200 dbus-run-session -- env XDG_DATA_HOME="$WORK/share" XDG_CONFIG_HOME="$WORK/config" XDG_CACHE_HOME="$WORK/cache" GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$SCHEMAS" bash -c '
 gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-sync --virtual-monitor 1280x720 > '"$WORK"'/shell.log 2>&1 & SP=$!
 sleep 20
 ev() { gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "$1" 2>&1 | grep -oP "\x27\K.*(?=\x27)" | tr -d "\""; }
@@ -37,9 +37,22 @@ ev "global.__N.set_boolean(\"legacy-global-fade\", false); 1" > /dev/null; sleep
 echo "LEGACY_OFF apps=$(ev "$APPS.get_int(\"opacity\")") saved=$(ev "global.__N.get_int(\"legacy-window-opacity\")")" >> '"$OUT"'
 ev "global.__N.set_boolean(\"shell-surfaces\", true); 1" > /dev/null; sleep 1
 echo "SURF_ON panel=$(ev "$(bs panel).get_boolean(\"blur\")") overview=$(ev "$(bs overview).get_boolean(\"blur\")") popup=$(ev "$(bs popup).get_boolean(\"blur\")")" >> '"$OUT"'
-ev "global.__N.set_boolean(\"safe-mode\", true); 1" > /dev/null; sleep 1
+SHELLCSS="'"$WORK"'/cache/niro/shell-appearance.css"
+sheets() { ev "imports.gi.St.ThemeContext.get_for_stage(global.stage).get_theme().get_custom_stylesheets().map(f => f.get_basename()).join(\"+\")"; }
+echo "SHELL_ON loaded=$(sheets | grep -c shell-appearance) panel=$(grep -c "#panel { background-color: rgba(28, 28, 30, 0.7" $SHELLCSS) accent=$(grep -c "rgba(232, 71, 43, 1)" $SHELLCSS)" >> '"$OUT"'
+ev "global.__N.set_string(\"accent\", \"#33AA55\"); 1" > /dev/null; sleep 1
+echo "SHELL_ACCENT $(grep -c "rgba(51, 170, 85, 1)" $SHELLCSS)" >> '"$OUT"'
+ev "global.__N.set_string(\"accent\", \"#E8472B\"); global.__N.set_boolean(\"safe-mode\", true); 1" > /dev/null; sleep 1
+echo "SHELL_SAFE solid=$(grep -c "#panel { background-color: rgba(28, 28, 30, 1)" $SHELLCSS)" >> '"$OUT"'
 echo "SURF_SAFE panel=$(ev "$(bs panel).get_boolean(\"blur\")") overview=$(ev "$(bs overview).get_boolean(\"blur\")") popup=$(ev "$(bs popup).get_boolean(\"blur\")")" >> '"$OUT"'
-ev "global.__N.set_boolean(\"safe-mode\", false); global.__N.set_boolean(\"shell-surfaces\", false); 1" > /dev/null; sleep 1
+ev "global.__N.set_boolean(\"safe-mode\", false); 1" > /dev/null; sleep 1
+HC="new imports.gi.Gio.Settings({schema_id: \"org.gnome.desktop.a11y.interface\"})"
+ev "$HC.set_boolean(\"high-contrast\", true); 1" > /dev/null; sleep 1
+echo "SHELL_HC loaded=$(sheets | grep -c shell-appearance)" >> '"$OUT"'
+ev "$HC.set_boolean(\"high-contrast\", false); 1" > /dev/null; sleep 1
+echo "SHELL_HC_OFF loaded=$(sheets | grep -c shell-appearance)" >> '"$OUT"'
+ev "global.__N.set_boolean(\"shell-surfaces\", false); 1" > /dev/null; sleep 1
+echo "SHELL_OFF loaded=$(sheets | grep -c shell-appearance)" >> '"$OUT"'
 echo "SURF_OFF panel=$(ev "$(bs panel).get_boolean(\"blur\")") overview=$(ev "$(bs overview).get_boolean(\"blur\")") popup=$(ev "$(bs popup).get_boolean(\"blur\")") backup=$(ev "global.__N.get_string(\"shell-surfaces-backup\")")" >> '"$OUT"'
 CSS="'"$WORK"'/config/gtk-4.0/niro-glass.css"
 sleep 1; echo "GTK_LIGHT $(grep -c "rgba(244, 244, 248" $CSS)" >> '"$OUT"'
@@ -64,6 +77,12 @@ has "legacy fade saved once and windows back to 255" "MIGRATE apps=255 saved=204
 has "the old fade switch restores the saved value" "LEGACY_ON apps=204"
 has "and switching it off returns to 255, keeping the saved value" "LEGACY_OFF apps=255 saved=204"
 has "shell surfaces: blur on for top bar, Overview, popups" "SURF_ON panel=true overview=true popup=true"
+has "shell stylesheet is loaded with the panel surface and the accent" "SHELL_ON loaded=1 panel=1 accent=2"
+has "an accent change reaches the shell stylesheet" "SHELL_ACCENT 2"
+has "safe mode makes the shell surfaces solid" "SHELL_SAFE solid=1"
+has "high contrast unloads it (GNOME's own high-contrast look is left alone)" "SHELL_HC loaded=0"
+has "and it returns afterwards" "SHELL_HC_OFF loaded=1"
+has "switching shell surfaces off unloads it" "SHELL_OFF loaded=0"
 has "safe mode drops the shell blur" "SURF_SAFE panel=false overview=false popup=false"
 has "turning it off puts the previous settings back" "SURF_OFF panel=false overview=true popup=false backup={}"
 has "GTK stylesheet follows a light system" "GTK_LIGHT 1"

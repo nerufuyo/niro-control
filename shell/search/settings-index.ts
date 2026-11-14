@@ -107,7 +107,7 @@ export const INDEX = [
   "menu": "Look",
   "group": "Universal Appearance",
   "title": "Light or dark",
-  "help": "The scheme of the control panel and of the GTK theme integration.",
+  "help": "The scheme of the control panel.",
   "key": "color-scheme",
   "kind": "select",
   "managed": false
@@ -186,7 +186,7 @@ export const INDEX = [
   "id": "niro.shell-surfaces",
   "menu": "Look",
   "group": "Universal Appearance",
-  "title": "Blur the top bar, Overview, menus, notifications and quick settings",
+  "title": "Style the top bar, menus, notifications, Quick Settings and Overview",
   "help": "Turns the blur extension's panel, Overview and popup blur on, in step with the shared look (strength, safe mode, performance mode).",
   "key": "shell-surfaces",
   "kind": "switch",

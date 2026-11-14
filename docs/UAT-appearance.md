@@ -11,10 +11,10 @@ Before you start: the package `niro-control` current version must be installed, 
 | 3 | GNOME Settings | Same | Same | Not Tested | headless screenshots (Settings) |
 | 4 | GNOME Text Editor | Same | Same; the source view may stay opaque | Not Tested | headless screenshots (Text Editor) |
 | 5 | A GTK 3 application | Restart a real GTK 3 app (for example GNOME Terminal) | Readable; note whether the scheme matches your GTK 3 theme | Not Tested | a GTK 3 test window only |
-| 6 | Top bar | Turn on "Blur the top bar, Overview, menus…" | Top bar is blurred and readable | Not Tested | blur switches verified headless (not the look) |
-| 7 | Overview | Same, open the Overview | Blurred, readable, nothing missing | Not Tested | switches only |
-| 8 | Notifications | Same, trigger one | Blurred popup, readable | Not Tested | switches only |
-| 9 | Quick Settings | Same, open the menu | Blurred, readable | Not Tested | switches only |
+| 6 | Top bar | Turn on "Style the top bar, menus, notifications, Quick Settings and Overview" (needs the new login) | Top bar surface follows the look; text readable; your MacTahoe theme's text still readable | Not Tested | stylesheet and switches verified headless on the stock Yaru shell only |
+| 7 | Overview | Same, open the Overview | Blurred, readable, nothing missing | Not Tested | headless screenshots on the stock shell |
+| 8 | Notifications | Same, trigger one | Blurred popup, readable | Not Tested | headless screenshots on the stock shell |
+| 9 | Quick Settings | Same, open the menu | Blurred, readable | Not Tested | headless screenshots on the stock shell |
 | 10 | Island | Change Look opacity and tint | Island follows | Not Tested | existing integration |
 | 11 | Dock | Same | Dock follows | Not Tested | existing integration |
 | 12 | Search | Super+Space after changing Look | Palette follows | Not Tested | existing integration |

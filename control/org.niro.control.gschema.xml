@@ -115,7 +115,7 @@
     </key>
     <key name="shell-surfaces" type="b">
       <default>false</default>
-      <summary>Blur the top bar, Overview, menus, notifications and quick settings</summary>
+      <summary>Style the top bar, menus, notifications, Quick Settings and Overview</summary>
       <description>Turns the blur extension's panel, Overview and popup blur on, in step with the shared look (strength, safe mode, performance mode). Your previous blur settings for those parts are kept and put back when this is turned off.</description>
     </key>
     <key name="shell-surfaces-backup" type="s">
