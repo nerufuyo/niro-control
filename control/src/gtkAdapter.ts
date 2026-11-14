@@ -16,7 +16,9 @@ const HOOK_TARGETS = {4: ['gtk.css', 'gtk-dark.css'], 3: ['gtk.css']};
 const rgba = l => `rgba(${l.rgb.join(', ')}, ${+l.a.toFixed(3)})`;
 
 /** Backgrounds only: the window glass, the sidebar and the content surfaces. Text and controls are left to the application. */
-export function gtkStylesheet(version: 3 | 4, scheme: Scheme, glass: number, tint: string | undefined, surfaces: Surfaces, disabled = false): string {
+export function gtkStylesheet(version: 3 | 4, scheme: Scheme, glass: number, tint: string | undefined, surfaces: Surfaces, disabled = false, solid = false): string {
+    // when the scheme could not be established the surfaces are opaque: a wrong guess then costs looks, never readability
+    if (solid) { glass = 100; surfaces = {sidebar: 100, content: 100, elevated: 100}; }
     // switched off (or off for GTK): the file stays, so the hook in gtk.css keeps working, but it says nothing
     if (disabled) return `/* Niro Control: appearance for GTK ${version} is switched off. */\n`;
     const t = tokens(scheme, glass, tint, surfaces);
@@ -51,7 +53,7 @@ export function withoutBlock(text: string): string {
 }
 
 /** `scheme` is for GTK 4 (it follows GNOME); `scheme3` for GTK 3 (it follows its theme), `scheme` when absent. */
-export interface Options {configDir: string; backupRoot: string; consent: boolean; scheme: Scheme; scheme3?: Scheme; glass: number; tint?: string; surfaces: Surfaces; disabled?: boolean}
+export interface Options {configDir: string; backupRoot: string; consent: boolean; scheme: Scheme; scheme3?: Scheme; /** GTK 3's scheme is uncertain: opaque surfaces */ solid3?: boolean; glass: number; tint?: string; surfaces: Surfaces; disabled?: boolean}
 
 /** Every file that would be created or changed, for the confirmation dialog. */
 export function plan(configDir: string) {
@@ -86,7 +88,7 @@ export function install(o: Options) {
             const dir = `${o.configDir}/gtk-${v}.0`;
             const gen = `${dir}/${GENERATED}`;
             touched.push({path: gen, before: read(gen)});
-            write(gen, gtkStylesheet(v, v === 3 ? (o.scheme3 ?? o.scheme) : o.scheme, o.glass, o.tint, o.surfaces, o.disabled));
+            write(gen, gtkStylesheet(v, v === 3 ? (o.scheme3 ?? o.scheme) : o.scheme, o.glass, o.tint, o.surfaces, o.disabled, v === 3 && o.solid3));
             for (const name of HOOK_TARGETS[v]) {
                 const real = target(`${dir}/${name}`);
                 if (touched.some(t => t.path === real)) continue;
@@ -134,7 +136,7 @@ export function refresh(o: Omit<Options, 'consent' | 'backupRoot'>): string[] {
     const rewritten = [];
     for (const v of [4, 3]) {
         const path = `${o.configDir}/gtk-${v}.0/${GENERATED}`;
-        const next = gtkStylesheet(v, v === 3 ? (o.scheme3 ?? o.scheme) : o.scheme, o.glass, o.tint, o.surfaces, o.disabled);
+        const next = gtkStylesheet(v, v === 3 ? (o.scheme3 ?? o.scheme) : o.scheme, o.glass, o.tint, o.surfaces, o.disabled, v === 3 && o.solid3);
         if (read(path) === next) continue;
         write(path, next);
         rewritten.push(path);

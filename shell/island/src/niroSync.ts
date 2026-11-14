@@ -46,7 +46,7 @@ export class NiroSync {
         this._id = this._shared.connect('changed', () => this._apply());
         // signals, not polling: GNOME's colour scheme and high contrast
         this._ifaceId = this._iface.connect('changed::color-scheme', () => this._queueGtk());
-        this._themeId = this._iface.connect('changed::gtk-theme', () => this._queueGtk());
+        this._themeId = this._iface.connect('changed::gtk-theme', () => this._probeGtk3());
         // the shell theme can change: measure it again (user-theme's name, GNOME's colour scheme)
         const again = () => { this._remeasure = true; this._queueShell(); };
         this._schemeShellId = this._iface.connect('changed::color-scheme', again);
@@ -57,7 +57,7 @@ export class NiroSync {
         this._migrate();
         this._surfaces();
         this._shellStyle();
-        this._queueGtk();
+        this._probeGtk3();
         try {
             this._applyAccent(this._shared.get_string('accent'));
         } catch (e) {
@@ -167,6 +167,19 @@ export class NiroSync {
         this._shellTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => { this._shellTimer = 0; this._shellStyle(); return GLib.SOURCE_REMOVE; });
     }
 
+    /** Asks GTK 3 (a short-lived gjs process, no window) for its effective scheme; again only when the GTK theme changes. */
+    _probeGtk3() {
+        const path = GLib.getenv('NIRO_GTK3_PROBE') ?? '/usr/share/niro-control/gtk3-probe.js';
+        if (!GLib.file_test(path, GLib.FileTest.EXISTS)) { this._gtk3 = 'unknown'; return; }
+        try {
+            const p = Gio.Subprocess.new(['gjs', '-m', path], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
+            p.communicate_utf8_async(null, null, (proc, res) => {
+                try { const [, out] = proc.communicate_utf8_finish(res); this._gtk3 = /^(dark|light)$/.test(out.trim()) ? out.trim() : 'unknown'; } catch (_e) { this._gtk3 = 'unknown'; }
+                this._queueGtk();
+            });
+        } catch (_e) { this._gtk3 = 'unknown'; }
+    }
+
     /** One rewrite at a time, shortly after the last change; refreshGtk skips files whose content would not change. */
     _queueGtk() {
         if (this._gtkTimer) return;
@@ -176,7 +189,7 @@ export class NiroSync {
                 const values = Object.fromEntries(PRESET_KEYS.map(k => [k, typeof this._shared.get_value(k).unpack() === 'boolean' ? this._shared.get_boolean(k) : this._shared.get_int(k)]));
                 const e = effective(values, {safeMode: this._flag('safe-mode', false), highContrast: this._a11y.get_boolean('high-contrast')});
                 refreshGtk({configDir: GLib.get_user_config_dir(), // third-party GTK 4 apps follow GNOME's scheme and GTK 3 apps their theme: Niro's own light/dark choice is for its panel only
-                    scheme: resolveScheme('system', this._iface.get_string('color-scheme')), scheme3: gtk3Scheme(this._iface.get_string('gtk-theme')),
+                    scheme: resolveScheme('system', this._iface.get_string('color-scheme')), scheme3: this._gtk3 === 'dark' || this._gtk3 === 'light' ? this._gtk3 : gtk3Scheme(this._iface.get_string('gtk-theme')), solid3: this._gtk3 !== 'dark' && this._gtk3 !== 'light',
                     glass: e.glass, tint: this._shared.get_string('tint'), surfaces: {sidebar: e.sidebar, content: e.content, elevated: e.elevated},
                     disabled: !this._flag('universal-enabled', true) || !this._flag('affect-gtk', true)});
             } catch (err) { console.error(`Island: GTK stylesheet not refreshed: ${err.message}`); }

@@ -16,9 +16,14 @@ import {install} from 'file://$PWD/control/build/gtkAdapter.js';
 install({configDir: '$WORK/config', backupRoot: '$WORK/backups', consent: true, scheme: 'dark', glass: 80, tint: '#1C1C1E', surfaces: {sidebar: 70, content: 85, elevated: 92}});
 J
 gjs -m "$WORK/install.js" || { echo "could not prepare the GTK config"; exit 1; }
+cat > "$WORK/probe.js" <<J
+import GLib from 'gi://GLib';
+print(new TextDecoder().decode(GLib.file_get_contents('$WORK/gtk3-answer')[1]).trim());
+J
+echo light > "$WORK/gtk3-answer"
 FAILS=0; OUT="$WORK/out.txt"; : > "$OUT"
 has() { if grep -q "$2" "$OUT"; then echo "ok   $1"; else echo "FAIL $1 (wanted: $2)"; FAILS=$((FAILS+1)); fi; }
-timeout 200 dbus-run-session -- env XDG_DATA_HOME="$WORK/share" XDG_CONFIG_HOME="$WORK/config" XDG_CACHE_HOME="$WORK/cache" GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$SCHEMAS" bash -c '
+timeout 200 dbus-run-session -- env NIRO_GTK3_PROBE="$WORK/probe.js" XDG_DATA_HOME="$WORK/share" XDG_CONFIG_HOME="$WORK/config" XDG_CACHE_HOME="$WORK/cache" GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$SCHEMAS" bash -c '
 gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-sync --virtual-monitor 1280x720 > '"$WORK"'/shell.log 2>&1 & SP=$!
 sleep 20
 ev() { gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "$1" 2>&1 | grep -oP "\x27\K.*(?=\x27)" | tr -d "\""; }
@@ -63,10 +68,12 @@ M1=$(stat -c %Y.%N $CSS); ev "global.__N.set_string(\"accent\", \"#33AA55\"); 1"
 ev "global.__N.set_string(\"color-scheme\", \"light\"); 1" > /dev/null; sleep 1.5
 echo "GTK_FORCED_LIGHT $(grep -c "rgba(244, 244, 248" $CSS)" >> '"$OUT"'
 CSS3="'"$WORK"'/config/gtk-3.0/niro-glass.css"
-ev "global.__I.set_string(\"gtk-theme\", \"Yaru-olive-dark\"); 1" > /dev/null; sleep 1.5
-echo "GTK3_DARKTHEME $(grep -c "rgba(28, 28, 30" $CSS3)" >> '"$OUT"'
-ev "global.__I.set_string(\"gtk-theme\", \"Adwaita\"); 1" > /dev/null; sleep 1.5
-echo "GTK3_LIGHTTHEME $(grep -c "rgba(244, 244, 248" $CSS3)" >> '"$OUT"'
+echo dark > '"$WORK"'/gtk3-answer; ev "global.__I.set_string(\"gtk-theme\", \"Whatever-1\"); 1" > /dev/null; sleep 2
+echo "GTK3_PROBE_DARK $(grep -c "rgba(16, 16, 20, 0.85" $CSS3)" >> '"$OUT"'
+echo light > '"$WORK"'/gtk3-answer; ev "global.__I.set_string(\"gtk-theme\", \"Whatever-2\"); 1" > /dev/null; sleep 2
+echo "GTK3_PROBE_LIGHT $(grep -c "rgba(250, 250, 252, 0.85" $CSS3)" >> '"$OUT"'
+echo unknown > '"$WORK"'/gtk3-answer; ev "global.__I.set_string(\"gtk-theme\", \"Whatever-3\"); 1" > /dev/null; sleep 2
+echo "GTK3_PROBE_UNKNOWN solid=$(grep -c "background-color: rgba(2[0-9]*, [0-9]*, [0-9]*, 1)" $CSS3) text=$(grep -c "\.view, textview text { color" $CSS3)" >> '"$OUT"'
 ev "new imports.gi.Gio.Settings({schema_id: \"org.gnome.desktop.a11y.interface\"}).set_boolean(\"high-contrast\", true); 1" > /dev/null; sleep 1.5
 echo "GTK_HC_SOLID $(grep -c "window.background:not(.solid-csd) { background-color: rgba(28, 28, 30, 1)" $CSS)" >> '"$OUT"'
 ev "global.__N.set_boolean(\"universal-enabled\", false); 1" > /dev/null; sleep 1.5
@@ -96,8 +103,9 @@ has "GTK stylesheet follows a light system" "GTK_LIGHT 1"
 has "GTK stylesheet follows GNOME to dark at once" "GTK_DARK 1"
 has "an unrelated change rewrites nothing" "GTK_UNCHANGED_UNTOUCHED yes"
 has "Niro's own light/dark choice does not change other applications: GTK 4 stays with GNOME" "GTK_FORCED_LIGHT 0"
-has "GTK 3 follows its theme: a dark theme gives dark" "GTK3_DARKTHEME 1"
-has "and a light theme gives light" "GTK3_LIGHTTHEME 1"
+has "GTK 3: the probe says dark, so dark glass" "GTK3_PROBE_DARK 1"
+has "GTK 3: the probe says light, so light glass" "GTK3_PROBE_LIGHT 1"
+has "GTK 3: an uncertain probe gives opaque surfaces and still sets the text colour" "GTK3_PROBE_UNKNOWN solid=[1-9]"
 has "high contrast makes the glass solid" "GTK_HC_SOLID 1"
 has "the global switch neutralises the stylesheet" "GTK_OFF 1"
 has "the global switch also unloads the shell stylesheet" "UNIVERSAL_OFF_SHELL loaded=0"
