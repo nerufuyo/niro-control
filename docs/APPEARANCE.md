@@ -37,6 +37,14 @@ Adapters (each separate, each with its own off switch):
 - Verified in a headless shell with the stock Yaru shell, light and dark (`scripts/shell-shots.sh`, `reports/ui/shell`, `reports/ui/shell-dark`) and by `tests/shell/niroSync.sh`. **Not verified**: your own shell theme (MacTahoe-Dark), the date menu and the app grid in the screenshots beyond a look, workspace thumbnails beyond the radius, other extensions' surfaces.
 - Island, dock and search already follow the shared opacity, tint and accent; their corner radii and shadows were not changed here.
 
+## 2.1 additions
+
+- **GTK 3 scheme from GTK itself.** `control/gtk3-probe.js` (a short-lived gjs process, no window) reads the colours GTK 3 really uses (theme and your gtk-3.0/gtk.css) and answers dark, light or unknown; unknown (colours that disagree, no display) gives opaque surfaces with the text colour set, so a wrong guess costs looks, not readability. It runs again only when the GTK theme changes.
+- **Glass shell themes are left alone.** The Shell stylesheet measures what the theme draws: a surface the theme already paints see-through (MacTahoe-Dark's top bar and Quick Settings) is not repainted; only the accent applies there. Checked against `~/.themes/MacTahoe-Dark` in an isolated session (`SHELL_THEME=MacTahoe-Dark scripts/shell-shots.sh`), the active theme was not changed.
+- **One edge treatment** (`EDGE` in `appearanceTokens.ts`): radii 16/18/28, one border, one shadow, shared by the Search palette and the Shell surfaces. Island and Dock keep their own radius settings and are not forced into it.
+- **Compatibility** shows, per application, the id, family, status (including *Not verified* for toolkits that were not identified), when a change reaches it, what can be set, and what is true now (its rule, the switches, whether the GTK integration is installed).
+- **Recovery without the panel**: `docs/RECOVERY.md`.
+
 ## Presets
 
 Balanced glass (default), Crystal glass, Solid, Performance; any hand edit makes it "custom". They are ordinary settings, so Niro Profiles carry them. Per-application rules are not part of profiles.
