@@ -160,5 +160,8 @@ if (Gtk.init_check()) {
     const d = homeData(model, []);
     if (d.config.total !== CATALOG.filter(i => !i.managed).length) fail(`home counts ${d.config.total} settings`);
     if (!d.look.accent || !d.dock.position) fail('home is missing the look or the dock');
+    const ids = d.health.map(h => h.id);
+    if (JSON.stringify(ids) !== JSON.stringify(['configuration', 'extensions', 'service', 'profile', 'recovery', 'restart'])) fail(`health rows: ${ids}`);
+    if (d.health.some(h => !['healthy', 'attention', 'recovery', 'unavailable'].includes(h.state))) fail('a health row has no valid state');
     print('controlUi: modes and home ok');
 }

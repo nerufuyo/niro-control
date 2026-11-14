@@ -7,6 +7,8 @@ import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
 import {CATALOG} from './catalog.js';
+import {assess, summary} from './health.js';
+import {validateDependencies} from './profileLogic.js';
 
 const POSITIONS = ['Bottom', 'Left', 'Right', 'Top'];
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
@@ -21,6 +23,18 @@ export function busNameOwned(name: string): boolean {
         return reply.deepUnpack()[0];
     } catch (_e) {
         return false;
+    }
+}
+
+/** GNOME Shell's state of each extension (ExtensionState), or null when it could not be asked. */
+export function extensionStates(): Map<string, number> | null {
+    try {
+        const reply = Gio.DBus.session.call_sync('org.gnome.Shell.Extensions', '/org/gnome/Shell/Extensions', 'org.gnome.Shell.Extensions', 'ListExtensions',
+            null, null, Gio.DBusCallFlags.NONE, 800, null);
+        const all = reply.recursiveUnpack()[0];
+        return new Map(Object.entries(all).map(([uuid, info]) => [uuid, Number(info.state)]));
+    } catch (_e) {
+        return null;
     }
 }
 
@@ -48,7 +62,16 @@ export function homeData(model, staleParts: string[]) {
     const broken = engine.interrupted();
     if (broken) notices.push({kind: 'interrupted', text: `"${broken.label}" did not finish. Restore the backup made before it.`});
     if (!engine.backups().length) notices.push({kind: 'info', text: 'No backup yet. One is made before every profile is applied.'});
+    const states = extensionStates();
+    const health = assess({
+        extensions: PARTS.map(([name, uuid]) => ({name, uuid, installed: installed(uuid), state: states ? (states.get(uuid) ?? null) : null})),
+        daemon: installed('island@niro.local') ? daemon : null, islandInstalled: installed('island@niro.local'),
+        profile: {id: activeId, name: active?.name ?? null, missing: Boolean(activeId && !active), modified: changes.length},
+        interrupted: broken ? {label: broken.label} : null, stale: staleParts,
+        unreachableSettings: engine.items.filter(i => !model.binding(i)).length, configProblems: validateDependencies(CATALOG),
+    });
     return {
+        health,
         profile: {name: active?.name ?? null, modified: changes.length, id: activeId, missing: Boolean(activeId && !active)},
         look: {accent: read('niro.accent'), tint: read('niro.tint'), opacity: read('niro.opacity'), blur: read('niro.blur'), strength: read('niro.blur-strength')},
         island: {shape: read('island.island-shape'), opens: read('island.open-on'), autoHide: read('island.auto-hide'), daemon, installed: installed('island@niro.local')},
@@ -106,32 +129,31 @@ export function homePage(model, ctx, profilesApi, staleParts: string[]) {
         head.add(row);
         body.append(head);
 
-        // notices
-        if (d.notices.length) {
-            const g = new Adw.PreferencesGroup({title: 'Needs attention'});
-            for (const n of d.notices.filter(x => x.kind !== 'info')) {
-                const r = new Adw.ActionRow({title: GLib.markup_escape_text(n.text, -1), icon_name: n.kind === 'logout' ? 'system-log-out-symbolic' : 'dialog-warning-symbolic'});
-                if (n.kind === 'interrupted') {
-                    const b = new Gtk.Button({label: 'Restore backup', valign: Gtk.Align.CENTER, css_classes: ['suggested-action']});
-                    b.connect('clicked', () => profilesApi.recover());
-                    r.add_suffix(b);
-                }
-                if (n.kind === 'logout') {
-                    const b = new Gtk.Button({label: 'Log out', valign: Gtk.Align.CENTER});
-                    b.connect('clicked', () => ctx.logout());
-                    r.add_suffix(b);
-                }
-                g.add(r);
-            }
-            if (g.get_first_child() && d.notices.some(x => x.kind !== 'info')) body.append(g);
-            const info = d.notices.find(x => x.kind === 'info');
-            if (info) {
-                const r = new Adw.ActionRow({title: GLib.markup_escape_text(info.text, -1), icon_name: 'dialog-information-symbolic'});
-                const b = new Gtk.Button({label: 'Back up now', valign: Gtk.Align.CENTER, css_classes: ['flat']});
-                b.connect('clicked', () => { try { model.engine.backup('Manual backup'); render(); ctx.toast('Backed up the settings'); } catch (e) { ctx.toast(e.message); } });
+        // settings health: one row per thing that can go wrong, with the way to fix it
+        const hg = new Adw.PreferencesGroup({title: 'Settings health', description: summary(d.health)});
+        const ICON = {healthy: 'emblem-ok-symbolic', attention: 'dialog-warning-symbolic', recovery: 'dialog-error-symbolic', unavailable: 'dialog-question-symbolic'};
+        const CLASS = {healthy: 'success', attention: 'warning', recovery: 'error', unavailable: 'dim-label'};
+        for (const h of d.health) {
+            const r = new Adw.ActionRow({title: GLib.markup_escape_text(h.title, -1), subtitle: GLib.markup_escape_text(h.detail, -1), subtitle_lines: 2});
+            r.set_name(`health-${h.id}`);
+            const icon = new Gtk.Image({icon_name: ICON[h.state], css_classes: [CLASS[h.state]]});
+            icon.update_property([Gtk.AccessibleProperty.LABEL], [h.state === 'healthy' ? 'Healthy' : h.state === 'unavailable' ? 'Unknown' : h.state === 'recovery' ? 'Recovery available' : 'Needs attention']);
+            r.add_prefix(icon);
+            if (h.action) {
+                const b = new Gtk.Button({label: h.action.label, valign: Gtk.Align.CENTER, css_classes: h.action.kind === 'recover' ? ['suggested-action'] : ['flat']});
+                b.connect('clicked', () => { if (h.action.kind === 'recover') profilesApi.recover(); else if (h.action.kind === 'logout') ctx.logout(); else ctx.go(h.action.page); });
                 r.add_suffix(b);
-                const g2 = new Adw.PreferencesGroup(); g2.add(r); body.append(g2);
             }
+            hg.add(r);
+        }
+        body.append(hg);
+        const info = d.notices.find(x => x.kind === 'info');
+        if (info) {
+            const r = new Adw.ActionRow({title: GLib.markup_escape_text(info.text, -1), icon_name: 'dialog-information-symbolic'});
+            const b = new Gtk.Button({label: 'Back up now', valign: Gtk.Align.CENTER, css_classes: ['flat']});
+            b.connect('clicked', () => { try { model.engine.backup('Manual backup'); render(); ctx.toast('Backed up the settings'); } catch (e) { ctx.toast(e.message); } });
+            r.add_suffix(b);
+            const g2 = new Adw.PreferencesGroup(); g2.add(r); body.append(g2);
         }
 
         // the three areas side by side
