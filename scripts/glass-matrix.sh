@@ -42,7 +42,7 @@ for c in $CASES_JOINED; do
   ev "if (global.__bg) global.__bg.destroy(); global.__bg = new imports.gi.St.Widget({style: \"$css\", width: 1440, height: 900}); Main.layoutManager._backgroundGroup.add_child(global.__bg); 1"
   env GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$SCHEMAS" NIRO_SCHEMA_DIR="$SCHEMAS" NIRO_CONFIG_DIR="$WORK/cfg" WAYLAND_DISPLAY=niro-glass GDK_BACKEND=wayland \
     NIRO_NOBANNER=1 NIRO_SIZE=1100x700 NIRO_PAGE=${NIRO_PAGE:-look} NIRO_SCHEME=$scheme NIRO_SET_OPACITY=$opacity gjs -m scripts/screenshot-panel.js > /dev/null 2>&1 & P=$!
-  sleep 5; ev "Main.overview.hide()"; sleep 1; shot "$scheme-$opacity-$wall"; kill $P 2>/dev/null; wait $P 2>/dev/null
+  sleep ${PANEL_WAIT:-5}; ev "Main.overview.hide()"; sleep 1; shot "$scheme-$opacity-$wall"; kill $P 2>/dev/null; wait $P 2>/dev/null
 done
 kill $SP' > /dev/null 2>&1
 ls "$OUT"

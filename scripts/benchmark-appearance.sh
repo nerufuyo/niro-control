@@ -21,7 +21,7 @@ variant() { # name, use-repo-extension(1/0), blur-ext(1/0), niro-set (js), legac
   local name=$1 repo=$2 ext=$3 js=$4
   local data="$HOME/.local/share"; [ "$repo" = 1 ] && data="$SHARE"
   timeout 300 dbus-run-session -- env XDG_DATA_HOME="$data" GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$SCHEMAS" bash -c '
-  gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-bm --virtual-monitor 1280x720 > /dev/null 2>&1 & SP=$!
+  DISP=niro-bm-'"$name"'-$$; gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=$DISP --virtual-monitor 1280x720 > /dev/null 2>&1 & SP=$!
   sleep 20
   ev() { gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "$1" 2>&1; }
   if [ '"$ext"' = 1 ]; then
@@ -30,7 +30,7 @@ variant() { # name, use-repo-extension(1/0), blur-ext(1/0), niro-set (js), legac
   fi
   ev "'"$js"'" > /dev/null
   APP="imports.gi.versions.Gtk=\"4.0\"; const {Gtk,GLib}=imports.gi; Gtk.init(); const a=new Gtk.Application({application_id: ARGV[0]}); a.connect(\"activate\",()=>{ const w=new Gtk.ApplicationWindow({application:a, title: ARGV[0]}); w.set_child(new Gtk.Label({label: ARGV[0]})); w.present(); }); a.run([]);"
-  for i in $(seq 1 '"$N"'); do (WAYLAND_DISPLAY=niro-bm GDK_BACKEND=wayland gjs -c "$APP" org.niro.Bench$i >/dev/null 2>&1 & echo $! >> '"$WORK"'/pids); sleep 1.5; done
+  for i in $(seq 1 '"$N"'); do (WAYLAND_DISPLAY=$DISP GDK_BACKEND=wayland gjs -c "$APP" org.niro.Bench$i >/dev/null 2>&1 & echo $! >> '"$WORK"'/pids); sleep 1.5; done
   sleep 3; ev "Main.overview.hide(); 1" > /dev/null; sleep 3
   ev "global.__paints = 0; global.stage.connect(\"after-paint\", () => { global.__paints++; }); 1" > /dev/null
   ticks() { awk "{print \$14+\$15}" /proc/$SP/stat; }

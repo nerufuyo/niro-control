@@ -1,0 +1,218 @@
+{
+  "system": {
+    "date": "2026-11-14T11:26:45+07:00",
+    "commit": "57f252d",
+    "package": "1.0.0+git787",
+    "kernel": "7.0.0-42-generic",
+    "cpu": "AMD Ryzen 5 5600G with Radeon Graphics x12",
+    "memory_mb": "39978",
+    "gnome-shell": "GNOME Shell 46.0",
+    "gjs": "gjs 1.80.2",
+    "load_at_start": "22.02 19.66 13.69",
+    "power": ""
+  },
+  "cold_note": "cache dropped",
+  "samples_requested": 30,
+  "idle_window_s": 20,
+  "isolated": {
+    "profiles_ms": {
+      "list": {
+        "n": 30,
+        "median": 0.859,
+        "p95": 3.61,
+        "min": 0.569,
+        "max": 4.855
+      },
+      "diff": {
+        "n": 30,
+        "median": 0.273,
+        "p95": 0.551,
+        "min": 0.212,
+        "max": 1.581
+      },
+      "apply": {
+        "n": 30,
+        "median": 13.895,
+        "p95": 20.867,
+        "min": 10.545,
+        "max": 55.267
+      },
+      "backup": {
+        "n": 30,
+        "median": 6.947,
+        "p95": 11.035,
+        "min": 3.681,
+        "max": 16.541
+      },
+      "restore": {
+        "n": 30,
+        "median": 16.289,
+        "p95": 45.041,
+        "min": 12.085,
+        "max": 53.471
+      }
+    },
+    "shell_with_niro": {
+      "settled_mem": {
+        "rss_mb": 352.8,
+        "pss_mb": 240.2
+      },
+      "idle_mem": {
+        "rss_mb": 354.5,
+        "pss_mb": 241.9
+      },
+      "idle_cpu_percent": 0.1,
+      "extensions": "island=State:ACTIVE dock=State:ACTIVE search=State:ACTIVE blur=State:ACTIVE corners=State:ACTIVE emoji=State:ACTIVE emulator=State:ACTIVE ",
+      "log_error_lines": 2,
+      "log_errors_sample": [
+        "Window manager warning: Failed to set environment variable WAYLAND_DISPLAY for gnome-session: GDBus.Error:org.freedesktop.DBus.Error.NameHasNoOwner: Name \"org.gnome.SessionManager\" does not exist",
+        "GNOME Shell-Message: 11:26:52.266: Error looking up permission: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for geolocation"
+      ],
+      "search_ms": {
+        "activation": {
+          "n": 30,
+          "median": 4.707,
+          "p95": 5.613,
+          "min": 3.892,
+          "max": 37.876
+        },
+        "calculator": {
+          "n": 30,
+          "median": 1.723,
+          "p95": 5.68,
+          "min": 1.388,
+          "max": 17.148
+        },
+        "conversion": {
+          "n": 30,
+          "median": 1.508,
+          "p95": 2.144,
+          "min": 1.373,
+          "max": 2.612
+        },
+        "apps": {
+          "n": 30,
+          "median": 1.393,
+          "p95": 4.931,
+          "min": 1.289,
+          "max": 5.605
+        },
+        "settings": {
+          "n": 30,
+          "median": 1.943,
+          "p95": 2.339,
+          "min": 1.783,
+          "max": 2.994
+        },
+        "profiles": {
+          "n": 30,
+          "median": 1.413,
+          "p95": 1.79,
+          "min": 1.332,
+          "max": 1.933
+        },
+        "mixed": {
+          "n": 30,
+          "median": 5.052,
+          "p95": 5.748,
+          "min": 4.637,
+          "max": 9.905
+        },
+        "no_match": {
+          "n": 30,
+          "median": 0.792,
+          "p95": 2.874,
+          "min": 0.752,
+          "max": 8.175
+        }
+      },
+      "growth_pss_mb_after_each_300_cycles": [
+        250.2,
+        353.1,
+        367.3,
+        373.3
+      ],
+      "panel_runs": 6,
+      "panel": {
+        "first_run_first_frame_ms": 866.5,
+        "later_first_frame_ms": {
+          "n": 5,
+          "median": 636.331,
+          "p95": 686.945,
+          "min": 630.456,
+          "max": 686.945
+        },
+        "idle_cpu_percent": {
+          "n": 6,
+          "median": 0.685,
+          "p95": 0.775,
+          "min": 0.456,
+          "max": 0.775
+        },
+        "idle_rss_mb": {
+          "n": 6,
+          "median": 250.602,
+          "p95": 256.684,
+          "min": 242.492,
+          "max": 256.684
+        },
+        "idle_pss_mb": {
+          "n": 6,
+          "median": 141.346,
+          "p95": 147.321,
+          "min": 133.108,
+          "max": 147.321
+        },
+        "navigation_ms": {
+          "n": 162,
+          "median": 28.468,
+          "p95": 74.03,
+          "min": 8.175,
+          "max": 367.754
+        }
+      }
+    },
+    "shell_stock": {
+      "settled_mem": {
+        "rss_mb": 280.1,
+        "pss_mb": 171.4
+      },
+      "idle_mem": {
+        "rss_mb": 281.5,
+        "pss_mb": 172.8
+      },
+      "idle_cpu_percent": 0.3,
+      "extensions": "island=State:INITIALIZED dock=State:INITIALIZED search=State:INITIALIZED blur=State:INITIALIZED corners=State:INITIALIZED emoji=State:INITIALIZED emulator=State:INITIALIZED ",
+      "log_error_lines": 2,
+      "log_errors_sample": [
+        "Window manager warning: Failed to set environment variable WAYLAND_DISPLAY for gnome-session: GDBus.Error:org.freedesktop.DBus.Error.NameHasNoOwner: Name \"org.gnome.SessionManager\" does not exist",
+        "GNOME Shell-Message: 11:29:35.108: Error looking up permission: GDBus.Error:org.freedesktop.portal.Error.NotFound: No entry for geolocation"
+      ]
+    }
+  },
+  "real_session": {
+    "pid": "1012393",
+    "mem": {
+      "rss_mb": 654.7,
+      "pss_mb": 548.4
+    },
+    "mem_after_idle": {
+      "rss_mb": 654.5,
+      "pss_mb": 548.4
+    },
+    "threads": "19",
+    "idle_cpu_percent": 9.75,
+    "voluntary_wakeups_per_s": "61",
+    "niro_journal_error_lines_this_boot": "0",
+    "island_daemon_mem": {
+      "rss_mb": 10.7,
+      "pss_mb": 8.4
+    }
+  },
+  "not_measured": [
+    "Search latency is JS time inside the shell, not to-pixel",
+    "first-result latency equals query latency (results are built synchronously)",
+    "real-session search latency: driving the real shell was not done",
+    "real-session cold panel start"
+  ]
+}
