@@ -11,6 +11,7 @@ import {CATALOG} from './catalog.js';
 import {settingsSearch} from './components.js';
 import {searchItems} from './logic.js';
 import {aboutPage, dockPage, islandPage, lookPage, Model, resultsPage, searchPage, windowsPage} from './pages.js';
+import {detectPreset, effective, PRESET_KEYS, PRESETS} from './appearance.js';
 import {stylesheet} from './glass.js';
 import {homePage} from './homePage.js';
 import {profilesPage} from './profilesPage.js';
@@ -44,7 +45,17 @@ export function buildWindow(app) {
     const manager = Adw.StyleManager.get_default();
     let model;
     // the glass follows Look > Opacity and the dark/light scheme; nothing else in the panel does
-    const restyle = () => provider.load_from_string(stylesheet(manager.get_dark() ? 'dark' : 'light', Number(model?.read('niro.opacity') ?? 80), model?.read('niro.tint')));
+    const a11y = new Gio.Settings({schema_id: 'org.gnome.desktop.a11y.interface'});
+    const read = id => model?.read(`niro.${id}`);
+    const values = () => Object.fromEntries(PRESET_KEYS.map(k => [k, read(k)]));
+    // what the panel shows: the settings, made safer where readability needs it (high contrast, safe mode, floors)
+    const restyle = () => {
+        const e = effective(values(), {safeMode: read('safe-mode') === true, highContrast: manager.get_high_contrast() || a11y.get_boolean('high-contrast')});
+        const scheme = read('color-scheme') === 'dark' ? 'dark' : read('color-scheme') === 'light' ? 'light' : (manager.get_dark() ? 'dark' : 'light');
+        const on = read('universal-enabled') !== false && read('affect-gtk') !== false;
+        // switched off, the panel keeps its own readable defaults instead of the shared glass
+        provider.load_from_string(stylesheet(scheme, on ? e.glass : 100, read('tint'), on ? {sidebar: e.sidebar, content: e.content, elevated: e.elevated} : {sidebar: 100, content: 100, elevated: 100}));
+    };
     restyle();
     // above USER (800): a user-wide ~/.config/gtk-4.0/gtk.css theme must not repaint the panel's layers (it set opaque backgrounds and a fixed text colour)
     Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER + 50);
@@ -76,7 +87,20 @@ export function buildWindow(app) {
         },
     };
     model = new Model(ctx);
-    for (const id of ['niro.opacity', 'niro.tint']) { const b = model.binding(CATALOG.find(i => i.id === id)); if (b && !Array.isArray(b)) b.subscribe(restyle); }
+    const watch = (id, fn) => { const b = model.binding(CATALOG.find(i => i.id === id)); if (b && !Array.isArray(b)) b.subscribe(fn); };
+    for (const id of ['tint', 'universal-enabled', 'affect-gtk', 'safe-mode', 'color-scheme', ...PRESET_KEYS]) watch(`niro.${id}`, restyle);
+    // choosing a preset writes its values; changing a value by hand makes the preset "custom"
+    let applying = false;
+    watch('niro.preset', () => {
+        const name = read('preset');
+        if (applying || !PRESETS[name] || detectPreset(values()) === name) return;
+        applying = true;
+        try { for (const k of PRESET_KEYS) model.binding(CATALOG.find(i => i.id === `niro.${k}`)).write(PRESETS[name][k]); } finally { applying = false; }
+        restyle();
+    });
+    const syncPreset = () => { if (applying) return; const name = detectPreset(values()); if (read('preset') !== name) { applying = true; try { model.binding(CATALOG.find(i => i.id === 'niro.preset')).write(name); } finally { applying = false; } } };
+    for (const k of PRESET_KEYS) watch(`niro.${k}`, syncPreset);
+    a11y.connect('changed::high-contrast', restyle); manager.connect('notify::high-contrast', restyle);
     manager.connect('notify::dark', restyle);
     restyle();
     const stale = GLib.getenv('NIRO_NOBANNER') ? [] : staleParts();
@@ -86,6 +110,10 @@ export function buildWindow(app) {
     shared.home = homePage(model, ctx, shared.profiles, stale);
 
     const content = new Gtk.Stack({hexpand: true, vexpand: true, transition_type: Gtk.StackTransitionType.CROSSFADE, transition_duration: 120});
+    // reduced motion: GNOME's animations switch also stops the panel's crossfade
+    const motion = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+    const syncMotion = () => content.set_transition_duration(motion.get_boolean('enable-animations') ? 120 : 0);
+    syncMotion(); motion.connect('changed::enable-animations', syncMotion);
     const titles = new Map();
     for (const [id, title, , make] of MODULES) {
         content.add_named(make(model, shared), id);

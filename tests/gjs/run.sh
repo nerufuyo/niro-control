@@ -10,3 +10,4 @@ glib-compile-schemas "$T"
 GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" gjs -m tests/gjs/blurPipeline.test.js
 GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/controlUi.test.js
 GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/profiles.test.js
+GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/appearance.test.js

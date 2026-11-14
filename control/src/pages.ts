@@ -321,8 +321,10 @@ export function lookPage(model: Model) {
     toneGroup.add(more);
     model.advancedWidgets.push(more);
     more.set_visible(model.mode === 'advanced');
-    const glass = model.section('Glass', items.filter(i => i.group === 'Glass'), 'Shared by the island, the dock and the windows');
-    return page(previewBlock(model, lookPreview(model.read)), tone && box, toneGroup, glass);
+    const glass = model.section('Glass', items.filter(i => i.group === 'Glass'), 'The background material: shared by the island, the dock, the search panel and the control panel');
+    const universal = model.section('Universal Appearance', items.filter(i => i.group === 'Universal Appearance'),
+        'Glass for the background, solid for what you read. Presets set the values below; per-application rules and the GTK theme integration are under Compatibility');
+    return page(previewBlock(model, lookPreview(model.read)), tone && box, toneGroup, glass, universal);
 }
 
 // ---- A module with sub-pages (Island, Dock): a list of its groups beside them
