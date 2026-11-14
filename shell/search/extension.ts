@@ -15,6 +15,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {buildRegistry, clipboardHistory, confirm, profiles, windows} from './actions.js';
 import {calculate} from './calc.js';
 import {searchItems} from './logic.js';
+import {arrange, bestScore} from './rank.js';
 import {INDEX} from './settings-index.js';
 import {convert} from './units.js';
 
@@ -242,12 +243,13 @@ export default class NiroSearch extends Extension {
     _collect(query) {
         const q = query.trim();
         const out = [];
-        const add = (section, r) => out.push({section, ...r});
+        // score: how well the title (or a keyword) matches, plus the kind's bonus (see rank.ts)
+        const add = (section, r) => out.push({section, ...r, score: (r.score ?? bestScore(q, [r.title, ...(r.keywords ?? [])]))});
         if (!q) return this._suggestions();
         const calc = calculate(q);
-        if (calc) add('Calculator', {title: calc.text, subtitle: `${q} =  ·  Enter copies`, action: 'clipboard.copy', args: {text: calc.text.replace(/,/g, '')}, iconName: ICON.Calculator, toast: true});
+        if (calc) add('Calculator', {title: calc.text, subtitle: `${q} =  ·  Enter copies`, score: 100, action: 'clipboard.copy', args: {text: calc.text.replace(/,/g, '')}, iconName: ICON.Calculator, toast: true});
         const conv = convert(q);
-        if (conv) add('Conversion', {title: conv.text, subtitle: `${q}  ·  Enter copies`, action: 'clipboard.copy', args: {text: conv.text}, iconName: ICON.Conversion, toast: true});
+        if (conv) add('Conversion', {title: conv.text, subtitle: `${q}  ·  Enter copies`, score: 100, action: 'clipboard.copy', args: {text: conv.text}, iconName: ICON.Conversion, toast: true});
 
         const nq = norm(q);
         // applications
@@ -256,34 +258,34 @@ export default class NiroSearch extends Extension {
             if (apps >= LIMITS.Applications) break;
             const app = Shell.AppSystem.get_default().lookup_app(id);
             if (!app || !app.get_app_info()?.should_show() || out.some(o => o.args?.id === id)) continue;
-            add('Applications', {title: app.get_name(), subtitle: (app.get_description() ?? '').split('\n')[0], icon: app.get_icon(), action: 'app.launch', args: {id}});
+            add('Applications', {title: app.get_name(), subtitle: (app.get_description() ?? '').split('\n')[0], icon: app.get_icon(), action: 'app.launch', args: {id}, score: Math.max(45 - apps * 3, bestScore(q, [app.get_name()]))});
             apps++;
         }
         // windows
         (this._windows ?? []).filter(w => norm(`${w.title} ${w.app}`).includes(nq)).slice(0, LIMITS.Windows)
-            .forEach(w => add('Windows', {title: w.title || w.app, subtitle: `${w.app}  ·  Switch to this window`, icon: w.icon, iconName: ICON.Windows, action: 'window.activate', args: {id: w.id}}));
+            .forEach(w => add('Windows', {title: w.title || w.app, subtitle: `${w.app}  ·  Switch to this window`, icon: w.icon, iconName: ICON.Windows, action: 'window.activate', args: {id: w.id}, score: Math.max(30, bestScore(q, [w.title, w.app]))}));
         // settings
         searchItems(INDEX, q).filter(i => !i.managed).slice(0, LIMITS.Settings)
             .forEach(i => add('Settings', {title: i.title, subtitle: `${i.menu} › ${i.group}${i.help ? '  ·  ' + i.help : ''}`, iconName: ICON.Settings,
-                action: 'settings.open', args: {page: PAGE_OF[i.menu], query: i.title}}));
+                action: 'settings.open', args: {page: PAGE_OF[i.menu], query: i.title}, score: Math.max(20, bestScore(q, [i.title]))}));
         // profiles
         const all = profiles();
         const wantsProfiles = /^(profiles?|mode|preset)s?\b/.test(nq);
         const rest = nq.replace(/^(profiles?|mode|preset)s?\s*/, '');
         all.filter(p => wantsProfiles ? (!rest || norm(p.name).includes(rest)) : norm(p.name).includes(nq)).slice(0, LIMITS.Profiles)
-            .forEach(p => add('Profiles', {title: p.name, subtitle: `${p.active ? 'Active profile  ·  ' : 'Apply profile  ·  '}${p.description}`, iconName: ICON.Profiles, action: 'profile.apply', args: {id: p.id}, toast: true}));
+            .forEach(p => add('Profiles', {title: p.name, subtitle: `${p.active ? 'Active profile  ·  ' : 'Apply profile  ·  '}${p.description}`, iconName: ICON.Profiles, action: 'profile.apply', args: {id: p.id}, toast: true, score: Math.max(wantsProfiles ? 70 : 0, bestScore(q, [p.name]))}));
         // actions (the ones that need nothing more from the person)
         this._registry.find(q, {}, 8).filter(a => !(a.params ?? []).some(p => p.required) && !a.id.startsWith('settings.')).slice(0, LIMITS.Actions)
-            .forEach(a => add('Actions', {title: a.title, subtitle: a.permission === 'none' ? a.description : `${a.description}  ·  asks first`, iconName: ICON.Actions, action: a.id, args: {}, toast: true}));
+            .forEach(a => add('Actions', {title: a.title, subtitle: a.permission === 'none' ? a.description : `${a.description}  ·  asks first`, iconName: ICON.Actions, action: a.id, args: {}, toast: true, keywords: a.keywords}));
         // clipboard: only when asked for, so that what was copied never turns up in an ordinary search
         const m = /^(?:clip(?:board)?|copied|paste)\b\s*(.*)$/i.exec(q);
         if (m) {
             const needle = norm(m[1]);
             clipboardHistory().filter(c => !needle || norm(c.text).includes(needle)).slice(0, LIMITS.Clipboard)
                 .forEach(c => add('Clipboard', {title: c.text.replace(/\s+/g, ' ').slice(0, 90), subtitle: `Copied ${GLib.DateTime.new_from_unix_local(Math.floor(c.at / 1000)).format('%d %b, %H:%M')}  ·  Enter copies it again`,
-                    iconName: ICON.Clipboard, action: 'clipboard.copy', args: {text: c.text.slice(0, 10000)}, toast: true}));
+                    iconName: ICON.Clipboard, action: 'clipboard.copy', args: {text: c.text.slice(0, 10000)}, toast: true, score: 80}));
         }
-        return out;
+        return arrange(out);
     }
 
     _suggestions() {
