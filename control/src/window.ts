@@ -12,7 +12,7 @@ import {settingsSearch} from './components.js';
 import {searchItems} from './logic.js';
 import {aboutPage, dockPage, islandPage, lookPage, Model, resultsPage, searchPage, windowsPage} from './pages.js';
 import {detectPreset, effective, PRESET_KEYS, PRESETS} from './appearance.js';
-import {stylesheet} from './glass.js';
+import {stylesheet} from './appearanceTokens.js';
 import {compatPage} from './compatPage.js';
 import {homePage} from './homePage.js';
 import {profilesPage} from './profilesPage.js';

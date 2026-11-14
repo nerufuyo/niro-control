@@ -18,6 +18,7 @@ gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-a
 sleep 20
 ev() { gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "$1" 2>&1; }
 ev "Main.extensionManager.enableExtension(\"blur@niro.local\"); 1" > /dev/null; sleep 4
+APPS="(function(){ const G=imports.gi.Gio; const src=G.SettingsSchemaSource.new_from_directory(\"'"$SHARE"'/gnome-shell/extensions/blur@niro.local/schemas\", G.SettingsSchemaSource.get_default(), false); return new G.Settings({settings_schema: src.lookup(\"org.gnome.shell.extensions.blur-my-shell.applications\", false)}); })()"
 ev "(function(){ const G=imports.gi.Gio; const src=G.SettingsSchemaSource.new_from_directory(\"'"$SHARE"'/gnome-shell/extensions/blur@niro.local/schemas\", G.SettingsSchemaSource.get_default(), false); const s=new G.Settings({settings_schema: src.lookup(\"org.gnome.shell.extensions.blur-my-shell.applications\", false)}); s.set_boolean(\"blur\", true); s.set_boolean(\"enable-all\", true); s.set_strv(\"blacklist\", []); s.set_boolean(\"dynamic-opacity\", false); return 1; })()" > /dev/null; sleep 3
 echo "STATE $(gnome-extensions info blur@niro.local 2>&1 | grep State | tr -d " ")" > '"$OUT"'
 APP="imports.gi.versions.Gtk=\"4.0\"; const {Gtk,GLib}=imports.gi; Gtk.init(); const a=new Gtk.Application({application_id: ARGV[0]}); a.connect(\"activate\",()=>{ new Gtk.ApplicationWindow({application:a, title: ARGV[0]}).present(); }); a.run([]);"
@@ -34,6 +35,8 @@ ev "$N.set_boolean(\"safe-mode\", true); 1" > /dev/null; sleep 1
 echo "SAFE $(probe)" >> '"$OUT"'
 ev "$N.set_boolean(\"safe-mode\", false); $N.set_boolean(\"universal-enabled\", false); 1" > /dev/null; sleep 1
 echo "OFF $(probe)" >> '"$OUT"'
+ev "$N.set_boolean(\"universal-enabled\", true); $N.set_string(\"app-rules\", JSON.stringify({\"org.niro.TestB\":{mode:\"exclude\"}})); $N.set_boolean(\"legacy-global-fade\", true); $APPS.set_int(\"opacity\", 204); 1" > /dev/null; sleep 1
+echo "LEGACY $(probe)" >> '"$OUT"'
 kill $(cat '"$WORK"'/pids) 2>/dev/null; kill $SP' > /dev/null 2>&1
 cat "$OUT"; grep -iE "JS ERROR|blur" "$WORK/shell.log" | grep -v "^dbus" | head -8
 has() { if grep -q "$2" "$OUT"; then echo "ok   $1"; else echo "FAIL $1 (wanted: $2)"; FAILS=$((FAILS+1)); fi; }
@@ -42,5 +45,6 @@ has "default: every window blurred, none faded" "DEFAULT org.niro.TestA=true/255
 has "an excluded window is not blurred; a fade needs the allowance" "RULES_NO_ALLOWANCE org.niro.TestA=true/255 org.niro.TestB=false/255 org.niro.TestC=true/255"
 has "with the allowance only the rule's window fades" "RULES_ALLOWED org.niro.TestA=true/255 org.niro.TestB=false/255 org.niro.TestC=true/127"
 has "safe mode: no blur, no fade" "SAFE org.niro.TestA=false/255 org.niro.TestB=false/255 org.niro.TestC=false/255"
+has "the old fade switch fades every window except the excluded one (opt-in, with its warning)" "LEGACY org.niro.TestA=true/204 org.niro.TestB=false/255 org.niro.TestC=true/204"
 has "global switch off: no effect on any window" "OFF org.niro.TestA=false/255 org.niro.TestB=false/255 org.niro.TestC=false/255"
 [ $FAILS = 0 ] && echo "appearance shell checks: all passed" || echo "appearance shell checks: $FAILS failed"

@@ -6,7 +6,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
-import {classify, effective, FAMILIES, parseRules, PRESET_KEYS, serializeRules, setRule, STATUS_LABEL} from './appearance.js';
+import {classify, effective, FAMILIES, parseRules, PRESET_KEYS, resolveScheme, serializeRules, setRule, STATUS_LABEL} from './appearance.js';
 import {CATALOG} from './catalog.js';
 import * as gtk from './gtkAdapter.js';
 
@@ -21,8 +21,7 @@ export const backupRoot = () => `${GLib.getenv('NIRO_CONFIG_DIR') ?? `${GLib.get
 export function adapterOptions(model, dark: boolean) {
     const v = Object.fromEntries(PRESET_KEYS.map(k => [k, model.read(`niro.${k}`)]));
     const e = effective(v, {safeMode: model.read('niro.safe-mode') === true, highContrast: false});
-    const s = model.read('niro.color-scheme');
-    return {configDir: configDir(), scheme: s === 'dark' ? 'dark' : s === 'light' ? 'light' : dark ? 'dark' : 'light', glass: e.glass, tint: model.read('niro.tint'),
+    return {configDir: configDir(), scheme: resolveScheme(model.read('niro.color-scheme'), dark ? 'prefer-dark' : 'default'), disabled: model.read('niro.universal-enabled') === false || model.read('niro.affect-gtk') === false, glass: e.glass, tint: model.read('niro.tint'),
         surfaces: {sidebar: e.sidebar, content: e.content, elevated: e.elevated}};
 }
 

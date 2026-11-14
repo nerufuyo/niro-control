@@ -116,7 +116,7 @@ A dependency rule in `scripts/control-panel-items.py` (`DEPENDS`) greys a row ou
 
 ## The panel's glass (layers)
 
-`control/src/glass.ts` (pure, tested) defines the panel's look as three layers, and `window.ts` loads its `stylesheet()` at a priority above the user's own `~/.config/gtk-4.0/gtk.css` (that file can carry a whole-desktop GTK theme that would otherwise repaint the panel with opaque backgrounds and a fixed text colour):
+`control/src/appearanceTokens.ts` (pure, tested) defines the panel's look as three layers, and `window.ts` loads its `stylesheet()` at a priority above the user's own `~/.config/gtk-4.0/gtk.css` (that file can carry a whole-desktop GTK theme that would otherwise repaint the panel with opaque backgrounds and a fixed text colour):
 
 1. glass: the window's own background. The only layer that follows Look > Opacity (and the Look tint in the dark scheme).
 2. surfaces: sidebar, content, groups, raised things: fixed alphas, high enough to carry text over any wallpaper.

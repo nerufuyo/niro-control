@@ -72,3 +72,21 @@ GLib.chmod(`${cfg3}/gtk-3.0`, 0o755);
 eq(withoutBlock(withBlock('x\n', 4)), 'x\n', 'block round trip');
 eq(withoutBlock('no block here'), 'no block here', 'no block');
 print('appearance: gtk adapter ok');
+
+// refresh: only differing files are rewritten, a disabled look writes a neutral file, nothing happens when not installed
+{
+    const cfg4 = `${tmp}/refresh`; for (const d of ['gtk-4.0', 'gtk-3.0']) GLib.mkdir_with_parents(`${cfg4}/${d}`, 0o755);
+    const o4 = {...o, configDir: cfg4};
+    eq(refresh({...o4}), [], 'not installed: nothing');
+    install(o4);
+    eq(refresh({...o4}), [], 'unchanged: nothing rewritten');
+    eq(refresh({...o4, scheme: 'light'}).length, 2, 'a scheme change rewrites both files');
+    eq(refresh({...o4, scheme: 'light'}), [], 'and then nothing again');
+    eq(refresh({...o4, scheme: 'light', glass: 81}).length, 2, 'a glass change rewrites');
+    const off = refresh({...o4, scheme: 'light', disabled: true});
+    eq(off.length, 2, 'disabling rewrites');
+    if (!read(`${cfg4}/gtk-4.0/${GENERATED}`).includes('switched off')) fail('a disabled look should write a neutral file');
+    if (read(`${cfg4}/gtk-4.0/${GENERATED}`).includes('background-color')) fail('a disabled look must style nothing');
+    restore(cfg4);
+    print('appearance: refresh ok');
+}

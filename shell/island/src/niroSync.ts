@@ -6,6 +6,8 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 
+import {effective, migrateLegacy, PRESET_KEYS, resolveScheme} from './appearance.js';
+import {refresh as refreshGtk} from './gtkAdapter.js';
 import {setBlurRadius} from './blurPipeline.js';
 
 const EXTENSION_DIRS = [GLib.get_user_data_dir(), '/usr/local/share', '/usr/share'].map(base => `${base}/gnome-shell/extensions`);
@@ -37,12 +39,72 @@ export class NiroSync {
         this._dock = extensionSettings('dock@niro.local', 'org.gnome.shell.extensions.dock');
         this._apps = extensionSettings('blur@niro.local', 'org.gnome.shell.extensions.blur-my-shell.applications');
         this._blur = extensionSettings('blur@niro.local', 'org.gnome.shell.extensions.blur-my-shell');
+        this._iface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
+        this._a11y = new Gio.Settings({schema_id: 'org.gnome.desktop.a11y.interface'});
         this._id = this._shared.connect('changed', () => this._apply());
+        // signals, not polling: GNOME's colour scheme and high contrast
+        this._ifaceId = this._iface.connect('changed::color-scheme', () => this._queueGtk());
+        this._a11yId = this._a11y.connect('changed::high-contrast', () => this._apply());
+        this._migrate();
+        this._surfaces();
+        this._queueGtk();
         try {
             this._applyAccent(this._shared.get_string('accent'));
         } catch (e) {
             console.error(`Island: accent not applied: ${e.message}`);
         }
+    }
+
+    _flag(key, fallback) { try { return this._shared.get_boolean(key); } catch (_e) { return fallback; } }
+    /** Safe mode, or GNOME's high-contrast setting: solid surfaces and no effects. */
+    _safe() { return this._flag('safe-mode', false) || this._a11y.get_boolean('high-contrast'); }
+
+    /** The old whole-window fade: saved once, windows go back to full opacity, the switch brings it back (see migrateLegacy). */
+    _migrate() {
+        if (!this._apps) return;
+        try {
+            const saved = this._shared.get_int('legacy-window-opacity'), now = this._apps.get_int('opacity');
+            const next = migrateLegacy({appsOpacity: now, saved, legacyFade: this._flag('legacy-global-fade', false)});
+            if (next.saved !== saved) this._shared.set_int('legacy-window-opacity', next.saved);
+            if (next.appsOpacity !== now) this._apps.set_int('opacity', next.appsOpacity);
+        } catch (e) { console.error(`Island: legacy fade not migrated: ${e.message}`); }
+    }
+
+    /** Top bar, Overview, menus, notifications, quick settings: the blur extension's own blur switches, in step with the look. */
+    _surfaces() {
+        try {
+            const parts = ['panel', 'overview', 'popup'];
+            const settings = Object.fromEntries(parts.map(p => [p, extensionSettings('blur@niro.local', `org.gnome.shell.extensions.blur-my-shell.${p}`)]));
+            let backup = JSON.parse(this._shared.get_string('shell-surfaces-backup') || '{}');
+            const on = this._flag('shell-surfaces', false) && this._flag('universal-enabled', true) && this._flag('affect-shell', true);
+            if (on) {
+                if (!Object.keys(backup).length) {
+                    backup = Object.fromEntries(parts.filter(p => settings[p]).map(p => [p, settings[p].get_boolean('blur')]));
+                    this._shared.set_string('shell-surfaces-backup', JSON.stringify(backup));
+                }
+                const blur = this._shared.get_boolean('blur') && !this._safe() && !this._flag('performance-mode', false);
+                for (const p of parts) if (settings[p] && settings[p].get_boolean('blur') !== blur) settings[p].set_boolean('blur', blur);
+            } else if (Object.keys(backup).length) {
+                for (const p of parts) if (settings[p] && p in backup) settings[p].set_boolean('blur', backup[p]);
+                this._shared.set_string('shell-surfaces-backup', '{}');
+            }
+        } catch (e) { console.error(`Island: shell surfaces not synced: ${e.message}`); }
+    }
+
+    /** One rewrite at a time, shortly after the last change; refreshGtk skips files whose content would not change. */
+    _queueGtk() {
+        if (this._gtkTimer) return;
+        this._gtkTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 400, () => {
+            this._gtkTimer = 0;
+            try {
+                const values = Object.fromEntries(PRESET_KEYS.map(k => [k, typeof this._shared.get_value(k).unpack() === 'boolean' ? this._shared.get_boolean(k) : this._shared.get_int(k)]));
+                const e = effective(values, {safeMode: this._flag('safe-mode', false), highContrast: this._a11y.get_boolean('high-contrast')});
+                refreshGtk({configDir: GLib.get_user_config_dir(), scheme: resolveScheme(this._shared.get_string('color-scheme'), this._iface.get_string('color-scheme')),
+                    glass: e.glass, tint: this._shared.get_string('tint'), surfaces: {sidebar: e.sidebar, content: e.content, elevated: e.elevated},
+                    disabled: !this._flag('universal-enabled', true) || !this._flag('affect-gtk', true)});
+            } catch (err) { console.error(`Island: GTK stylesheet not refreshed: ${err.message}`); }
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     /** Island's own highlights in the accent: its stylesheet names the colour in a few places, overridden here. */
@@ -64,12 +126,15 @@ export class NiroSync {
     }
 
     _apply() {
+        this._migrate();
+        this._surfaces();
+        this._queueGtk();
         // Universal Appearance: switched off (or off for the shell), the island, dock and search keep the values they have;
         // safe mode and performance mode make the glass solid and drop the blur (mirrors effective() in control/src/appearance.ts)
         const flag = (key, fallback) => { try { return this._shared.get_boolean(key); } catch (_e) { return fallback; } };
         if (!flag('universal-enabled', true) || !flag('affect-shell', true))
             return;
-        const safe = flag('safe-mode', false);
+        const safe = this._safe();
         const opacity = safe ? 100 : this._shared.get_int('opacity');
         const blur = this._shared.get_boolean('blur') && !safe && !flag('performance-mode', false);
         const strength = this._shared.get_int('blur-strength');
@@ -96,8 +161,7 @@ export class NiroSync {
             }
         }
         if (this._apps) {
-            // no whole-window fade from the shared look (it fades text too): the blur extension reads Niro's per-application rules instead
-            this._apps.set_int('opacity', 255);
+            // (the whole-window opacity is handled by _migrate: 255 unless the old fade was switched back on)
             this._apps.set_boolean('blur', blur);
         }
     }
@@ -110,5 +174,10 @@ export class NiroSync {
         if (this._id)
             this._shared.disconnect(this._id);
         this._id = 0;
+        if (this._ifaceId) this._iface.disconnect(this._ifaceId);
+        if (this._a11yId) this._a11y.disconnect(this._a11yId);
+        this._ifaceId = this._a11yId = 0;
+        if (this._gtkTimer) GLib.source_remove(this._gtkTimer);
+        this._gtkTimer = 0;
     }
 }

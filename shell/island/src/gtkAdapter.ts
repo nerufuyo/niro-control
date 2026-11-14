@@ -1,0 +1,1 @@
+../../../control/src/gtkAdapter.ts

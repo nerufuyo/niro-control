@@ -44,6 +44,8 @@ export const ApplicationsBlur = class ApplicationsBlur {
         if (Gio.SettingsSchemaSource.get_default()?.lookup('org.niro.control', true)) {
             this.niro = new Gio.Settings({ schema_id: 'org.niro.control' });
             this.niro_changed = this.niro.connect('changed', () => this.set_opacity());
+            this.a11y = new Gio.Settings({ schema_id: 'org.gnome.desktop.a11y.interface' });
+            this.a11y_changed = this.a11y.connect('changed::high-contrast', () => this.set_opacity());
         }
         connect_system_style_changes(this.connections, () => {
             if (this.settings.applications.PIPELINE_AUTO_MODE)
@@ -459,13 +461,17 @@ export const ApplicationsBlur = class ApplicationsBlur {
         const rule = Object.prototype.hasOwnProperty.call(rules, id) ? rules[id] : null;
         if (rule?.mode === 'exclude')
             return { blur: false, fade: null, excluded: true };
-        const safe = n.get_boolean('safe-mode');
+        // safe mode, or GNOME's high contrast: no effects
+        const safe = n.get_boolean('safe-mode') || this.a11y.get_boolean('high-contrast');
         const blur = !safe && n.get_boolean('blur') && !n.get_boolean('performance-mode') && rule?.blur !== false;
         // the control panel paints its own glass: it gets the blur and keeps full opacity
         const own = id === 'org.niro.Control';
         const fade = !safe && !own && rule?.mode === 'fade' && n.get_boolean('affect-thirdparty')
             ? Math.round(Math.min(100, Math.max(20, Number(rule.opacity) || 80)) * 2.55) : null;
-        return { blur, fade, excluded: false };
+        // the old whole-window fade for every application, only when switched back on (it fades text and controls too)
+        const legacy = !safe && !own && fade === null && n.get_boolean('legacy-global-fade') && this.settings.applications.OPACITY < 255
+            ? this.settings.applications.OPACITY : null;
+        return { blur, fade: fade ?? legacy, excluded: false };
     }
 
     /// Update all corners, to use when the setting has been changed.
@@ -550,7 +556,7 @@ export const ApplicationsBlur = class ApplicationsBlur {
         this.enabled = false;
 
         delete this.mutter_gsettings;
-        if (this.niro) { this.niro.disconnect(this.niro_changed); this.niro = null; }
+        if (this.niro) { this.niro.disconnect(this.niro_changed); this.a11y.disconnect(this.a11y_changed); this.niro = null; this.a11y = null; }
 
         [...this.meta_windows].forEach(meta_window =>
             this.untrack_meta_window(meta_window)

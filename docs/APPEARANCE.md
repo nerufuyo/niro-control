@@ -14,7 +14,7 @@ Adapters (each separate, each with its own off switch):
 
 | Adapter | Files | What it does |
 |---|---|---|
-| Tokens | `control/src/glass.ts`, `control/src/appearance.ts` | Colours and alphas of the layers, presets, safety rules (floors, high contrast, safe mode, performance mode), per-application rules, the compatibility matrix. Pure and tested, including WCAG contrast over black, white and mid wallpapers |
+| Tokens | `control/src/appearanceTokens.ts`, `control/src/appearance.ts` | Colours and alphas of the layers, presets, safety rules (floors, high contrast, safe mode, performance mode), per-application rules, the compatibility matrix. Pure and tested, including WCAG contrast over black, white and mid wallpapers |
 | Control panel | `control/src/window.ts` | Paints the three layers; follows the Look; reduced motion and high contrast respected |
 | GTK adapter | `control/src/gtkAdapter.ts`, `control/src/compatPage.ts` | A generated stylesheet for GTK 3 and GTK 4 (backgrounds only), hooked into your gtk.css by one marked block, **only with your consent**, after a backup. Restore removes the block (byte-identical result) |
 | Shell | `shell/island/src/niroSync.ts`, `shell/blur/...` | Island, dock and search follow the shared look; the blur extension applies per-application rules (blur, exclusion, opt-in window fade) |

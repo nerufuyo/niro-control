@@ -9,7 +9,8 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "removeComments": false,
-    "sourceMap": false
+    "sourceMap": false,
+    "preserveSymlinks": true
   },
   "include": ["**/*.ts"],
   "exclude": ["build", "node_modules"]

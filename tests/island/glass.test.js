@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {contrast, glassAlpha, stylesheet, textContrast, tokens} from '../../control/build/glass.js';
+import {contrast, glassAlpha, stylesheet, textContrast, tokens} from '../../control/build/appearanceTokens.js';
 
 const WALLPAPERS = {black: [0, 0, 0], white: [255, 255, 255], mid: [128, 128, 128], red: [220, 40, 40], sky: [120, 180, 240]};
 const OPACITIES = [0, 20, 50, 80, 100];
