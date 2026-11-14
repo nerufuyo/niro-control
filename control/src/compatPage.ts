@@ -6,13 +6,14 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
-import {classify, effective, FAMILIES, parseRules, PRESET_KEYS, resolveScheme, serializeRules, setRule, STATUS_LABEL} from './appearance.js';
+import {APPLIES_LABEL, classify, effective, FAMILIES, parseRules, PRESET_KEYS, resolveScheme, serializeRules, setRule, STATUS_LABEL, UNKNOWN} from './appearance.js';
 import {CATALOG} from './catalog.js';
 import * as gtk from './gtkAdapter.js';
 
 const scrolled = child => new Gtk.ScrolledWindow({child, hscrollbar_policy: Gtk.PolicyType.NEVER, vexpand: true});
-const MODES = ['inherit', 'exclude', 'fade'];
-const MODE_LABEL = ['Inherit the global appearance', 'Exclude from effects', 'Window fade (also fades text)'];
+const FILTERS = ['All applications', 'With a rule', 'Excluded', 'Theme integration', 'Compositor effects only', 'Limited support', 'Unsupported'];
+const FILTER_STATUS = {3: 'theme', 4: 'compositor', 5: 'limited', 6: 'unsupported'};
+const FADE_WARNING = 'Window fade lowers the opacity of the whole window, so its text, icons and controls fade with the background. It also needs "Window-level effects for other applications" on.';
 
 export const configDir = () => GLib.get_user_config_dir();
 export const backupRoot = () => `${GLib.getenv('NIRO_CONFIG_DIR') ?? `${GLib.get_user_config_dir()}/niro-control`}/appearance-backups`;
@@ -81,46 +82,76 @@ export function compatPage(model, ctx) {
 
     // ---- per-application rules
     const apps = new Adw.PreferencesGroup({title: 'Applications', description: 'Rules are kept by application id, never by window title. Inherit means the global appearance; Exclude switches every effect off for that application.'});
-    const search = new Gtk.SearchEntry({placeholder_text: 'Find an application', hexpand: true, margin_bottom: 6});
+    const search = new Gtk.SearchEntry({placeholder_text: 'Find an application', hexpand: true});
     search.update_property([Gtk.AccessibleProperty.LABEL], ['Find an application']);
+    const filter = new Gtk.DropDown({model: Gtk.StringList.new(FILTERS), valign: Gtk.Align.CENTER});
+    filter.update_property([Gtk.AccessibleProperty.LABEL], ['Show applications']);
+    const bar = new Gtk.Box({spacing: 8, margin_bottom: 6}); bar.append(search); bar.append(filter);
     const list = new Gtk.ListBox({selection_mode: Gtk.SelectionMode.NONE, css_classes: ['boxed-list']});
     list.update_property([Gtk.AccessibleProperty.LABEL], ['Applications and their appearance rules']);
     let rules = parseRules(niro?.get_string('app-rules') ?? '{}');
-    const save = next => { rules = next; niro?.set_string('app-rules', serializeRules(rules)); Gio.Settings.sync(); };
+    const save = next => { rules = next; niro?.set_string('app-rules', serializeRules(rules)); Gio.Settings.sync(); applyFilter(); };
     const rows = [];
     for (const info of Gio.AppInfo.get_all().filter(a => a.should_show()).sort((a, b) => a.get_name().localeCompare(b.get_name()))) {
         const id = (info.get_id() ?? '').replace(/\.desktop$/, '');
-        const wm = info.get_string?.('StartupWMClass') || id;     // windows are matched by the class they announce
-        const fam = classify(id, info.get_commandline?.() ?? '');
-        const row = new Adw.ActionRow({title: GLib.markup_escape_text(info.get_name(), -1), subtitle: GLib.markup_escape_text(fam ? `${STATUS_LABEL[fam.status]} · ${fam.name}` : 'Limited support · toolkit not identified', -1)});
-        row._text = `${info.get_name()} ${id}`.toLowerCase();
+        const wm = info.get_string?.('StartupWMClass') || id;     // windows are matched by the class they announce, never by title
+        const fam = classify(id, info.get_commandline?.() ?? '') ?? UNKNOWN;
+        const row = new Adw.ActionRow({title: GLib.markup_escape_text(info.get_name(), -1), subtitle_lines: 2,
+            subtitle: GLib.markup_escape_text(`${wm} · ${fam.name}\n${STATUS_LABEL[fam.status]} · ${APPLIES_LABEL[fam.applies]}`, -1)});
+        row.set_tooltip_text(`${fam.how}\nLimit: ${fam.limit}\nCan be set: ${fam.customizations.join(', ')}\nEvidence: ${fam.evidence}`);
+        row._text = `${info.get_name()} ${id} ${wm}`.toLowerCase(); row._wm = wm; row._status = fam.status;
         const icon = info.get_icon(); if (icon) row.add_prefix(new Gtk.Image({gicon: icon, pixel_size: 28}));
-        const drop = new Gtk.DropDown({model: Gtk.StringList.new(MODE_LABEL), valign: Gtk.Align.CENTER});
+        // inherit or exclude: always there. Window fade: Advanced only, with its warning.
+        const drop = new Gtk.DropDown({model: Gtk.StringList.new(['Inherit', 'Exclude']), valign: Gtk.Align.CENTER});
         drop.update_property([Gtk.AccessibleProperty.LABEL], [`Appearance rule for ${info.get_name()}`]);
-        drop.set_selected(Math.max(0, MODES.indexOf(rules[wm]?.mode ?? 'inherit')));
-        drop.connect('notify::selected', () => save(setRule(rules, wm, {mode: MODES[drop.get_selected()], ...(MODES[drop.get_selected()] === 'fade' ? {opacity: rules[wm]?.opacity ?? 80} : {})})));
+        const fade = new Gtk.Switch({valign: Gtk.Align.CENTER, tooltip_text: FADE_WARNING});
+        fade.update_property([Gtk.AccessibleProperty.LABEL], [`Window fade for ${info.get_name()}`]);
+        const amount = new Gtk.SpinButton({adjustment: new Gtk.Adjustment({lower: 20, upper: 100, step_increment: 5, value: 80}), valign: Gtk.Align.CENTER, tooltip_text: 'Whole-window opacity, in percent'});
+        amount.update_property([Gtk.AccessibleProperty.LABEL], [`Window fade opacity for ${info.get_name()}`]);
+        const fadeBox = new Gtk.Box({spacing: 6, valign: Gtk.Align.CENTER}); fadeBox.append(new Gtk.Label({label: 'Fade', css_classes: ['caption']})); fadeBox.append(fade); fadeBox.append(amount);
+        model.advancedWidgets.push(fadeBox); fadeBox.set_visible(model.mode === 'advanced');
+        let busy = false;
+        const show = () => {
+            busy = true;
+            const r = rules[wm];
+            drop.set_selected(r?.mode === 'exclude' ? 1 : 0); fade.set_active(r?.mode === 'fade'); amount.set_value(r?.opacity ?? 80);
+            amount.set_sensitive(r?.mode === 'fade'); fade.set_sensitive(r?.mode !== 'exclude');
+            busy = false;
+        };
+        show();
+        drop.connect('notify::selected', () => { if (busy) return; save(setRule(rules, wm, drop.get_selected() === 1 ? {mode: 'exclude'} : null)); show(); });
+        fade.connect('notify::active', () => { if (busy) return; save(setRule(rules, wm, fade.get_active() ? {mode: 'fade', opacity: amount.get_value()} : null)); show(); });
+        amount.connect('value-changed', () => { if (busy || !fade.get_active()) return; save(setRule(rules, wm, {mode: 'fade', opacity: amount.get_value()})); });
         const reset = new Gtk.Button({icon_name: 'edit-undo-symbolic', css_classes: ['flat', 'circular'], valign: Gtk.Align.CENTER, tooltip_text: 'Restore this application to the global appearance'});
         reset.update_property([Gtk.AccessibleProperty.LABEL], [`Restore ${info.get_name()} to the global appearance`]);
-        reset.connect('clicked', () => { save(setRule(rules, wm, null)); drop.set_selected(0); });
-        row.add_suffix(drop); row.add_suffix(reset);
+        reset.connect('clicked', () => { save(setRule(rules, wm, null)); show(); });
+        row.add_suffix(fadeBox); row.add_suffix(drop); row.add_suffix(reset);
         list.append(row); rows.push(row);
     }
     const empty = new Gtk.Label({label: 'No application matches.', css_classes: ['dim-label'], margin_top: 12, visible: false});
-    search.connect('search-changed', () => {
-        const q = search.get_text().trim().toLowerCase(); let shown = 0;
-        for (const r of rows) { const v = !q || r._text.includes(q); r.set_visible(v); if (v) shown++; }
+    function applyFilter() {
+        const q = search.get_text().trim().toLowerCase(), f = filter.get_selected(); let shown = 0;
+        for (const r of rows) {
+            const rule = rules[r._wm];
+            const ok = (!q || r._text.includes(q)) && (f === 0 || (f === 1 && !!rule) || (f === 2 && rule?.mode === 'exclude') || (f >= 3 && r._status === FILTER_STATUS[f]));
+            r.set_visible(ok); if (ok) shown++;
+        }
         empty.set_visible(shown === 0);
-    });
+    }
+    search.connect('search-changed', applyFilter); filter.connect('notify::selected', applyFilter);
     const scroll = new Gtk.ScrolledWindow({child: list, min_content_height: 260, max_content_height: 420, hscrollbar_policy: Gtk.PolicyType.NEVER, propagate_natural_height: true});
-    const appsBox = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL}); appsBox.append(search); appsBox.append(scroll); appsBox.append(empty);
+    const appsBox = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL}); appsBox.append(bar); appsBox.append(scroll); appsBox.append(empty);
     apps.add(appsBox);
+    const advancedNote = new Gtk.Label({label: FADE_WARNING, wrap: true, xalign: 0, css_classes: ['caption', 'warning'], margin_top: 6});
+    model.advancedWidgets.push(advancedNote); advancedNote.set_visible(model.mode === 'advanced');
+    appsBox.append(advancedNote);
     root.append(apps);
 
     // ---- the matrix
     const matrix = new Adw.PreferencesGroup({title: 'What is known', description: 'A toolkit alone does not make an application compatible: each line says how it is reached, what it cannot do, and how that is known.'});
     for (const f of FAMILIES) {
-        const row = new Adw.ExpanderRow({title: GLib.markup_escape_text(f.name, -1), subtitle: `${STATUS_LABEL[f.status]} · ${f.evidence}`});
-        for (const [k, v] of [['How', f.how], ['Limit', f.limit]]) { const r = new Adw.ActionRow({title: k, subtitle: GLib.markup_escape_text(v, -1), subtitle_lines: 4}); row.add_row(r); }
+        const row = new Adw.ExpanderRow({title: GLib.markup_escape_text(f.name, -1), subtitle: `${STATUS_LABEL[f.status]} · ${APPLIES_LABEL[f.applies]} · ${f.evidence}`});
+        for (const [k, v] of [['How', f.how], ['Limit', f.limit], ['Can be set', f.customizations.join(', ')]]) { const r = new Adw.ActionRow({title: k, subtitle: GLib.markup_escape_text(v, -1), subtitle_lines: 4}); row.add_row(r); }
         matrix.add(row);
     }
     root.append(matrix);

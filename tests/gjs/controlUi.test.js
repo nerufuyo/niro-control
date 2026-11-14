@@ -174,6 +174,14 @@ if (Gtk.init_check()) {
     audit(window);
     if (unlabeled.length) fail(`icon-only buttons without a tooltip: ${[...new Set(unlabeled)].join(', ')}`);
     if (unfocusable.length) fail(`controls the keyboard cannot reach: ${unfocusable.join(', ')}`);
+    // Compatibility: Window fade (with its warning) exists per application, but only in Advanced mode
+    const fadeBoxes = model.advancedWidgets.filter(w => { let found = false; const walk = x => { if (x instanceof Gtk.Switch && /Window fade lowers the opacity/.test(x.get_tooltip_text() ?? '')) found = true; for (let c = x.get_first_child?.(); c; c = c.get_next_sibling()) walk(c); }; walk(w); return found; });
+    if (!fadeBoxes.length) fail('no Window fade control with its warning was found in Compatibility');
+    model.setMode('simple', false);
+    if (fadeBoxes.some(w => w.get_visible())) fail('Window fade is shown in Simple mode');
+    model.setMode('advanced', false);
+    if (fadeBoxes.some(w => !w.get_visible())) fail('Window fade is missing in Advanced mode');
+    model.setMode('simple', false);
     const ids = d.health.map(h => h.id);
     if (JSON.stringify(ids) !== JSON.stringify(['configuration', 'extensions', 'service', 'profile', 'recovery', 'restart'])) fail(`health rows: ${ids}`);
     if (d.health.some(h => !['healthy', 'attention', 'recovery', 'unavailable'].includes(h.state))) fail('a health row has no valid state');

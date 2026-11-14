@@ -83,27 +83,36 @@ export function windowEffect(appId: string, rules: Rules, o: {universal: boolean
 // ---- Compatibility matrix: what is known about each family, and how it is known
 export type Status = 'native' | 'theme' | 'compositor' | 'limited' | 'unsupported';
 export type Evidence = 'tested' | 'partly tested' | 'documented, not tested here';
+export type Applies = 'live' | 'restart' | 'login';
 export interface Family {
     id: string; name: string; match: RegExp; status: Status; how: string; limit: string; evidence: Evidence;
+    /** When a change reaches the application: while it runs, after it restarts, or after a new login (shell code) */
+    applies: Applies;
+    /** What can be set for it, only what actually takes effect */
+    customizations: string[];
 }
+export const APPLIES_LABEL: Record<Applies, string> = {live: 'Applied live', restart: 'Application restart required', login: 'Requires new login'};
 export const STATUS_LABEL: Record<Status, string> = {native: 'Native integration', theme: 'Theme integration', compositor: 'Compositor effects only', limited: 'Limited support', unsupported: 'Unsupported'};
 
 export const FAMILIES: Family[] = [
     {id: 'niro', name: 'Niro Control', match: /^org\.niro\./i, status: 'native', evidence: 'tested',
-        how: 'Paints its own three layers from the shared Look', limit: 'None known'},
+        how: 'Paints its own three layers from the shared Look', limit: 'None known', applies: 'live', customizations: ['Exclude from effects']},
     {id: 'gtk4', name: 'GNOME apps (GTK 4, libadwaita)', match: /^org\.gnome\.(Nautilus|TextEditor|Settings|Calculator|Characters|Loupe|Papers|Evince|Snapshot|Totem|clocks|Maps|Weather|Contacts|Logs)/i, status: 'theme', evidence: 'partly tested',
-        how: 'The GTK theme integration styles their window, sidebar and content backgrounds; their text colours are left to the app', limit: 'Needs the GTK theme integration installed from Compatibility; apps restart to pick it up; applications with their own opaque backgrounds stay opaque'},
+        how: 'The GTK theme integration styles their window, sidebar and content backgrounds; their text colours are left to the app', limit: 'Needs the GTK theme integration installed from Compatibility; apps restart to pick it up; applications with their own opaque backgrounds stay opaque', applies: 'restart', customizations: ['Exclude from compositor effects', 'Window fade (Advanced)']},
     {id: 'gtk3', name: 'GTK 3 apps', match: /^(org\.gnome\.Terminal|gnome-terminal|org\.gnome\.gedit|org\.gnome\.Software|org\.gnome\.Extensions|gimp|org\.gimp)/i, status: 'limited', evidence: 'documented, not tested here',
-        how: 'The GTK 3 stylesheet of the integration (backgrounds only)', limit: 'GNOME Terminal has its own transparency setting in its profile; GTK 3 themes in ~/.config/gtk-3.0 are applied before ours'},
+        how: 'The GTK 3 stylesheet of the integration (backgrounds only)', limit: 'GNOME Terminal has its own transparency setting in its profile; GTK 3 themes in ~/.config/gtk-3.0 are applied before ours', applies: 'restart', customizations: ['Exclude from compositor effects', 'Window fade (Advanced)']},
     {id: 'chrome', name: 'Chrome / Chromium', match: /(google-chrome|chromium|chrome)/i, status: 'compositor', evidence: 'documented, not tested here',
-        how: 'Blur behind the window and rounded corners by the shell', limit: 'The page and the toolbar are opaque: only a window-level fade is possible, and it fades the text too (off unless you set it)'},
+        how: 'Blur behind the window and rounded corners by the shell', limit: 'The page and the toolbar are opaque: only a window-level fade is possible, and it fades the text too (off unless you set it)', applies: 'live', customizations: ['Exclude from effects', 'Blur off', 'Window fade (Advanced)']},
     {id: 'firefox', name: 'Firefox', match: /firefox/i, status: 'compositor', evidence: 'documented, not tested here',
-        how: 'Blur behind the window and rounded corners by the shell', limit: 'Firefox draws opaque content; styling it needs a user profile stylesheet, which Niro does not write'},
+        how: 'Blur behind the window and rounded corners by the shell', limit: 'Firefox draws opaque content; styling it needs a user profile stylesheet, which Niro does not write', applies: 'live', customizations: ['Exclude from effects', 'Blur off', 'Window fade (Advanced)']},
     {id: 'electron', name: 'Electron (VS Code and others)', match: /(^code$|visual-studio-code|electron|slack|discord|obsidian|spotify)/i, status: 'compositor', evidence: 'documented, not tested here',
-        how: 'Blur behind the window and rounded corners by the shell', limit: 'Opaque content; a window-level fade also fades text and is off unless you set it per application'},
+        how: 'Blur behind the window and rounded corners by the shell', limit: 'Opaque content; a window-level fade also fades text and is off unless you set it per application', applies: 'live', customizations: ['Exclude from effects', 'Blur off', 'Window fade (Advanced)']},
     {id: 'qt', name: 'Qt 5 / Qt 6 apps', match: /^org\.kde\.|^(vlc|qbittorrent|telegram|obs)/i, status: 'unsupported', evidence: 'documented, not tested here',
-        how: 'Would need a Qt platform theme (qt5ct, Kvantum) that is not installed here', limit: 'No Qt integration is installed or written by Niro; blur and rounded corners by the shell only if the window is see-through'},
+        how: 'Would need a Qt platform theme (qt5ct, Kvantum) that is not installed here', limit: 'No Qt integration is installed or written by Niro; blur and rounded corners by the shell only if the window is see-through', applies: 'live', customizations: ['Exclude from effects', 'Window fade (Advanced)']},
 ];
+/** What an application that matches no family gets: honest about not knowing. */
+export const UNKNOWN: Family = {id: 'unknown', name: 'Toolkit not identified', match: /$^/, status: 'limited', evidence: 'documented, not tested here', applies: 'live',
+    how: 'Blur behind the window by the shell, when the window is see-through', limit: 'Its content cannot be restyled from outside: whatever it paints stays as it is', customizations: ['Exclude from effects', 'Blur off', 'Window fade (Advanced)']};
 export function classify(appId: string, execLine = ''): Family | null {
     const hay = `${appId} ${execLine}`;
     return FAMILIES.find(f => f.match.test(appId) || (f.id !== 'gtk4' && f.id !== 'gtk3' && f.id !== 'niro' && f.match.test(hay))) ?? null;

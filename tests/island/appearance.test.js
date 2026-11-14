@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {classify, detectPreset, effective, FAMILIES, FLOORS, parseRules, PRESETS, serializeRules, setRule, windowEffect} from '../../control/build/appearance.js';
+import {APPLIES_LABEL, UNKNOWN, classify, detectPreset, effective, FAMILIES, FLOORS, parseRules, PRESETS, serializeRules, setRule, windowEffect} from '../../control/build/appearance.js';
 
 test('presets are recognised, anything else is custom', () => {
     for (const [name, v] of Object.entries(PRESETS)) assert.equal(detectPreset(v), name);
@@ -59,7 +59,12 @@ test('windowEffect: no fade by default, exclusion wins, safe mode and the global
 });
 
 test('matrix: nothing is called supported on a toolkit alone, every entry says what it cannot do', () => {
-    for (const f of FAMILIES) assert.ok(f.how && f.limit && f.evidence, f.id);
+    for (const f of FAMILIES) assert.ok(f.how && f.limit && f.evidence && f.applies && f.customizations.length, f.id);
+    // nothing is offered that does not take effect: Window fade only where the compositor can do it, and always marked Advanced
+    for (const f of [...FAMILIES, UNKNOWN]) for (const c of f.customizations) assert.ok(!/fade/i.test(c) || /Advanced/.test(c), `${f.id}: ${c}`);
+    assert.equal(classify('org.gnome.Nautilus').applies, 'restart');             // GTK styles load when an app starts
+    assert.equal(UNKNOWN.status, 'limited');
+    assert.equal(APPLIES_LABEL.restart, 'Application restart required');
     assert.equal(classify('org.gnome.Nautilus').status, 'theme');
     assert.equal(classify('google-chrome').status, 'compositor');
     assert.equal(classify('code', '/usr/share/code/code --unity-launch').id, 'electron');
