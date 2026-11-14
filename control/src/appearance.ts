@@ -76,7 +76,7 @@ export function windowEffect(appId: string, rules: Rules, o: {universal: boolean
     const r = rules[appId];
     if (!o.universal || r?.mode === 'exclude') return {blur: false, fade: null, excluded: true};
     const blur = !o.safeMode && o.blurOn && r?.blur !== false;
-    const fade = !o.safeMode && r?.mode === 'fade' && (o.thirdParty || r.opacity !== undefined) ? (r.opacity ?? 80) : null;
+    const fade = !o.safeMode && r?.mode === 'fade' && o.thirdParty ? (r.opacity ?? 80) : null;
     return {blur, fade, excluded: false};
 }
 

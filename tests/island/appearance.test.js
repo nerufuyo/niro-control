@@ -50,7 +50,8 @@ test('windowEffect: no fade by default, exclusion wins, safe mode and the global
     const on = {universal: true, safeMode: false, thirdParty: false, blurOn: true};
     assert.deepEqual(windowEffect('any.app', {}, on), {blur: true, fade: null, excluded: false});
     assert.equal(windowEffect('a', {a: {mode: 'exclude'}}, on).excluded, true);
-    assert.equal(windowEffect('a', {a: {mode: 'fade', opacity: 70}}, on).fade, 70);
+    assert.equal(windowEffect('a', {a: {mode: 'fade', opacity: 70}}, on).fade, null);               // not without the global allowance
+    assert.equal(windowEffect('a', {a: {mode: 'fade', opacity: 70}}, {...on, thirdParty: true}).fade, 70);
     assert.equal(windowEffect('a', {a: {mode: 'inherit', blur: false}}, on).blur, false);
     assert.equal(windowEffect('a', {a: {mode: 'fade', opacity: 70}}, {...on, safeMode: true}).fade, null);
     assert.equal(windowEffect('a', {}, {...on, universal: false}).excluded, true);

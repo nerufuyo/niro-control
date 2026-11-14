@@ -39,6 +39,12 @@ export const ApplicationsBlur = class ApplicationsBlur {
         this.enabled = true;
 
         this.mutter_gsettings = new Gio.Settings({ schema: 'org.gnome.mutter' });
+        // Niro's shared appearance (absent when the extension is used on its own: then the old behaviour stays)
+        this.niro = null;
+        if (Gio.SettingsSchemaSource.get_default()?.lookup('org.niro.control', true)) {
+            this.niro = new Gio.Settings({ schema_id: 'org.niro.control' });
+            this.niro_changed = this.niro.connect('changed', () => this.set_opacity());
+        }
         connect_system_style_changes(this.connections, () => {
             if (this.settings.applications.PIPELINE_AUTO_MODE)
                 this.change_pipeline();
@@ -431,19 +437,35 @@ export const ApplicationsBlur = class ApplicationsBlur {
             && !is_fullscreen
             && (this.settings.applications.BLUR_ON_OVERVIEW || !this.overview_visible);
 
-        if (show_blur)
+        const effect = this.window_effect(meta_window);
+        if (show_blur && effect.blur)
             blur_actor.show();
         else
             blur_actor.hide();
+        this.window_opacity.set(window_actor, show_blur && effect.fade !== null ? effect.fade : 255, blur_actor);
+    }
 
-        // The control panel paints its own glass (its background follows Look > Opacity), so fading the whole window here would
-        // fade its text and controls too: it gets the blur behind it and keeps full opacity.
-        const paints_own_glass = meta_window.get_wm_class() === 'org.niro.Control';
-        this.window_opacity.set(
-            window_actor,
-            show_blur && !paints_own_glass ? this.settings.applications.OPACITY : 255,
-            blur_actor
-        );
+    /// What the compositor does to a window (mirrors windowEffect() in control/src/appearance.ts, which is tested):
+    /// blur behind it, and a whole-window fade only when its rule asks for one. A fade also fades the text, so it is never the default.
+    window_effect(meta_window) {
+        const n = this.niro;
+        if (!n)
+            return { blur: true, fade: this.settings.applications.OPACITY, excluded: false };
+        if (!n.get_boolean('universal-enabled'))
+            return { blur: false, fade: null, excluded: true };
+        let rules = {};
+        try { rules = JSON.parse(n.get_string('app-rules') || '{}') ?? {}; } catch (_e) { rules = {}; }
+        const id = meta_window.get_wm_class() || '';
+        const rule = Object.prototype.hasOwnProperty.call(rules, id) ? rules[id] : null;
+        if (rule?.mode === 'exclude')
+            return { blur: false, fade: null, excluded: true };
+        const safe = n.get_boolean('safe-mode');
+        const blur = !safe && n.get_boolean('blur') && !n.get_boolean('performance-mode') && rule?.blur !== false;
+        // the control panel paints its own glass: it gets the blur and keeps full opacity
+        const own = id === 'org.niro.Control';
+        const fade = !safe && !own && rule?.mode === 'fade' && n.get_boolean('affect-thirdparty')
+            ? Math.round(Math.min(100, Math.max(20, Number(rule.opacity) || 80)) * 2.55) : null;
+        return { blur, fade, excluded: false };
     }
 
     /// Update all corners, to use when the setting has been changed.
@@ -528,6 +550,7 @@ export const ApplicationsBlur = class ApplicationsBlur {
         this.enabled = false;
 
         delete this.mutter_gsettings;
+        if (this.niro) { this.niro.disconnect(this.niro_changed); this.niro = null; }
 
         [...this.meta_windows].forEach(meta_window =>
             this.untrack_meta_window(meta_window)

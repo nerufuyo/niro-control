@@ -64,8 +64,14 @@ export class NiroSync {
     }
 
     _apply() {
-        const opacity = this._shared.get_int('opacity');
-        const blur = this._shared.get_boolean('blur');
+        // Universal Appearance: switched off (or off for the shell), the island, dock and search keep the values they have;
+        // safe mode and performance mode make the glass solid and drop the blur (mirrors effective() in control/src/appearance.ts)
+        const flag = (key, fallback) => { try { return this._shared.get_boolean(key); } catch (_e) { return fallback; } };
+        if (!flag('universal-enabled', true) || !flag('affect-shell', true))
+            return;
+        const safe = flag('safe-mode', false);
+        const opacity = safe ? 100 : this._shared.get_int('opacity');
+        const blur = this._shared.get_boolean('blur') && !safe && !flag('performance-mode', false);
         const strength = this._shared.get_int('blur-strength');
         this._island.set_int('glass-tint', opacity);
         const accent = this._shared.get_string('accent');
@@ -90,7 +96,8 @@ export class NiroSync {
             }
         }
         if (this._apps) {
-            this._apps.set_int('opacity', Math.round(opacity * 2.55));
+            // no whole-window fade from the shared look (it fades text too): the blur extension reads Niro's per-application rules instead
+            this._apps.set_int('opacity', 255);
             this._apps.set_boolean('blur', blur);
         }
     }
