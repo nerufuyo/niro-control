@@ -148,3 +148,23 @@ test('JSON that does not parse says where', () => {
     assert.match(describeParseError(message, text), /line \d+, column \d+/);
     assert.equal(describeParseError('boom', 'x'), 'boom');
 });
+
+test('dependency rules: the ones the code did not support are gone, unverified ones only hint', async () => {
+    const {dependencyBlocks} = await import('../../control/build/logic.js');
+    const byId = Object.fromEntries(CATALOG.map(i => [i.id, i]));
+    // system-alerts is a pre-0.7 switch the island resets to on; each alert has its own switch; the blur strength applies with blur off
+    for (const id of ['island.alert-power', 'island.alert-network', 'island.alert-bluetooth', 'island.alert-caps-lock', 'island.alert-bluetooth-battery', 'niro.blur-strength'])
+        assert.equal(byId[id].depends, undefined, `${id} must not depend on anything`);
+    assert.ok(!CATALOG.some(i => i.depends?.id === 'island.system-alerts'));
+    // an unverified rule is shown as a hint: it never disables a row and never produces a "no effect" note
+    const unverified = CATALOG.filter(i => i.depends?.unverified);
+    assert.deepEqual(unverified.map(i => i.id).sort(), ['dock.show-threshold', 'island.auto-hide-delay', 'island.call-preview']);
+    for (const item of unverified) {
+        assert.equal(dependencyBlocks(item, () => (item.depends.op === 'off' ? true : false)), false, item.id);
+        const change = {id: item.id, title: item.title, menu: item.menu, group: '', from: 1, to: 2};
+        assert.equal(inactiveNotes([change], {[item.depends.id]: false}, CATALOG).length, 0, item.id);
+    }
+    // a verified rule still blocks
+    assert.equal(dependencyBlocks(byId['island.hover-delay'], () => 'click'), true);
+    assert.equal(dependencyBlocks(byId['island.hover-delay'], () => 'hover'), false);
+});

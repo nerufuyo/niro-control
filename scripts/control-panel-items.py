@@ -39,18 +39,21 @@ MANAGED = {('island', 'glass-tint'): 'niro.opacity', ('dock', 'dock-opacity'): '
            ('dock', 'dock-blur-enabled'): 'niro.blur', ('dock', 'dock-background-color'): 'niro.tint',
            ('dock', 'custom-css'): 'niro.accent'}
 # What switches a setting on or off: (setting, op, value). Only the control's sensitivity follows it.
+# Each rule was checked against the extension's code (2026-11): a rule stays only where the code ties the two settings together.
+# Dropped as unsupported: alert-* on system-alerts (system-alerts is a pre-0.7 switch the island resets to on at start-up, each alert has its
+# own switch); alert-bluetooth-battery on alert-bluetooth (bluetooth_low answers to its own switch); niro.blur-strength on niro.blur
+# (the strength is applied to the blur whether or not blur is on).
 DEPENDS = {
     'island.hover-delay': ('island.open-on', 'eq', 'hover'), 'island.auto-hide-delay': ('island.auto-hide', 'ne', 'off'),
     'island.event-alert-minutes': ('island.event-alerts', 'on', None),
-    'island.alert-power': ('island.system-alerts', 'on', None), 'island.alert-network': ('island.system-alerts', 'on', None),
-    'island.alert-bluetooth': ('island.system-alerts', 'on', None), 'island.alert-caps-lock': ('island.system-alerts', 'on', None),
-    'island.alert-bluetooth-battery': ('island.alert-bluetooth', 'on', None), 'island.call-preview': ('island.call-activity', 'on', None),
+    'island.call-preview': ('island.call-activity', 'on', None),
     'dock.preview-scale': ('dock.window-previews', 'on', None), 'dock.magnification-scale': ('dock.magnification-enabled', 'on', None),
     'dock.magnification-falloff': ('dock.magnification-enabled', 'on', None), 'dock.running-indicator-style': ('dock.running-indicators', 'on', None),
     'dock.show-applications-button-position': ('dock.show-applications-button', 'on', None), 'dock.show-threshold': ('dock.auto-hide', 'on', None),
     'blur.whitelist': ('blur.enable-all', 'off', None), 'blur.blacklist': ('blur.enable-all', 'on', None),
-    'niro.blur-strength': ('niro.blur', 'on', None),
 }
+# Rules whose link is only reasoned from the wiring, not seen in code: the panel shows them as a hint and never disables the row.
+UNVERIFIED = {'dock.show-threshold', 'island.call-preview', 'island.auto-hide-delay'}
 for k in ('usage-claude', 'usage-codex', 'usage-grok', 'usage-warn', 'usage-critical'):
     DEPENDS[f'island.{k}'] = ('island.usage-enabled', 'on', None)
 
@@ -125,7 +128,7 @@ def build(source, menu, name, group, k):
     if (source, name) in MANAGED:
         it['managed'] = MANAGED[(source, name)]
     if it['id'] in DEPENDS:
-        s, op, v = DEPENDS[it['id']]; it['depends'] = dict(id=s, op=op, **({'value': v} if v else {}))
+        s, op, v = DEPENDS[it['id']]; it['depends'] = dict(id=s, op=op, **({'value': v} if v else {}), **({'unverified': True} if it['id'] in UNVERIFIED else {}))
     return it
 
 items = []

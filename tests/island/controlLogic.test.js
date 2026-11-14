@@ -4,7 +4,7 @@ import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 
 import {CATALOG} from '../../control/build/catalog.js';
-import {canonicalAccel, decodeEntities, dependencyMet, findConflict, hasModifier, normalizeAccel, searchItems} from '../../control/build/logic.js';
+import {canonicalAccel, decodeEntities, dependencyBlocks, dependencyMet, findConflict, hasModifier, normalizeAccel, searchItems} from '../../control/build/logic.js';
 
 const csv = readFileSync(new URL('../../docs/control-panel-items.csv', import.meta.url), 'utf8').trim().split('\n').slice(1);
 

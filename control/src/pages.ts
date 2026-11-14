@@ -11,7 +11,7 @@ import {
     settingsSwitch, settingsText, shortcutRecorder, resetControl,
 } from './components.js';
 import type {Context} from './components.js';
-import {dependencyMet} from './logic.js';
+import {dependencyBlocks, dependencyMet} from './logic.js';
 import {dockPreview, lookPreview, windowsPreview} from './previews.js';
 import {ProfileEngine} from './profiles.js';
 import {bindingFor, Stores} from './store.js';
@@ -139,11 +139,11 @@ export class Model {
 
     applyDependency(item: Item, row) {
         const met = dependencyMet(item, this.read);
-        row.set_sensitive(met);
+        row.set_sensitive(!dependencyBlocks(item, this.read));
         const dep = item.depends && this.item(item.depends.id);
         if (dep) {
             const need = {on: 'is on', off: 'is off', eq: `is "${item.depends.value}"`, ne: `isn't "${item.depends.value}"`}[item.depends.op];
-            row.set_tooltip_text(met ? (item.detail !== item.help ? item.detail : null) : `Available when "${dep.title}" ${need}`);
+            row.set_tooltip_text(met ? (item.detail !== item.help ? item.detail : null) : `${item.depends.unverified ? 'Probably only has an effect' : 'Available'} when "${dep.title}" ${need}${item.depends.unverified ? ' (not verified)' : ''}`);
         }
     }
 

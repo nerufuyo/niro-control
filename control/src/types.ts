@@ -26,5 +26,5 @@ export interface Item {
     keys?: string[];         // dict: the settings that hold them
     advanced?: boolean;
     managed?: string;        // written by Look: the id of the Look item that owns it
-    depends?: {id: string; op: 'on' | 'off' | 'eq' | 'ne'; value?: string};
+    depends?: {id: string; op: 'on' | 'off' | 'eq' | 'ne'; value?: string; unverified?: boolean};
 }

@@ -47,6 +47,11 @@ export function dependencyMet(item: Item, valueOf: (id: string) => unknown): boo
     }
 }
 
+/** Whether the row of `item` should be disabled: its dependency fails and was verified. An unverified rule only hints, it never blocks. */
+export function dependencyBlocks(item: Item, valueOf: (id: string) => unknown): boolean {
+    return !!item.depends && !item.depends.unverified && !dependencyMet(item, valueOf);
+}
+
 // ---- Shortcuts
 
 const MODIFIERS = ['Primary', 'Control', 'Alt', 'Shift', 'Super', 'Meta', 'Hyper'];

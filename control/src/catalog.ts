@@ -50,11 +50,7 @@ export const CATALOG: Item[] = [
   "digits": 0,
   "step": 1,
   "min": 0.0,
-  "max": 100.0,
-  "depends": {
-   "id": "niro.blur",
-   "op": "on"
-  }
+  "max": 100.0
  },
  {
   "id": "niro.accent",
@@ -430,7 +426,8 @@ export const CATALOG: Item[] = [
   "depends": {
    "id": "island.auto-hide",
    "op": "ne",
-   "value": "off"
+   "value": "off",
+   "unverified": true
   }
  },
  {
@@ -548,11 +545,7 @@ export const CATALOG: Item[] = [
   "type": "b",
   "default": "true",
   "unit": "",
-  "kind": "switch",
-  "depends": {
-   "id": "island.system-alerts",
-   "op": "on"
-  }
+  "kind": "switch"
  },
  {
   "id": "island.alert-network",
@@ -566,11 +559,7 @@ export const CATALOG: Item[] = [
   "type": "b",
   "default": "true",
   "unit": "",
-  "kind": "switch",
-  "depends": {
-   "id": "island.system-alerts",
-   "op": "on"
-  }
+  "kind": "switch"
  },
  {
   "id": "island.alert-bluetooth",
@@ -584,11 +573,7 @@ export const CATALOG: Item[] = [
   "type": "b",
   "default": "true",
   "unit": "",
-  "kind": "switch",
-  "depends": {
-   "id": "island.system-alerts",
-   "op": "on"
-  }
+  "kind": "switch"
  },
  {
   "id": "island.alert-bluetooth-battery",
@@ -602,11 +587,7 @@ export const CATALOG: Item[] = [
   "type": "b",
   "default": "false",
   "unit": "",
-  "kind": "switch",
-  "depends": {
-   "id": "island.alert-bluetooth",
-   "op": "on"
-  }
+  "kind": "switch"
  },
  {
   "id": "island.alert-caps-lock",
@@ -620,11 +601,7 @@ export const CATALOG: Item[] = [
   "type": "b",
   "default": "true",
   "unit": "",
-  "kind": "switch",
-  "depends": {
-   "id": "island.system-alerts",
-   "op": "on"
-  }
+  "kind": "switch"
  },
  {
   "id": "island.event-alerts",
@@ -849,7 +826,8 @@ export const CATALOG: Item[] = [
   "kind": "switch",
   "depends": {
    "id": "island.call-activity",
-   "op": "on"
+   "op": "on",
+   "unverified": true
   }
  },
  {
@@ -1663,7 +1641,8 @@ export const CATALOG: Item[] = [
   "advanced": true,
   "depends": {
    "id": "dock.auto-hide",
-   "op": "on"
+   "op": "on",
+   "unverified": true
   }
  },
  {

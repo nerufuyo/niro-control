@@ -198,7 +198,7 @@ export function inactiveNotes(changes: Change[], after: Settings, catalog: Item[
     const notes: Note[] = [];
     for (const c of changes) {
         const item = byId.get(c.id);
-        if (!item?.depends || dependencyMet(item, id => after[id])) continue;
+        if (!item?.depends || item.depends.unverified || dependencyMet(item, id => after[id])) continue;
         const target = byId.get(item.depends.id);
         const need = {on: 'is on', off: 'is off', eq: `is "${item.depends.value}"`, ne: `is not "${item.depends.value}"`}[item.depends.op];
         notes.push({id: c.id, title: item.title, text: `${item.title} has no effect until "${target?.title ?? item.depends.id}" ${need}`});
