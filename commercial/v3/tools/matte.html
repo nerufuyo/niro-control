@@ -1,0 +1,16 @@
+<!doctype html><meta charset=utf-8><script>
+// Recovers an element's true RGBA from two captures of it, one over a pure black desktop and one over a pure white desktop:
+// black capture = a*F, white capture = a*F + (1-a)*255  =>  a = 1 - (white-black)/255, F = black/a.  Returns the cropped PNG and its box.
+const load = u => new Promise((r, e) => { const i = new Image(); i.onload = () => r(i); i.onerror = e; i.src = u; });
+window.matte = async (kUrl, wUrl, [x0, y0, x1, y1], cut = false) => {
+  const [k, w] = await Promise.all([load(kUrl), load(wUrl)]), W = x1 - x0, H = y1 - y0;
+  const rd = im => { const c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d', {willReadFrequently: true}); g.drawImage(im, x0, y0, W, H, 0, 0, W, H); return g.getImageData(0, 0, W, H).data; };
+  const K = rd(k), Wh = rd(w), out = new Uint8ClampedArray(W * H * 4); let bx0 = W, by0 = H, bx1 = 0, by1 = 0;
+  for (let i = 0; i < W * H; i++) { const j = i * 4, d = ((Wh[j] - K[j]) + (Wh[j + 1] - K[j + 1]) + (Wh[j + 2] - K[j + 2])) / 3, a0 = Math.min(1, Math.max(0, 1 - d / 255)), a = (cut || (y0 + ((i / W) | 0)) < 150) ? a0 * Math.min(1, Math.max(0, (a0 - 0.4) / 0.25)) : a0;
+    if (a > 0.02) { const x = i % W, y = (i / W) | 0; if (x < bx0) bx0 = x; if (x > bx1) bx1 = x; if (y < by0) by0 = y; if (y > by1) by1 = y; out[j] = Math.min(255, K[j] / a); out[j + 1] = Math.min(255, K[j + 1] / a); out[j + 2] = Math.min(255, K[j + 2] / a); out[j + 3] = Math.round(a * 255); } }
+  if (bx1 <= bx0) return null;
+  const c = document.createElement('canvas'); c.width = W; c.height = H; c.getContext('2d').putImageData(new ImageData(out, W, H), 0, 0);
+  const c2 = document.createElement('canvas'); c2.width = bx1 - bx0 + 1; c2.height = by1 - by0 + 1; c2.getContext('2d').drawImage(c, bx0, by0, c2.width, c2.height, 0, 0, c2.width, c2.height);
+  return {png: c2.toDataURL('image/png'), box: [x0 + bx0, y0 + by0, c2.width, c2.height]}; };
+window.__ready = true;
+</script>

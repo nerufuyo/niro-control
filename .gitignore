@@ -1,5 +1,9 @@
+apps/music/dist/
+apps/music/node_modules/
+commercial/assets/bg/
 commercial/assets/shots/
 commercial/assets/shots2/
+commercial/assets/shots3/
 commercial/audio/*.wav
 commercial/deliverables/
 commercial/out/
@@ -9,6 +13,13 @@ commercial/v2/audio/*.wav
 commercial/v2/deliverables/
 commercial/v2/node_modules/
 commercial/v2/out/
+commercial/v3/audio/analysis-full.json
+commercial/v3/audio/sync.json
+commercial/v3/audio/*.wav
+commercial/v3/deliverables/
+commercial/v3/node_modules
+commercial/v3/out/
+commercial/v3/tex/*.png
 control/build/
 node_modules/
 out/

@@ -8,7 +8,7 @@ D = ['gdbus','call','--session','--dest','org.gnome.Mutter.DisplayConfig','--obj
 out = subprocess.run(D + ['--method','org.gnome.Mutter.DisplayConfig.GetCurrentState'], capture_output=True, text=True).stdout
 serial = re.match(r'\(uint32 (\d+),', out).group(1)
 conn = re.search(r"\(\('([^']+)'", out).group(1)
-mode = re.search(r"\('(3840x2160@[0-9.]+)'", out).group(1)
+mode = re.search(r"\('(" + __import__('os').environ.get('MONITOR','3840x2160') + r"@[0-9.]+)'", out).group(1)
 r = subprocess.run(D + ['--method','org.gnome.Mutter.DisplayConfig.ApplyMonitorsConfig', serial, '1', f"[(0, 0, {__import__('os').environ.get('SCALE','2')}.0, uint32 0, true, [('{conn}', '{mode}', {{}})])]", '{}'], capture_output=True, text=True)
 print('scale 2:', (r.stdout.strip() or r.stderr.strip())[:120])
 P
@@ -23,7 +23,7 @@ ev "(function(){ const C = imports.gi.Clutter, G = imports.gi.GLib; global.__ptr
 # real GTK 4 apps with NIRO's GTK integration, installed into this session's private config only
 cat > "$WORK/install.js" <<J
 import {install} from 'file://$ROOT/control/build/gtkAdapter.js';
-install({configDir: '$WORK/config', backupRoot: '$WORK/backups', consent: true, scheme: 'dark', glass: 70, tint: '#0A1030', surfaces: {sidebar: 70, content: 85, elevated: 92}});
+install({configDir: '$WORK/config', backupRoot: '$WORK/backups', consent: true, scheme: 'dark', glass: ${GLASS:-70}, tint: '${TINT:-#0A1030}', surfaces: {sidebar: ${SURF_S:-70}, content: ${SURF_C:-85}, elevated: ${SURF_E:-92}}});
 J
 gjs -m "$WORK/install.js" > /dev/null 2>&1
 appenv() { env WAYLAND_DISPLAY=niro-film GDK_BACKEND=wayland ADW_DEBUG_COLOR_SCHEME=prefer-dark "$@"; }

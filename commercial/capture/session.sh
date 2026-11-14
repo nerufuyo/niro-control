@@ -15,7 +15,7 @@ REAL_HOME=${REAL_HOME:-$(getent passwd "$(id -un)" | cut -d: -f6)}; export REAL_
 timeout 1500 dbus-run-session -- bash -c '
 source "$HERE/seed.sh" > "$WORK/seed.log" 2>&1
 [ -s "$XDG_CONFIG_HOME/glib-2.0/settings/keyfile" ] && [ "$HOME" != "$REAL_HOME" ] || { echo "REFUSING TO RUN: settings are not isolated"; exit 1; }
-gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-film --virtual-monitor 3840x2160 > "$WORK/shell.log" 2>&1 & SP=$!
+gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-film --virtual-monitor ${MONITOR:-3840x2160} > "$WORK/shell.log" 2>&1 & SP=$!
 sleep 22
 ev() { gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "$1" 2>&1 | grep -oP "\x27\K.*(?=\x27)" ; }
 shot() { gdbus call --session --dest org.gnome.Shell.Screenshot --object-path /org/gnome/Shell/Screenshot --method org.gnome.Shell.Screenshot.Screenshot false false "$OUT/$1.png" > /dev/null 2>&1; }
