@@ -12,6 +12,7 @@ test:
 	cargo test -p island-core -p island-daemon
 
 test-shell:           # needs the installed package and a built daemon; starts its own headless GNOME Shell
+	tests/shell/gtk3Probe.sh
 	tests/shell/niroSync.sh
 	tests/shell/appearance.sh
 	tests/shell/headless.sh
