@@ -22,3 +22,9 @@
 .niro-search-icon { margin-right: 12px; }
 .niro-search-name { color: #f2f2f7; font-size: 14px; font-weight: 600; }
 .niro-search-description { color: #8e8e93; font-size: 11px; }
+.niro-search-scroll { padding-top: 4px; }
+.niro-search-section { color: #8e8e93; font-size: 11px; font-weight: 700; padding: 8px 10px 2px 10px; }
+.niro-search-status { color: #8e8e93; font-size: 13px; padding: 14px 12px; }
+.niro-search-icon-symbolic { color: #c7c7cc; }
+.niro-confirm-title { font-size: 16px; font-weight: 700; padding-bottom: 6px; }
+.niro-confirm-body { font-size: 13px; }

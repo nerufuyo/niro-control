@@ -25,7 +25,7 @@ cp -r shell/dock/schemas "$EXT"/; rm -f "$EXT"/schemas/gschemas.compiled; glib-c
 
 # --- Search
 EXT="$EXTDIR/search@niro.local"
-install -D -m 644 shell/search/build/extension.js "$EXT/extension.js"
+for f in shell/search/build/*.js; do install -D -m 644 "$f" "$EXT/$(basename "$f")"; done
 install -D -m 644 shell/search/metadata.json "$EXT/metadata.json"
 install -D -m 644 shell/search/stylesheet.css "$EXT/stylesheet.css"
 
