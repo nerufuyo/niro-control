@@ -90,3 +90,29 @@ print('appearance: gtk adapter ok');
     restore(cfg4);
     print('appearance: refresh ok');
 }
+
+// recovery without the panel: the command line
+{
+    const {appearanceCli} = await import('../../control/build/appearanceCli.js');
+    const {Stores} = await import('../../control/build/store.js');
+    const niro = new Stores().by.niro;
+    const cfgCli = `${tmp}/cli`; for (const d of ['gtk-4.0', 'gtk-3.0']) GLib.mkdir_with_parents(`${cfgCli}/${d}`, 0o755);
+    const original = '@define-color accent_bg_color #E8472B;';
+    GLib.file_set_contents(`${cfgCli}/gtk-4.0/gtk.css`, original);
+    GLib.setenv('NIRO_GTK_CONFIG_DIR', cfgCli, true); GLib.setenv('NIRO_CONFIG_DIR', `${tmp}/niro-config`, true);
+    install({...o, configDir: cfgCli, backupRoot: `${tmp}/niro-config/appearance-backups`});
+    eq(appearanceCli(['--appearance-safe-mode', 'on']), 0, 'safe mode on exit');
+    eq(niro.get_boolean('safe-mode'), true, 'safe mode set');
+    eq(appearanceCli(['--appearance-safe-mode', 'maybe']), 2, 'bad value refused');
+    eq(appearanceCli(['--appearance-global', 'off']), 0, 'global off exit');
+    eq(niro.get_boolean('universal-enabled'), false, 'global switch off');
+    eq(appearanceCli(['--appearance-global', 'on']), 0, 'global on exit');
+    niro.set_boolean('shell-surfaces', true); niro.set_boolean('legacy-global-fade', true); niro.set_boolean('safe-mode', false);
+    eq(appearanceCli(['--appearance-status']), 0, 'status exit');
+    eq(appearanceCli(['--appearance-recover']), 0, 'recover exit');
+    eq([niro.get_boolean('safe-mode'), niro.get_boolean('shell-surfaces'), niro.get_boolean('legacy-global-fade')], [true, false, false], 'recover sets everything plain');
+    eq(read(`${cfgCli}/gtk-4.0/gtk.css`), original, 'recover restores gtk.css byte for byte');
+    eq(appearanceCli(['--appearance-restore-gtk']), 0, 'restore when not installed is harmless');
+    eq(appearanceCli(['--list-profiles']), null, 'other arguments are not ours');
+    print('appearance: recovery cli ok');
+}

@@ -3,12 +3,16 @@
 //   niro-control --list-profiles           one JSON object per line: id, name, description, builtin, active
 //   niro-control --apply-profile <id>      applies it; prints what changed; exit 1 on failure (nothing is left half-applied)
 //   niro-control --restore-backup latest   puts back the newest backup (made before every apply): the undo
+//   niro-control --appearance-*            recovery and switches for Universal Appearance (see appearanceCli.ts)
 //   niro-control --current-profile         the active profile's id, and "modified" when settings were changed by hand
+import {appearanceCli} from './appearanceCli.js';
 import {ProfileEngine} from './profiles.js';
 import {Stores} from './store.js';
 
 /** Returns the exit code, or null when the arguments are not for the command line. */
 export function runCli(args: string[]): number | null {
+    const appearance = appearanceCli(args);
+    if (appearance !== null) return appearance;
     const flag = args.find(a => /^--(list-profiles|apply-profile|current-profile|restore-backup)$/.test(a));
     if (!flag) return null;
     const engine = new ProfileEngine(new Stores());

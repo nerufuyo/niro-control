@@ -15,8 +15,9 @@ const FILTERS = ['All applications', 'With a rule', 'Excluded', 'Theme integrati
 const FILTER_STATUS = {3: 'theme', 4: 'compositor', 5: 'limited', 6: 'unsupported', 7: 'unverified'};
 const FADE_WARNING = 'Window fade lowers the opacity of the whole window, so its text, icons and controls fade with the background. It also needs "Window-level effects for other applications" on.';
 
-export const configDir = () => GLib.get_user_config_dir();
-export const backupRoot = () => `${GLib.getenv('NIRO_CONFIG_DIR') ?? `${GLib.get_user_config_dir()}/niro-control`}/appearance-backups`;
+import {gtkBackupRoot, gtkConfigDir} from './appearanceCli.js';
+export const configDir = gtkConfigDir;
+export const backupRoot = gtkBackupRoot;
 
 /** The options the GTK adapter needs, from the shared Look. */
 export function adapterOptions(model, dark: boolean) {
