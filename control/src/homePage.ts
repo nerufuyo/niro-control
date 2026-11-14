@@ -45,6 +45,8 @@ export function homeData(model, staleParts: string[]) {
     for (const [name, uuid] of PARTS) if (!installed(uuid)) notices.push({kind: 'missing', text: `${name} is not installed.`});
     const daemon = busNameOwned('org.niro.island.Daemon');
     if (installed('island@niro.local') && !daemon) notices.push({kind: 'daemon', text: "The island's background service is not running: music, calls and the assistant need it."});
+    const broken = engine.interrupted();
+    if (broken) notices.push({kind: 'interrupted', text: `"${broken.label}" did not finish. Restore the backup made before it.`});
     if (!engine.backups().length) notices.push({kind: 'info', text: 'No backup yet. One is made before every profile is applied.'});
     return {
         profile: {name: active?.name ?? null, modified: changes.length, id: activeId, missing: Boolean(activeId && !active)},
@@ -109,6 +111,11 @@ export function homePage(model, ctx, profilesApi, staleParts: string[]) {
             const g = new Adw.PreferencesGroup({title: 'Needs attention'});
             for (const n of d.notices.filter(x => x.kind !== 'info')) {
                 const r = new Adw.ActionRow({title: GLib.markup_escape_text(n.text, -1), icon_name: n.kind === 'logout' ? 'system-log-out-symbolic' : 'dialog-warning-symbolic'});
+                if (n.kind === 'interrupted') {
+                    const b = new Gtk.Button({label: 'Restore backup', valign: Gtk.Align.CENTER, css_classes: ['suggested-action']});
+                    b.connect('clicked', () => profilesApi.recover());
+                    r.add_suffix(b);
+                }
                 if (n.kind === 'logout') {
                     const b = new Gtk.Button({label: 'Log out', valign: Gtk.Align.CENTER});
                     b.connect('clicked', () => ctx.logout());

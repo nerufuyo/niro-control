@@ -7,7 +7,7 @@ import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
 import {CATALOG} from './catalog.js';
-import {describeValue, diff} from './profileLogic.js';
+import {describeValue, diff, inactiveNotes, stalePartsAffected} from './profileLogic.js';
 import type {Change} from './profileLogic.js';
 import type {ProfileEngine} from './profiles.js';
 
@@ -44,10 +44,19 @@ export function profilesPage(engine: ProfileEngine, ctx) {
     };
 
     /** Shows what would change; `go` runs when the person agrees. */
-    const confirm = (title: string, changes: Change[], verb: string, go: () => void) => {
+    const confirm = (title: string, changes: Change[], verb: string, go: () => void, notes: string[] = []) => {
         const empty = !changes.length;
         const d = Adw.AlertDialog.new(title, empty ? 'Nothing to change: the settings already match.' : `${plural(changes.length, 'setting')} will change. Nothing else is touched.`);
-        if (!empty) d.set_extra_child(changeList(changes));
+        if (!empty) {
+            if (notes.length) {
+                const box = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 8});
+                box.append(changeList(changes));
+                box.append(new Gtk.Label({label: notes.join('\n'), wrap: true, xalign: 0, css_classes: ['caption', 'warning']}));
+                d.set_extra_child(box);
+            } else {
+                d.set_extra_child(changeList(changes));
+            }
+        }
         d.add_response('cancel', 'Cancel');
         if (!empty) { d.add_response('go', verb); d.set_response_appearance('go', Adw.ResponseAppearance.SUGGESTED); d.set_default_response('go'); }
         d.connect('response', (_d, response) => response === 'go' && go());
@@ -58,6 +67,9 @@ export function profilesPage(engine: ProfileEngine, ctx) {
         if (result.ok) {
             const t = result.changed.length ? `Applied "${name}": ${plural(result.changed.length, 'setting')} changed` : `"${name}" already matches`;
             ctx.toast(t, result.changed.length ? () => undoLast() : undefined, 'Undo');
+            const pending = stalePartsAffected(result.changed, ctx.stale ?? [], CATALOG);
+            const lines = [...(result.notes ?? []).map(n => n.text), ...(pending.length ? [`${pending.join(', ')} ${pending.length === 1 ? 'has' : 'have'} an update that loads at your next login: until then these settings are read by the older version.`] : [])];
+            if (lines.length) failure('Applied, with notes', lines.join('\n\n'));
         } else {
             failure(`Couldn't apply "${name}"`,
                 `"${result.failed.title}" could not be written: ${result.failed.error}.\n` +
@@ -74,7 +86,9 @@ export function profilesPage(engine: ProfileEngine, ctx) {
 
     const apply = (profile) => {
         const target = engine.settingsOf(profile);
-        confirm(`Apply "${profile.name}"?`, engine.preview(target), 'Apply', () => attempt('Apply failed', () => report(profile.name, engine.apply(profile.id))));
+        const changes = engine.preview(target);
+        const notes = inactiveNotes(changes, {...engine.capture(), ...target}, engine.items).map(n => `Note: ${n.text}.`);
+        confirm(`Apply "${profile.name}"?`, changes, 'Apply', () => attempt('Apply failed', () => report(profile.name, engine.apply(profile.id))), notes);
     };
 
     const ask = (title: string, body: string, initial: string, verb: string, go: (text: string, menus: string[]) => void, scopes = false) => {
@@ -137,7 +151,8 @@ export function profilesPage(engine: ProfileEngine, ctx) {
     importBtn.connect('clicked', () => fileDialog('Import a profile', false, '', path => attempt('Not imported', () => {
         const {profile, warnings} = engine.importFrom(path);
         refresh();
-        ctx.toast(`Imported "${profile.name}"${warnings.length ? ` (${plural(warnings.length, 'note')}: ${warnings[0]})` : ''}`);
+        ctx.toast(`Imported "${profile.name}"${warnings.length ? ` with ${plural(warnings.length, 'note')}` : ''}`);
+        if (warnings.length) failure(`Imported "${profile.name}", with notes`, warnings.map(w => `• ${w}`).join('\n'));
     })));
     const backupBtn = new Gtk.Button({label: 'Back up now'});
     backupBtn.connect('clicked', () => attempt('Backup failed', () => { const b = engine.backup('Manual backup'); refresh(); ctx.toast(`Backed up ${plural(b.count, 'setting')}`); }));
@@ -206,6 +221,18 @@ export function profilesPage(engine: ProfileEngine, ctx) {
         status.set_description(!active ? 'Apply a profile to make it active.' : mods.length ? `${plural(mods.length, 'setting')} changed by hand since it was applied.` : 'The settings match this profile.');
         if (status._extra) status.remove(status._extra);
         status._extra = null;
+        if (status._broken) status.remove(status._broken);
+        status._broken = null;
+        const broken = engine.interrupted();
+        if (broken) {
+            const r = new Adw.ActionRow({title: 'A change did not finish', subtitle: GLib.markup_escape_text(`"${broken.label}" was interrupted. ${broken.backup ? 'Restore the backup made before it to be sure of what is set.' : ''}`, -1), icon_name: 'dialog-warning-symbolic'});
+            const undo = new Gtk.Button({label: 'Restore backup', valign: Gtk.Align.CENTER, css_classes: ['suggested-action']});
+            undo.connect('clicked', () => attempt('Recovery failed', () => { report('the backup', engine.recover()); }));
+            const keep = new Gtk.Button({label: 'Keep as is', valign: Gtk.Align.CENTER});
+            keep.connect('clicked', () => { engine.dismissInterrupted(); refresh(); });
+            r.add_suffix(undo); r.add_suffix(keep);
+            status.add(r); status._broken = r;
+        }
         if (active && mods.length) {
             const row = new Adw.ActionRow({title: 'Settings differ from the profile', subtitle: mods.slice(0, 3).map(c => byId.get(c.id)?.title ?? c.id).join(', ') + (mods.length > 3 ? `, and ${mods.length - 3} more` : '')});
             const review = new Gtk.Button({label: 'Review', valign: Gtk.Align.CENTER});
@@ -248,5 +275,5 @@ export function profilesPage(engine: ProfileEngine, ctx) {
     const later = () => { if (timer) GLib.source_remove(timer); timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 350, () => { timer = 0; refresh(); return GLib.SOURCE_REMOVE; }); };
     for (const s of Object.values(engine.stores.by)) s?.connect('changed', later);
     refresh();
-    return {widget: scroller, refresh, apply};
+    return {widget: scroller, refresh, apply, recover: () => attempt('Recovery failed', () => { report('the backup', engine.recover()); })};
 }

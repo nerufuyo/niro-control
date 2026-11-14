@@ -102,3 +102,49 @@ test('the four built-in profiles are valid, only name real settings, and are par
         assert.ok(Object.keys(r.profile.settings).length < CATALOG.length);
     }
 });
+
+import {describeParseError, inactiveNotes, stalePartsAffected, validateDependencies} from '../../control/build/profileLogic.js';
+
+test('dependency metadata is sound: targets exist, no cycles, operators fit their targets', () => {
+    assert.deepEqual(validateDependencies(CATALOG), []);
+    const broken = [
+        {id: 'a.x', kind: 'switch', depends: {id: 'a.gone', op: 'on'}},
+        {id: 'a.y', kind: 'switch', depends: {id: 'a.y', op: 'on'}},
+        {id: 'a.z', kind: 'switch', depends: {id: 'a.sel', op: 'on'}},
+        {id: 'a.sel', kind: 'select', options: [{value: 'hover'}], depends: {id: 'a.z', op: 'on'}},
+        {id: 'a.w', kind: 'switch', depends: {id: 'a.sel', op: 'eq', value: 'nope'}},
+    ];
+    const problems = validateDependencies(broken).join('\n');
+    assert.match(problems, /a\.gone, which does not exist/);
+    assert.match(problems, /depends on itself/);
+    assert.match(problems, /needs a switch/);
+    assert.match(problems, /cycle/);
+    assert.match(problems, /no choice "nope"/);
+});
+
+test('a profile that sets a control whose gate stays off is told so', () => {
+    const changes = [{id: 'island.hover-delay', title: 'x', menu: 'Island', group: 'g', from: 120, to: 300}];
+    const notes = inactiveNotes(changes, {'island.hover-delay': 300, 'island.open-on': 'click'}, CATALOG);
+    assert.equal(notes.length, 1);
+    assert.match(notes[0].text, /no effect until .* is "hover"/);
+    assert.equal(inactiveNotes(changes, {'island.hover-delay': 300, 'island.open-on': 'hover'}, CATALOG).length, 0);
+    assert.equal(inactiveNotes([{id: 'niro.opacity', title: '', menu: 'Look', group: '', from: 1, to: 2}], {}, CATALOG).length, 0);
+});
+
+test('a pending login is named only for the parts a change touches', () => {
+    const c = id => ({id, title: '', menu: '', group: '', from: 0, to: 1});
+    assert.deepEqual(stalePartsAffected([c('dock.icon-size')], ['Island', 'Dock'], CATALOG), ['Dock']);
+    assert.deepEqual(stalePartsAffected([c('island.chimes')], ['Island', 'Dock'], CATALOG), ['Island']);
+    assert.deepEqual(stalePartsAffected([c('niro.opacity')], ['Island', 'Dock'], CATALOG), ['Island', 'Dock']);
+    assert.deepEqual(stalePartsAffected([c('niro.search-shortcut')], ['Island', 'Search'], CATALOG), ['Search']);
+    assert.deepEqual(stalePartsAffected([c('dock.icon-size')], [], CATALOG), []);
+    assert.deepEqual(stalePartsAffected([c('corners.border-width')], ['Island'], CATALOG), []);
+});
+
+test('JSON that does not parse says where', () => {
+    const text = '{\n  "a": 1,\n  "b": \n}';
+    let message = '';
+    try { JSON.parse(text); } catch (e) { message = e.message; }
+    assert.match(describeParseError(message, text), /line \d+, column \d+/);
+    assert.equal(describeParseError('boom', 'x'), 'boom');
+});

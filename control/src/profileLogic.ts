@@ -1,5 +1,6 @@
 // Profiles, the pure part (no GLib/GTK, tested with node): the file format, validation of a value against the catalog,
 // resolving `extends`, and the difference between two sets of settings.
+import {dependencyMet} from './logic.js';
 import type {Item} from './types.js';
 
 export const FORMAT = 'niro-profile';
@@ -162,4 +163,82 @@ export function makeProfile(name: string, settings: Settings, opts: {id?: string
         createdAt: new Date().toISOString(), settings};
     if (opts.extends) p.extends = opts.extends;
     return p;
+}
+
+// ---- Dependencies: metadata checks, and what a profile would set that has no effect
+
+/** What is wrong with the dependency metadata of the catalog (empty when it is sound). */
+export function validateDependencies(catalog: Item[]): string[] {
+    const byId = new Map(catalog.map(i => [i.id, i]));
+    const problems: string[] = [];
+    for (const item of catalog) {
+        const dep = item.depends;
+        if (!dep) continue;
+        const target = byId.get(dep.id);
+        if (!target) { problems.push(`${item.id} depends on ${dep.id}, which does not exist`); continue; }
+        if (dep.id === item.id) problems.push(`${item.id} depends on itself`);
+        if ((dep.op === 'on' || dep.op === 'off') && target.kind !== 'switch') problems.push(`${item.id}: "${dep.op}" needs a switch, ${dep.id} is a ${target.kind}`);
+        if ((dep.op === 'eq' || dep.op === 'ne') && !(target.options ?? []).some(o => String(o.value) === dep.value))
+            problems.push(`${item.id}: ${dep.id} has no choice "${dep.value}"`);
+        // a cycle: following the chain comes back
+        const seen = new Set([item.id]);
+        for (let t: Item | undefined = target; t?.depends; t = byId.get(t.depends.id)) {
+            if (seen.has(t.id)) { problems.push(`${item.id} is in a dependency cycle through ${t.id}`); break; }
+            seen.add(t.id);
+        }
+    }
+    return problems;
+}
+
+export interface Note {id: string; title: string; text: string}
+
+/** Changes that would have no effect once applied, because what they depend on stays off: `after` is every setting as it will be. */
+export function inactiveNotes(changes: Change[], after: Settings, catalog: Item[]): Note[] {
+    const byId = new Map(catalog.map(i => [i.id, i]));
+    const notes: Note[] = [];
+    for (const c of changes) {
+        const item = byId.get(c.id);
+        if (!item?.depends || dependencyMet(item, id => after[id])) continue;
+        const target = byId.get(item.depends.id);
+        const need = {on: 'is on', off: 'is off', eq: `is "${item.depends.value}"`, ne: `is not "${item.depends.value}"`}[item.depends.op];
+        notes.push({id: c.id, title: item.title, text: `${item.title} has no effect until "${target?.title ?? item.depends.id}" ${need}`});
+    }
+    return notes;
+}
+
+// ---- Scope: which part of the desktop a change belongs to, so a note about a pending login names the right one
+const PART: Record<string, string> = {island: 'Island', dock: 'Dock', blur: 'Blur', corners: 'Corners'};
+
+/** The parts (of those updated on disk but not yet loaded) that the `changes` touch; Look settings touch every part. */
+export function stalePartsAffected(changes: Change[], stale: string[], catalog: Item[]): string[] {
+    if (!stale.length) return [];
+    const byId = new Map(catalog.map(i => [i.id, i]));
+    const touched = new Set<string>();
+    for (const c of changes) {
+        const item = byId.get(c.id);
+        if (!item) continue;
+        if (item.source === 'niro') (item.key === 'search-shortcut' ? ['Search'] : stale).forEach(p => touched.add(p));
+        else if (PART[item.source]) touched.add(PART[item.source]);
+    }
+    return stale.filter(p => touched.has(p));
+}
+
+/** Readable text for JSON that does not parse: where it went wrong. Engines word it differently: SpiderMonkey gives the line
+ * and column, V8 gives a position or only a snippet of the text around the bad token (found again in `text`). */
+export function describeParseError(message: string, text: string): string {
+    const at = (pos: number) => {
+        const before = text.slice(0, Math.max(0, pos));
+        return `${message.replace(/ in JSON at position \d+.*/s, '').replace(/ of the JSON data$/, '')} (line ${before.split('\n').length}, column ${pos - before.lastIndexOf('\n')})`;
+    };
+    const lc = /at line (\d+) column (\d+)/.exec(message);
+    if (lc) return `${message.replace(/ of the JSON data$/, '')}`;
+    const p = /position (\d+)/.exec(message);
+    if (p) return at(Number(p[1]));
+    const snippet = /^Unexpected token .*?, "?(?:\.\.\.)?(.*?)(?:\.\.\.)?"? is not valid JSON$/s.exec(message);
+    if (snippet && snippet[1]) {
+        const ctx = snippet[1].replace(/^"/, '').replace(/"$/, '');
+        const i = text.indexOf(ctx);
+        if (i >= 0) return at(i + ctx.length - 1);
+    }
+    return message;
 }

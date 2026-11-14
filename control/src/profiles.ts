@@ -6,8 +6,8 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 import {CATALOG} from './catalog.js';
-import {BACKUP_FORMAT, deepEqual, diff, makeProfile, pick, resolve, slugify, uniqueId, validateProfile, VERSION} from './profileLogic.js';
-import type {Change, Profile, Settings} from './profileLogic.js';
+import {BACKUP_FORMAT, describeParseError, diff, inactiveNotes, makeProfile, pick, resolve, slugify, uniqueId, validateProfile, VERSION} from './profileLogic.js';
+import type {Change, Note, Profile, Settings} from './profileLogic.js';
 import {bindingFor} from './store.js';
 import type {Stores} from './store.js';
 import type {Item} from './types.js';
@@ -17,9 +17,14 @@ const decoder = new TextDecoder();
 const encoder = new TextEncoder();
 
 export interface Backup {file: string; createdAt: string; label: string; count: number}
+/** The most a profile or backup file may hold: nothing real comes near it. */
+const MAX_FILE_BYTES = 256 * 1024;
+
 export interface ApplyResult {
     ok: boolean;
     changed: Change[];
+    notes?: Note[];                  // changes that have no effect until something else is on
+    reset?: number;                  // settings put back to unset (their default, not stored) rather than written
     failed?: {id: string; title: string; error: string};
     rolledBack?: boolean;
     rollbackErrors?: string[];
@@ -28,7 +33,13 @@ export interface ApplyResult {
 const readJson = (path: string) => {
     const [ok, bytes] = GLib.file_get_contents(path);
     if (!ok) throw new Error(`can't read ${path}`);
-    return JSON.parse(decoder.decode(bytes));
+    if (bytes.length > MAX_FILE_BYTES) throw new Error(`the file is ${Math.round(bytes.length / 1024)} KB: too big to be a profile (the limit is ${MAX_FILE_BYTES / 1024} KB)`);
+    const text = decoder.decode(bytes);
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        throw new Error(describeParseError(e.message, text));
+    }
 };
 
 /** Written whole or not at all: to a temporary file, then renamed over the real one. */
@@ -108,13 +119,49 @@ export class ProfileEngine {
         return diff(this.capture(Object.keys(target)), target, this.items);
     }
 
-    /** Writes `target` (only what differs). A failed write puts back what was already written; the report says so. */
-    applySettings(target: Settings, backupLabel?: string): ApplyResult {
+    /** The settings now, as they stand in the store: their values, and which keys hold none of their own (unset = the default). */
+    snapshot(ids?: string[]): {values: Settings; unset: string[]} {
+        const values = this.capture(ids);
+        const unset = new Set<string>();
+        const set = new Set<string>();
+        for (const item of this.items) {
+            if (!(item.id in values)) continue;
+            const b = this.binding(item);
+            for (const one of Array.isArray(b) ? b : [b]) {
+                const ref = one.keyRef();
+                (ref.settings.get_user_value(ref.key) === null ? unset : set).add(ref.id);
+            }
+        }
+        for (const id of set) unset.delete(id);      // a key shared by several settings is unset only if none of them holds a value
+        return {values, unset: [...unset]};
+    }
+
+    /** Puts keys back to unset: they keep the default, and it is not stored as if it had been chosen. */
+    private unsetKeys(refs: string[]): number {
+        let n = 0;
+        const done = new Set<string>();
+        for (const item of this.items) {
+            const b = this.binding(item);
+            for (const one of Array.isArray(b) ? b : [b ?? []].flat()) {
+                if (!one?.keyRef) continue;
+                const ref = one.keyRef();
+                if (refs.includes(ref.id) && !done.has(ref.id) && ref.settings.get_user_value(ref.key) !== null) { ref.settings.reset(ref.key); n++; }
+                done.add(ref.id);
+            }
+        }
+        return n;
+    }
+
+    /** Writes `target` (only what differs). A failed write puts back what was already written (stored values as they were, and
+     * unset keys unset); the report says whether that worked. `unset` names keys to leave unset, as a backup recorded them. */
+    applySettings(target: Settings, backupLabel?: string, unset: string[] = []): ApplyResult {
         const changes = this.preview(target);
-        if (!changes.length) return {ok: true, changed: []};
-        if (backupLabel) this.backup(backupLabel);
+        const notes = inactiveNotes(changes, {...this.capture(), ...target}, this.items);
+        if (!changes.length && !unset.length) return {ok: true, changed: [], notes};
+        const backup = backupLabel ? this.backup(backupLabel) : null;
+        this.journal({backup: backup?.file ?? null, label: backupLabel ?? 'change'});
         const byId = new Map(this.items.map(i => [i.id, i]));
-        const before = this.capture(changes.map(c => c.id));
+        const before = this.snapshot(changes.map(c => c.id));
         // Look first: the island, dock and windows copy from it, and what a profile sets for them wins afterwards
         const order = [...changes].sort((a, b) => Number(b.id.startsWith('niro.')) - Number(a.id.startsWith('niro.')));
         const done: Change[] = [];
@@ -126,18 +173,50 @@ export class ProfileEngine {
                 const rollbackErrors = [];
                 for (const w of done.reverse()) {
                     try {
-                        this.writeItem(byId.get(w.id), before[w.id]);
+                        this.writeItem(byId.get(w.id), before.values[w.id]);
                     } catch (e2) {
                         rollbackErrors.push(`${w.title}: ${e2.message}`);
                     }
                 }
+                this.unsetKeys(before.unset);
                 Gio.Settings.sync();
+                if (!rollbackErrors.length) this.clearJournal();      // otherwise it stays: the next start offers the backup
                 return {ok: false, changed: [], failed: {id: change.id, title: change.title, error: e.message}, rolledBack: !rollbackErrors.length, rollbackErrors};
             }
         }
+        const reset = this.unsetKeys(unset);
         Gio.Settings.sync();   // dconf writes are queued: a process that ends right after (the command line) must flush them
-        return {ok: true, changed: done};
+        this.clearJournal();
+        return {ok: true, changed: done, notes, reset};
     }
+
+    // ---- The journal: written before settings change, removed when they are done. One left behind means a change that
+    // never finished (a crash, a power cut, a rollback that could not put everything back); the backup it names undoes it.
+    get journalPath() { return `${this.root}/applying.json`; }
+
+    private journal(entry: {backup: string | null; label: string}) {
+        writeJson(this.journalPath, {...entry, at: new Date().toISOString()});
+    }
+
+    private clearJournal() {
+        try { Gio.File.new_for_path(this.journalPath).delete(null); } catch (_e) { /* none */ }
+    }
+
+    /** A change that did not finish, with the backup that undoes it; null when there is none. */
+    interrupted(): {label: string; at: string; backup: string | null} | null {
+        try { return readJson(this.journalPath); } catch (_e) { return null; }
+    }
+
+    /** Undoes an interrupted change by restoring the backup made before it (and clears the note either way). */
+    recover(): ApplyResult {
+        const j = this.interrupted();
+        if (!j) return {ok: true, changed: []};
+        if (!j.backup) { this.clearJournal(); return {ok: true, changed: []}; }
+        this.clearJournal();
+        return this.restore(j.backup);
+    }
+
+    dismissInterrupted() { this.clearJournal(); }
 
     // ---- Profiles on disk
     get profilesDir() { return `${this.root}/profiles`; }
@@ -287,8 +366,8 @@ export class ProfileEngine {
         const now = new Date();
         const stamp = now.toISOString().replace(/[:.]/g, '-');
         const file = `${this.backupsDir}/${stamp}.json`;
-        const settings = this.capture();
-        writeJson(file, {format: BACKUP_FORMAT, version: VERSION, createdAt: now.toISOString(), label, settings});
+        const {values: settings, unset} = this.snapshot();
+        writeJson(file, {format: BACKUP_FORMAT, version: VERSION, createdAt: now.toISOString(), label, settings, unset});
         for (const old of jsonFiles(this.backupsDir).slice(0, -BACKUPS_KEPT))
             Gio.File.new_for_path(old).delete(null);
         return {file, createdAt: now.toISOString(), label, count: Object.keys(settings).length};
@@ -312,7 +391,7 @@ export class ProfileEngine {
         if (b.format !== BACKUP_FORMAT || b.version > VERSION) throw new Error('Not a backup this version can read');
         const checked = validateProfile({format: 'niro-profile', version: b.version, name: 'backup', settings: b.settings}, CATALOG);
         if (!checked.ok) throw new Error(`The backup is damaged:\n${checked.errors.join('\n')}`);
-        const result = this.applySettings(checked.profile.settings, 'Before restoring a backup');
+        const result = this.applySettings(checked.profile.settings, 'Before restoring a backup', Array.isArray(b.unset) ? b.unset.filter(x => typeof x === 'string') : []);
         if (result.ok) this.setActive(null);
         return result;
     }

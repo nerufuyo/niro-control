@@ -82,6 +82,9 @@ class KeyBinding {
         return this.s.get_value(this.key).equal(this.s.settings_schema.get_key(this.key).get_default_value());
     }
 
+    /** The key this binding writes, for a snapshot: whether it holds a value of its own or is unset (the default, not stored). */
+    keyRef() { return {settings: this.s, key: this.key, id: `${this.s.schema_id ?? this.s.settings_schema.get_id()}:${this.key}`}; }
+
     subscribe(callback) {
         const id = this.s.connect(`changed::${this.key}`, callback);
         return () => this.s.disconnect(id);
@@ -149,6 +152,8 @@ class FieldBinding {
         return this.read() === original;
     }
 
+    keyRef() { return {settings: this.s, key: this.key, id: `${this.s.settings_schema.get_id()}:${this.key}`}; }
+
     subscribe(callback) {
         const id = this.s.connect(`changed::${this.key}`, callback);
         return () => this.s.disconnect(id);
@@ -176,6 +181,8 @@ class ShadowBinding {
     isDefault() {
         return this.s.get_value(this.key).equal(this.s.settings_schema.get_key(this.key).get_default_value());
     }
+
+    keyRef() { return {settings: this.s, key: this.key, id: `${this.s.settings_schema.get_id()}:${this.key}`}; }
 
     subscribe(callback) {
         const id = this.s.connect(`changed::${this.key}`, callback);

@@ -83,6 +83,7 @@ export function buildWindow(app) {
     };
     const model = new Model(ctx);
     const stale = GLib.getenv('NIRO_NOBANNER') ? [] : staleParts();
+    ctx.stale = stale;
     const shared = {};
     shared.profiles = profilesPage(model.engine, ctx);
     shared.home = homePage(model, ctx, shared.profiles, stale);
