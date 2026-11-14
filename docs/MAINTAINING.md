@@ -96,3 +96,20 @@ org.niro.Search.RunAction profile.apply '{"id":"gaming"}'`. The island's assista
 
 Home (`homePage.ts`) only reads. Simple/Advanced (`Model.setMode`) hides the Advanced groups and shows a hint with their count;
 it saves to `ui.json` in the config folder and never writes a setting. Search results show every setting in both modes.
+
+## Settings health and dependency rules
+
+Home shows a Settings Health group (`control/src/health.ts`, pure and tested; `homePage.ts` gathers the facts). A row is healthy only when it was checked: an unanswered question (GNOME Shell did not report extension states, the session bus did not answer) is "unavailable", never a green tick.
+
+A dependency rule in `scripts/control-panel-items.py` (`DEPENDS`) greys a row out when its controlling setting is off. A rule stays only where the extension's code ties the two together; each was audited against the code and the ones with no support were dropped (reasons are in the comment above `DEPENDS`). A rule that is only reasoned from the wiring goes in `UNVERIFIED`: the panel shows it as a hint and it never disables a row or adds a "no effect" note. Adding a rule: find the line of code that reads the dependent setting only when the controlling one holds, then add the rule; if you cannot, add it to `UNVERIFIED`.
+
+## Performance
+
+`scripts/benchmark-performance.sh [--cold] [--quick]` measures the panel, Search, the profile engine and GNOME Shell with and without the Niro extensions, in private headless shells and against throw-away settings, plus read-only samples of your running shell. Reports go to `reports/performance/` (JSON and Markdown, median and p95). The numbers of one machine are a baseline for that machine: compare two runs on the same machine under the same load, never across machines. Search latency is JavaScript time inside the shell, not time to pixel.
+
+## Checks, by kind
+
+- Automated: `npm test` (node and GJS), `cargo test -p island-core -p island-daemon`.
+- Headless GNOME Shell: `make test-shell` (needs the installed package).
+- Installed files match the build: `scripts/verify-install.sh`.
+- Real session: `docs/UAT.md`. Nothing is called verified in a real session until that checklist has been run.
