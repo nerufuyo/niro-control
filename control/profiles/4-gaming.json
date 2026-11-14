@@ -1,0 +1,22 @@
+{
+  "format": "niro-profile",
+  "version": 1,
+  "id": "gaming",
+  "name": "Gaming",
+  "description": "No blur, a solid look, and nothing over the game",
+  "createdAt": "2026-11-14T00:00:00.000Z",
+  "settings": {
+    "niro.opacity": 100,
+    "niro.blur": false,
+    "dock.auto-hide": true,
+    "dock.magnification-enabled": false,
+    "dock.bounce-on-launch": false,
+    "island.auto-hide": "always",
+    "island.alerts-over-fullscreen": false,
+    "island.system-alerts": false,
+    "island.event-alerts": false,
+    "island.privacy-indicators": true,
+    "blur.unblur-when-fullscreen": true
+  },
+  "extends": "everyday"
+}

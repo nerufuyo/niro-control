@@ -1,0 +1,26 @@
+{
+  "format": "niro-profile",
+  "version": 1,
+  "id": "everyday",
+  "name": "Everyday",
+  "description": "Balanced glass, a dock that magnifies, alerts on",
+  "createdAt": "2026-11-14T00:00:00.000Z",
+  "settings": {
+    "niro.accent": "#E8472B",
+    "niro.tint": "#1C1C1E",
+    "niro.opacity": 80,
+    "niro.blur": true,
+    "niro.blur-strength": 30,
+    "dock.auto-hide": false,
+    "dock.magnification-enabled": true,
+    "dock.magnification-scale": 1.4,
+    "dock.bounce-on-launch": true,
+    "dock.window-previews": true,
+    "island.auto-hide": "off",
+    "island.island-shape": "notch",
+    "island.system-alerts": true,
+    "island.event-alerts": true,
+    "island.alerts-over-fullscreen": false,
+    "blur.unblur-when-fullscreen": false
+  }
+}

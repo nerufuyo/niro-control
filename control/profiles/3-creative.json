@@ -1,0 +1,19 @@
+{
+  "format": "niro-profile",
+  "version": 1,
+  "id": "creative",
+  "name": "Creative",
+  "description": "More glass and larger icons, in violet",
+  "createdAt": "2026-11-14T00:00:00.000Z",
+  "settings": {
+    "niro.accent": "#5E5CE6",
+    "niro.tint": "#171527",
+    "niro.opacity": 65,
+    "niro.blur-strength": 45,
+    "dock.icon-size": 56,
+    "dock.magnification-enabled": true,
+    "dock.magnification-scale": 1.8,
+    "island.open-size": "large"
+  },
+  "extends": "everyday"
+}

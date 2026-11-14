@@ -1,0 +1,104 @@
+// Profiles, the pure part: validation against the catalog, resolving `extends`, differences, partial profiles.
+import assert from 'node:assert/strict';
+import {readdirSync, readFileSync} from 'node:fs';
+import {test} from 'node:test';
+
+import {CATALOG} from '../../control/build/catalog.js';
+import {deepEqual, describeValue, diff, makeProfile, pick, resolve, slugify, uniqueId, validateProfile, validateValue} from '../../control/build/profileLogic.js';
+
+const byId = id => CATALOG.find(i => i.id === id);
+const mk = settings => ({format: 'niro-profile', version: 1, name: 'T', settings});
+
+test('every kind of setting validates its own default and refuses a wrong type', () => {
+    for (const item of CATALOG.filter(i => !i.managed)) {
+        const wrong = item.kind === 'switch' ? 'x' : item.kind === 'list' || item.kind === 'shortcut' ? 5 : item.kind === 'slider' || item.kind === 'stepper' ? 'x' : 5;
+        assert.ok(validateValue(item, wrong), `${item.id} accepted ${wrong}`);
+    }
+});
+
+test('ranges, choices, colours and whole numbers are enforced', () => {
+    assert.equal(validateValue(byId('niro.opacity'), 50), null);
+    assert.match(validateValue(byId('niro.opacity'), 101), /at most 100/);
+    assert.match(validateValue(byId('niro.opacity'), -1), /at least 0/);
+    assert.match(validateValue(byId('dock.icon-size'), 48.5), /whole number/);
+    assert.equal(validateValue(byId('dock.magnification-scale'), 1.5), null);
+    assert.match(validateValue(byId('island.auto-hide'), 'sometimes'), /one of/);
+    assert.equal(validateValue(byId('dock.dock-position'), 2), null);
+    assert.match(validateValue(byId('niro.accent'), 'red'), /#RRGGBB/);
+    assert.equal(validateValue(byId('niro.accent'), '#aBc123'), null);
+    assert.match(validateValue(byId('dock.focus-app'), [['<Super>1']]), /10 lists/);
+});
+
+test('an imported file is checked: format, version, name, values, unknown and managed settings', () => {
+    assert.equal(validateProfile('x', CATALOG).ok, false);
+    assert.match(validateProfile({format: 'other'}, CATALOG).errors[0], /not a Niro profile/);
+    assert.match(validateProfile({...mk({}), version: 9}, CATALOG).errors[0], /newer Niro Control/);
+    assert.match(validateProfile({...mk({}), name: ''}, CATALOG).errors[0], /no name/);
+    const bad = validateProfile(mk({'niro.opacity': 500, 'dock.auto-hide': 'yes'}), CATALOG);
+    assert.equal(bad.ok, false);
+    assert.equal(bad.errors.length, 2);
+    const odd = validateProfile(mk({'niro.opacity': 40, 'nothing.here': 1, 'dock.dock-opacity': 10, 'windows.blur': true}), CATALOG);
+    assert.equal(odd.ok, true);
+    assert.deepEqual(Object.keys(odd.profile.settings), ['niro.opacity']);
+    assert.equal(odd.warnings.length, 3);
+});
+
+test('a file cannot make itself built-in, and its id is made safe', () => {
+    const r = validateProfile({...mk({'niro.blur': true}), builtin: true, id: '../../etc/passwd'}, CATALOG);
+    assert.equal(r.profile.builtin, undefined);
+    assert.match(r.profile.id, /^[a-z0-9-]+$/);
+});
+
+test('ids: slug and uniqueness', () => {
+    assert.equal(slugify('Deep Work!'), 'deep-work');
+    assert.equal(slugify('   '), 'profile');
+    assert.equal(uniqueId('work', ['work', 'work-2']), 'work-3');
+    assert.equal(uniqueId('new', ['work']), 'new');
+});
+
+test('extends: a profile sits on its base, and cycles and missing bases do not hang', () => {
+    const base = makeProfile('Base', {'niro.opacity': 80, 'niro.blur': true}, {id: 'base'});
+    const child = makeProfile('Child', {'niro.opacity': 50}, {id: 'child', extends: 'base'});
+    const find = id => ({base, child}[id]);
+    assert.deepEqual(resolve(child, find), {'niro.opacity': 50, 'niro.blur': true});
+    const a = makeProfile('A', {'niro.blur': false}, {id: 'a', extends: 'b'}), b = makeProfile('B', {'niro.opacity': 1}, {id: 'b', extends: 'a'});
+    assert.deepEqual(resolve(a, id => ({a, b}[id])), {'niro.opacity': 1, 'niro.blur': false});
+    assert.deepEqual(resolve(makeProfile('X', {'niro.blur': true}, {id: 'x', extends: 'gone'}), () => undefined), {'niro.blur': true});
+});
+
+test('diff names only what the target sets and what differs, with titles', () => {
+    const current = {'niro.opacity': 80, 'niro.blur': true, 'niro.accent': '#E8472B'};
+    const target = {'niro.opacity': 60, 'niro.blur': true, 'niro.accent': '#e8472b'};
+    const changes = diff(current, target, CATALOG);
+    assert.equal(changes.length, 1);
+    assert.equal(changes[0].id, 'niro.opacity');
+    assert.equal(changes[0].menu, 'Look');
+    assert.equal(diff(current, {}, CATALOG).length, 0);
+    assert.ok(deepEqual([['a'], []], [['a'], []]) && !deepEqual([1], [2]) && deepEqual(1.4, 1.4000000001));
+});
+
+test('partial profiles keep only the menus asked for', () => {
+    const all = {'niro.opacity': 1, 'dock.auto-hide': true, 'island.auto-hide': 'off', 'corners.skip-libhandy-app': false};
+    assert.deepEqual(Object.keys(pick(all, ['Dock'], CATALOG)), ['dock.auto-hide']);
+    assert.deepEqual(Object.keys(pick(all, ['Look', 'Island'], CATALOG)).sort(), ['island.auto-hide', 'niro.opacity']);
+});
+
+test('values read well in a preview', () => {
+    assert.equal(describeValue(byId('dock.auto-hide'), true), 'On');
+    assert.equal(describeValue(byId('niro.opacity'), 70), '70 %');
+    assert.equal(describeValue(byId('dock.dock-position'), 1), 'Left');
+    assert.equal(describeValue(byId('dock.dock-position'), undefined), '—');
+});
+
+test('the four built-in profiles are valid, only name real settings, and are partial', () => {
+    const dir = new URL('../../control/profiles/', import.meta.url);
+    const files = readdirSync(dir).filter(f => f.endsWith('.json')).sort();
+    assert.deepEqual(files.map(f => JSON.parse(readFileSync(new URL(f, dir), 'utf8')).name), ['Everyday', 'Deep Work', 'Creative', 'Gaming']);
+    for (const f of files) {
+        const raw = JSON.parse(readFileSync(new URL(f, dir), 'utf8'));
+        const r = validateProfile(raw, CATALOG);
+        assert.ok(r.ok, `${f}: ${r.errors}`);
+        assert.equal(r.warnings.length, 0, `${f}: ${r.warnings}`);
+        assert.ok(Object.keys(r.profile.settings).length < CATALOG.length);
+    }
+});

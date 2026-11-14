@@ -1,0 +1,22 @@
+{
+  "format": "niro-profile",
+  "version": 1,
+  "id": "deep-work",
+  "name": "Deep Work",
+  "description": "Fewer distractions: quiet alerts, a hidden dock, the island out of the way",
+  "createdAt": "2026-11-14T00:00:00.000Z",
+  "settings": {
+    "niro.opacity": 92,
+    "niro.blur-strength": 20,
+    "dock.auto-hide": true,
+    "dock.magnification-enabled": false,
+    "dock.bounce-on-launch": false,
+    "island.auto-hide": "windows",
+    "island.system-alerts": false,
+    "island.event-alerts": true,
+    "island.focus-dnd": true,
+    "island.chimes": false,
+    "island.track-peek": false
+  },
+  "extends": "everyday"
+}

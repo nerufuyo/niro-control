@@ -13,6 +13,7 @@ import {
 import type {Context} from './components.js';
 import {dependencyMet} from './logic.js';
 import {dockPreview, lookPreview, windowsPreview} from './previews.js';
+import {ProfileEngine} from './profiles.js';
 import {bindingFor, Stores} from './store.js';
 import type {Item} from './types.js';
 
@@ -25,6 +26,7 @@ export class Model {
     constructor(ctx: Context) {
         this.ctx = ctx;
         this.stores = new Stores();
+        this.engine = new ProfileEngine(this.stores);
         this.cache = new Map();
         this.rows = new Map();     // item id -> the rows showing it (to grey them out when a dependency is off)
         this.byId = new Map(CATALOG.map(i => [i.id, i]));

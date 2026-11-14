@@ -11,11 +11,13 @@ import {CATALOG} from './catalog.js';
 import {settingsSearch} from './components.js';
 import {searchItems} from './logic.js';
 import {aboutPage, dockPage, islandPage, lookPage, Model, resultsPage, searchPage, windowsPage} from './pages.js';
+import {profilesPage} from './profilesPage.js';
 
 const MODULES = [
     ['look', 'Look', 'preferences-desktop-theme-symbolic', lookPage], ['island', 'Island', 'view-pin-symbolic', islandPage],
     ['dock', 'Dock', 'view-app-grid-symbolic', dockPage], ['windows', 'Windows', 'window-new-symbolic', windowsPage],
-    ['search', 'Search', 'system-search-symbolic', searchPage], ['about', 'About', 'help-about-symbolic', aboutPage],
+    ['search', 'Search', 'system-search-symbolic', searchPage],
+    ['profiles', 'Profiles', 'user-bookmarks-symbolic', model => profilesPage(model.engine, model.ctx).widget], ['about', 'About', 'help-about-symbolic', aboutPage],
 ];
 
 const CSS = `
@@ -25,6 +27,8 @@ const CSS = `
 .niro-subnav { background-color: alpha(@sidebar_bg_color, 0.6); }
 .niro-subnav row { border-radius: 8px; margin: 1px 6px; }
 .niro-preview { border-radius: 12px; background-color: alpha(@card_bg_color, 0.55); }
+.niro-card { border-radius: 14px; background-color: alpha(@card_bg_color, 0.88); }
+.niro-card-active { background-color: alpha(@accent_bg_color, 0.14); border-radius: 14px; }
 .niro-preset { padding: 6px 10px; border-radius: 9px; }
 .niro-sidebar row.activatable { border-radius: 9px; margin: 1px 6px; }
 `;
@@ -57,10 +61,10 @@ export function buildWindow(app) {
 
     const ctx = {
         window,
-        toast: (message, retry) => {
+        toast: (message, retry, label = 'Retry') => {
             const t = Adw.Toast.new(message);
             t.set_timeout(retry ? 8 : 4);
-            if (retry) { t.set_button_label('Retry'); t.connect('button-clicked', retry); }
+            if (retry) { t.set_button_label(label); t.connect('button-clicked', retry); }
             overlay.add_toast(t);
         },
         openLook: () => select('look'),
