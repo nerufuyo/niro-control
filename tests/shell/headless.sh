@@ -13,7 +13,7 @@ check() { if [ "$2" = "$3" ]; then echo "ok   $1"; else echo "FAIL $1: expected 
 has() { if [[ "$2" == *"$3"* ]]; then echo "ok   $1"; else echo "FAIL $1: [$2] lacks [$3]"; FAILS=$((FAILS+1)); fi; }
 
 timeout 150 dbus-run-session -- bash -c '
-gnome-shell --headless --wayland --no-x11 --unsafe-mode --virtual-monitor 1280x720 > '"$LOG"' 2>&1 & SP=$!
+gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-test --virtual-monitor 1280x720 > '"$LOG"' 2>&1 & SP=$!
 sleep 22
 export DAEMON='"$DAEMON"'
 eval_js() { gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "$1" 2>&1; }
@@ -40,11 +40,23 @@ for q in "2*pi" "20 gb to mb" "dock pos" "profile" "qqqzzzxx"; do
   eval_js "$O._open(); $O._entry.set_text(\"$q\"); JSON.stringify($O._results.map(r=>r.section+\":\"+r.title).slice(0,3))" | sed "s/^/QUERY[$q] /"
 done
 eval_js "$O._close()" >/dev/null
+# the keyboard: the first result is selected, the hint says Enter asks to confirm for a protected action, and a second activation is refused
+eval_js "$O._open(); $O._entry.set_text(\"restart\"); \"SEL=\"+$O._selected+\" HINT=\"+$O._hint.text" | sed "s/^/KEYS /"
+eval_js "$O._close(); \"x\"" >/dev/null
+echo "ONCE $(eval_js "(function(){ const o=$O._once; return [o.begin(), o.begin()].join(); })()" | grep -o "true,false")"
+eval_js "$O._once.end()" >/dev/null
+# focus comes back to the window that had it when the palette closes
+( WAYLAND_DISPLAY=niro-test GDK_BACKEND=wayland gjs -c "imports.gi.versions.Gtk=\"4.0\"; const {Gtk,GLib}=imports.gi; Gtk.init(); new Gtk.Window({title:\"focus-probe\"}).present(); GLib.MainLoop.new(null,false).run();" >/dev/null 2>&1 & echo $! > /tmp/niro_probe.pid ); sleep 5
+eval_js "global.get_window_actors().find(a=>a.meta_window.title==\"focus-probe\").meta_window.activate(global.get_current_time()); \"x\"" >/dev/null; sleep 2
+echo "FOCUS_BEFORE $(eval_js "global.display.focus_window ? global.display.focus_window.title : \"none\"" | grep -o "focus-probe\|none")"
+eval_js "$O._open(); \"x\"" >/dev/null; sleep 1; eval_js "$O._close(); \"x\"" >/dev/null; sleep 1
+echo "FOCUS_AFTER $(eval_js "global.display.focus_window ? global.display.focus_window.title : \"none\"" | grep -o "focus-probe\|none")"
+kill $(cat /tmp/niro_probe.pid) 2>/dev/null
 echo "HISTORY $(call History 50 | grep -o "\"caller\":\"[a-z-]*\"" | sort -u | tr "\n" " ")"
-} 2>&1 | grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|DUP|DECLINED|QUERY|HISTORY)"
+} 2>&1 | grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)"
 kill $SP; wait $SP 2>/dev/null' > /tmp/niro_headless.out 2>&1
 
-OUT=$(grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|DUP|DECLINED|QUERY|HISTORY)" /tmp/niro_headless.out)
+OUT=$(grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)" /tmp/niro_headless.out)
 has "all seven extensions active" "$OUT" "island=State:ACTIVE dock=State:ACTIVE search=State:ACTIVE blur=State:ACTIVE corners=State:ACTIVE emoji=State:ACTIVE emulator=State:ACTIVE"
 has "twelve actions listed" "$OUT" "ACTIONS 12"
 has "no handlers exposed" "$OUT" "NOHANDLER 0"
@@ -63,6 +75,9 @@ has "palette: conversion" "$OUT" "Conversion:20,000 MB"
 has "palette: settings" "$OUT" "Settings:Dock position"
 has "palette: profiles" "$OUT" "Profiles:Everyday"
 has "palette: nothing found is empty" "$OUT" 'QUERY[qqqzzzxx] (true, '"'"'"[]"'
+has "keyboard: first result selected, protected action says Enter asks to confirm" "$OUT" "SEL=0 HINT=Enter asks to confirm"
+has "a second activation is refused" "$OUT" "ONCE true,false"
+has "focus returns to the window that had it" "$OUT" "FOCUS_AFTER focus-probe"
 has "audit names the caller" "$OUT" '"caller":"island-daemon"'
 check "no JS errors in the shell" "$(grep -c 'JS ERROR' "$LOG")" "0"
 echo; [ $FAILS -eq 0 ] && echo "headless shell checks: all passed" || { echo "headless shell checks: $FAILS failed"; echo "$OUT" | head -40; exit 1; }
