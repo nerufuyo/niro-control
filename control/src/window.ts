@@ -24,6 +24,8 @@ const MODULES = [
 
 const CSS = `
 .niro-window { background-color: alpha(@window_bg_color, 0.93); }
+/* round every corner of the window itself: the shell's corner effect skips libadwaita apps */
+window.niro-window:not(.maximized):not(.fullscreen):not(.tiled), window.niro-window.csd:not(.maximized):not(.fullscreen):not(.tiled) { border-radius: 14px; }
 .niro-sidebar { background-color: alpha(@sidebar_bg_color, 0.86); }
 .niro-window .boxed-list, .niro-window preferencesgroup > box > box > list { background-color: alpha(@card_bg_color, 0.88); }
 .niro-subnav { background-color: alpha(@sidebar_bg_color, 0.6); }

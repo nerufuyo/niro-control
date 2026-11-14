@@ -160,7 +160,7 @@ export function profilesPage(engine: ProfileEngine, ctx) {
     [newBtn, importBtn, backupBtn].forEach(b => actions.append(b));
 
     const card = (p, active: boolean, modified: boolean) => {
-        const box = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 8, margin_top: 14, margin_bottom: 14, margin_start: 14, margin_end: 14, css_classes: active ? ['niro-card-active'] : []});
+        const box = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 8, margin_top: 14, margin_bottom: 14, margin_start: 14, margin_end: 14});
         const head = new Gtk.Box({spacing: 8});
         head.append(new Gtk.Label({label: p.name, xalign: 0, hexpand: true, css_classes: ['title-4'], ellipsize: 3, max_width_chars: 20}));
         if (active) head.append(new Gtk.Label({label: modified ? 'Active · modified' : 'Active', css_classes: [modified ? 'warning' : 'success', 'caption-heading']}));
@@ -181,7 +181,7 @@ export function profilesPage(engine: ProfileEngine, ctx) {
         more.update_property([Gtk.AccessibleProperty.LABEL], [`More actions for ${p.name}`]);
         row.append(more);
         box.append(row);
-        const frame = new Gtk.Frame({child: box, css_classes: ['niro-card']});
+        const frame = new Gtk.Frame({child: box, css_classes: active ? ['niro-card', 'niro-card-active'] : ['niro-card']});
         return frame;
     };
 
