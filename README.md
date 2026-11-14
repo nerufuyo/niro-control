@@ -33,6 +33,14 @@ Taken from a headless GNOME Shell with the installed package (`scripts/screensho
 | **Search: calculator** | **Search: profiles** |
 | ![Calculator](docs/images/search-calculator.png) | ![Profiles in Search](docs/images/search-profiles.png) |
 
+## Universal Appearance
+
+One shared look with glass for backgrounds and solid text: presets, safe mode, a global switch, per-application rules and an opt-in GTK theme integration (never installed without your consent, always restorable). See [docs/APPEARANCE.md](docs/APPEARANCE.md) for what reaches which application, and what is only documented, not tested.
+
+| Compatibility | GTK apps with the integration (Files, Settings) |
+|---|---|
+| ![Compatibility](reports/ui/compatibility.png) | ![Settings](reports/ui/gtk/settings-dark-on.png) |
+
 ## Install
 
 ```sh

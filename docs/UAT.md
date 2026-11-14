@@ -28,5 +28,8 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 22 | Light and dark | Switch the system theme | Panel and Search stay legible; focus rings visible with Tab |
 | 23 | Idle CPU | `top -p $(pgrep -xo gnome-shell)` for a minute with nothing moving | Note the CPU. Two read-only samples on the author's machine gave 17.9% and 2.7% (the first was probably transient load, not reproduced): if yours stays high, bisect with `gnome-extensions disable` one Niro extension at a time |
 | 24 | Panel glass and readability | After the login that loads the new blur extension, open the Control Panel over a bright and a detailed wallpaper; move Look > Opacity from 0 to 100 | The sidebar and content stay readable at every value; only the window's background gets more or less see-through; text and controls never fade |
+| 25 | Universal Appearance on a real GTK app | Compatibility > GTK theme integration > Install… (read the file list; a backup is made), restart Files and Settings | Backgrounds follow the glass and stay readable; Restore original brings the old look back and your gtk.css files are byte-identical to before |
+| 26 | Per-application rules | Compatibility: exclude one app; turn on "Window-level effects", set Window fade for one app | After the new login: the excluded app has no blur; only the fade app is see-through (and its text too); everything else is unfaded |
+| 27 | Presets, safe mode | Look > Universal Appearance: pick each preset; turn Safe mode on and off | Values change with the preset; safe mode makes everything solid at once; high-contrast (Settings > Accessibility) makes the panel solid |
 
 Nothing in this list has been run by the author yet; the report says so.
