@@ -49,8 +49,13 @@ M1=$(stat -c %Y.%N $CSS); ev "global.__N.set_string(\"accent\", \"#33AA55\"); 1"
 [ "$M1" = "$M2" ] && echo "GTK_UNCHANGED_UNTOUCHED yes" >> '"$OUT"' || echo "GTK_UNCHANGED_UNTOUCHED no" >> '"$OUT"'
 ev "global.__N.set_string(\"color-scheme\", \"light\"); 1" > /dev/null; sleep 1.5
 echo "GTK_FORCED_LIGHT $(grep -c "rgba(244, 244, 248" $CSS)" >> '"$OUT"'
+CSS3="'"$WORK"'/config/gtk-3.0/niro-glass.css"
+ev "global.__I.set_string(\"gtk-theme\", \"Yaru-olive-dark\"); 1" > /dev/null; sleep 1.5
+echo "GTK3_DARKTHEME $(grep -c "rgba(28, 28, 30" $CSS3)" >> '"$OUT"'
+ev "global.__I.set_string(\"gtk-theme\", \"Adwaita\"); 1" > /dev/null; sleep 1.5
+echo "GTK3_LIGHTTHEME $(grep -c "rgba(244, 244, 248" $CSS3)" >> '"$OUT"'
 ev "new imports.gi.Gio.Settings({schema_id: \"org.gnome.desktop.a11y.interface\"}).set_boolean(\"high-contrast\", true); 1" > /dev/null; sleep 1.5
-echo "GTK_HC_SOLID $(grep -c "window.background:not(.solid-csd) { background-color: rgba(244, 244, 248, 1)" $CSS)" >> '"$OUT"'
+echo "GTK_HC_SOLID $(grep -c "window.background:not(.solid-csd) { background-color: rgba(28, 28, 30, 1)" $CSS)" >> '"$OUT"'
 ev "global.__N.set_boolean(\"universal-enabled\", false); 1" > /dev/null; sleep 1.5
 echo "GTK_OFF $(grep -c "switched off" $CSS)" >> '"$OUT"'
 kill $SP' > /dev/null 2>&1
@@ -64,7 +69,9 @@ has "turning it off puts the previous settings back" "SURF_OFF panel=false overv
 has "GTK stylesheet follows a light system" "GTK_LIGHT 1"
 has "GTK stylesheet follows GNOME to dark at once" "GTK_DARK 1"
 has "an unrelated change rewrites nothing" "GTK_UNCHANGED_UNTOUCHED yes"
-has "Niro's own choice wins over the system" "GTK_FORCED_LIGHT 1"
+has "Niro's own light/dark choice does not change other applications: GTK 4 stays with GNOME" "GTK_FORCED_LIGHT 0"
+has "GTK 3 follows its theme: a dark theme gives dark" "GTK3_DARKTHEME 1"
+has "and a light theme gives light" "GTK3_LIGHTTHEME 1"
 has "high contrast makes the glass solid" "GTK_HC_SOLID 1"
 has "the global switch neutralises the stylesheet" "GTK_OFF 1"
 [ $FAILS = 0 ] && echo "niroSync shell checks: all passed" || echo "niroSync shell checks: $FAILS failed"

@@ -107,3 +107,12 @@ test('rules inside profiles: validated, counted, and a dropped exclusion is name
     assert.deepEqual(exclusionsDropped(now, '{}'), ['org.gnome.Nautilus']);
     assert.deepEqual(exclusionsDropped(now, JSON.stringify({'org.gnome.Nautilus': {mode: 'exclude'}})), []);
 });
+
+import {gtk3Scheme} from '../../control/build/appearance.js';
+test('GTK 3 scheme follows the theme, not GNOME', () => {
+    assert.equal(gtk3Scheme('Yaru-olive-dark'), 'dark');
+    assert.equal(gtk3Scheme('Adwaita-dark'), 'dark');
+    assert.equal(gtk3Scheme('Adwaita'), 'light');
+    assert.equal(gtk3Scheme('Adwaita', true), 'dark');
+    assert.equal(gtk3Scheme(''), 'light');
+});

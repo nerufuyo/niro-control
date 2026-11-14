@@ -6,7 +6,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 
-import {effective, migrateLegacy, PRESET_KEYS, resolveScheme} from './appearance.js';
+import {effective, gtk3Scheme, migrateLegacy, PRESET_KEYS, resolveScheme} from './appearance.js';
 import {refresh as refreshGtk} from './gtkAdapter.js';
 import {setBlurRadius} from './blurPipeline.js';
 
@@ -44,6 +44,7 @@ export class NiroSync {
         this._id = this._shared.connect('changed', () => this._apply());
         // signals, not polling: GNOME's colour scheme and high contrast
         this._ifaceId = this._iface.connect('changed::color-scheme', () => this._queueGtk());
+        this._themeId = this._iface.connect('changed::gtk-theme', () => this._queueGtk());
         this._a11yId = this._a11y.connect('changed::high-contrast', () => this._apply());
         this._migrate();
         this._surfaces();
@@ -99,7 +100,8 @@ export class NiroSync {
             try {
                 const values = Object.fromEntries(PRESET_KEYS.map(k => [k, typeof this._shared.get_value(k).unpack() === 'boolean' ? this._shared.get_boolean(k) : this._shared.get_int(k)]));
                 const e = effective(values, {safeMode: this._flag('safe-mode', false), highContrast: this._a11y.get_boolean('high-contrast')});
-                refreshGtk({configDir: GLib.get_user_config_dir(), scheme: resolveScheme(this._shared.get_string('color-scheme'), this._iface.get_string('color-scheme')),
+                refreshGtk({configDir: GLib.get_user_config_dir(), // third-party GTK 4 apps follow GNOME's scheme and GTK 3 apps their theme: Niro's own light/dark choice is for its panel only
+                    scheme: resolveScheme('system', this._iface.get_string('color-scheme')), scheme3: gtk3Scheme(this._iface.get_string('gtk-theme')),
                     glass: e.glass, tint: this._shared.get_string('tint'), surfaces: {sidebar: e.sidebar, content: e.content, elevated: e.elevated},
                     disabled: !this._flag('universal-enabled', true) || !this._flag('affect-gtk', true)});
             } catch (err) { console.error(`Island: GTK stylesheet not refreshed: ${err.message}`); }
@@ -175,8 +177,9 @@ export class NiroSync {
             this._shared.disconnect(this._id);
         this._id = 0;
         if (this._ifaceId) this._iface.disconnect(this._ifaceId);
+        if (this._themeId) this._iface.disconnect(this._themeId);
         if (this._a11yId) this._a11y.disconnect(this._a11yId);
-        this._ifaceId = this._a11yId = 0;
+        this._ifaceId = this._themeId = this._a11yId = 0;
         if (this._gtkTimer) GLib.source_remove(this._gtkTimer);
         this._gtkTimer = 0;
     }

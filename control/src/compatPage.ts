@@ -6,7 +6,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
-import {APPLIES_LABEL, classify, effective, FAMILIES, parseRules, PRESET_KEYS, resolveScheme, serializeRules, setRule, STATUS_LABEL, UNKNOWN} from './appearance.js';
+import {APPLIES_LABEL, classify, effective, FAMILIES, parseRules, PRESET_KEYS, gtk3Scheme, resolveScheme, serializeRules, setRule, STATUS_LABEL, UNKNOWN} from './appearance.js';
 import {CATALOG} from './catalog.js';
 import * as gtk from './gtkAdapter.js';
 
@@ -22,7 +22,7 @@ export const backupRoot = () => `${GLib.getenv('NIRO_CONFIG_DIR') ?? `${GLib.get
 export function adapterOptions(model, dark: boolean) {
     const v = Object.fromEntries(PRESET_KEYS.map(k => [k, model.read(`niro.${k}`)]));
     const e = effective(v, {safeMode: model.read('niro.safe-mode') === true, highContrast: false});
-    return {configDir: configDir(), scheme: resolveScheme(model.read('niro.color-scheme'), dark ? 'prefer-dark' : 'default'), disabled: model.read('niro.universal-enabled') === false || model.read('niro.affect-gtk') === false, glass: e.glass, tint: model.read('niro.tint'),
+    return {configDir: configDir(), scheme: resolveScheme('system', dark ? 'prefer-dark' : 'default'), scheme3: gtk3Scheme(new Gio.Settings({schema_id: 'org.gnome.desktop.interface'}).get_string('gtk-theme')), disabled: model.read('niro.universal-enabled') === false || model.read('niro.affect-gtk') === false, glass: e.glass, tint: model.read('niro.tint'),
         surfaces: {sidebar: e.sidebar, content: e.content, elevated: e.elevated}};
 }
 

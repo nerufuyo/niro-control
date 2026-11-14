@@ -24,15 +24,23 @@ run() { # name scheme integration command...
   local name=$1 scheme=$2 integ=$3; shift 3
   local cfg="$WORK/cfg-$scheme-$integ"; mkdir -p "$cfg"
   [ "$integ" = on ] && gjs -m "$WORK/install.js" "$cfg" "$WORK/backups-$scheme" "$scheme" > /dev/null 2>&1
-  env XDG_CONFIG_HOME="$cfg" WAYLAND_DISPLAY=niro-gtk GDK_BACKEND=wayland ADW_DEBUG_COLOR_SCHEME=prefer-$scheme "$@" > /dev/null 2>&1 & local P=$!
+  local theme=""; { [ "$name" = gtk3 ] || [ "$name" = terminal ]; } && [ "$scheme" = dark ] && theme="GTK_THEME=Adwaita:dark"   # GTK 3 follows its theme
+  env XDG_CONFIG_HOME="$cfg" WAYLAND_DISPLAY=niro-gtk GDK_BACKEND=wayland ADW_DEBUG_COLOR_SCHEME=prefer-$scheme $theme "$@" > /dev/null 2>&1 & local P=$!
   sleep 9; ev "Main.overview.hide(); 1"; sleep 1; shot "$name-$scheme-$integ"; kill $P 2>/dev/null; wait $P 2>/dev/null; sleep 1
 }
+GTK3="imports.gi.versions.Gtk=\"3.0\"; const {Gtk}=imports.gi; Gtk.init(null); const w=new Gtk.Window({title:\"GTK 3 test\", default_width: 700, default_height: 420}); const hb=new Gtk.HeaderBar({title:\"GTK 3 test\", show_close_button:true}); w.set_titlebar(hb); const box=new Gtk.Box(); const side=new Gtk.ListBox(); side.get_style_context().add_class(\"sidebar\"); for (const t of [\"Documents\",\"Music\",\"Pictures\"]) side.add(new Gtk.Label({label:t, margin:10})); const tv=new Gtk.TextView({hexpand:true}); tv.get_buffer().set_text(\"GTK 3 content: readable text over the glass.\\nSecond line.\", -1); box.pack_start(side,false,false,0); box.pack_start(tv,true,true,0); w.add(box); w.connect(\"destroy\", Gtk.main_quit); w.show_all(); Gtk.main();"
 for scheme in dark light; do
   for integ in off on; do
     [ "$integ" = off ] && [ "$scheme" = light ] && continue
-    run files $scheme $integ nautilus --new-window /usr/share/backgrounds
-    run editor $scheme $integ gnome-text-editor /etc/os-release
-    run settings $scheme $integ gnome-control-center
+    if [ -z "${ONLY:-}" ] || [ "$ONLY" = gtk4 ]; then
+      run files $scheme $integ nautilus --new-window /usr/share/backgrounds
+      run editor $scheme $integ gnome-text-editor /etc/os-release
+      run settings $scheme $integ gnome-control-center
+    fi
+    if [ -z "${ONLY:-}" ] || [ "$ONLY" = gtk3 ]; then
+      run gtk3 $scheme $integ gjs -c "$GTK3"
+      run terminal $scheme $integ gnome-terminal
+    fi
   done
 done
 kill $SP' > /dev/null 2>&1

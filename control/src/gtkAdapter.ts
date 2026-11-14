@@ -26,6 +26,7 @@ window.background:not(.solid-csd) { background-color: ${rgba(t.glass)}; }
 headerbar, .titlebar { background-color: transparent; box-shadow: none; border-color: ${rgba(t.divider)}; }
 ${sidebar} { background-color: ${rgba(t.sidebar)}; }
 .view, textview, textview text, .content-pane { background-color: ${rgba(t.content)}; }
+${version === 3 ? `/* GTK 3 follows its theme, not GNOME's scheme: the text on the surfaces painted here gets a matching colour, so a wrong guess cannot hide it */\n.view, textview text { color: ${rgba(t.text1)}; }\n.sidebar label, .navigation-sidebar label { color: ${rgba(t.text1)}; }\n` : ''}
 .boxed-list, list.rich-list { background-color: ${rgba(t.group)}; }
 `;
 }
@@ -49,7 +50,8 @@ export function withoutBlock(text: string): string {
     return text.slice(0, i - 1) + text.slice(j + END.length + 1);
 }
 
-export interface Options {configDir: string; backupRoot: string; consent: boolean; scheme: Scheme; glass: number; tint?: string; surfaces: Surfaces; disabled?: boolean}
+/** `scheme` is for GTK 4 (it follows GNOME); `scheme3` for GTK 3 (it follows its theme), `scheme` when absent. */
+export interface Options {configDir: string; backupRoot: string; consent: boolean; scheme: Scheme; scheme3?: Scheme; glass: number; tint?: string; surfaces: Surfaces; disabled?: boolean}
 
 /** Every file that would be created or changed, for the confirmation dialog. */
 export function plan(configDir: string) {
@@ -84,7 +86,7 @@ export function install(o: Options) {
             const dir = `${o.configDir}/gtk-${v}.0`;
             const gen = `${dir}/${GENERATED}`;
             touched.push({path: gen, before: read(gen)});
-            write(gen, gtkStylesheet(v, o.scheme, o.glass, o.tint, o.surfaces, o.disabled));
+            write(gen, gtkStylesheet(v, v === 3 ? (o.scheme3 ?? o.scheme) : o.scheme, o.glass, o.tint, o.surfaces, o.disabled));
             for (const name of HOOK_TARGETS[v]) {
                 const real = target(`${dir}/${name}`);
                 if (touched.some(t => t.path === real)) continue;
@@ -132,7 +134,7 @@ export function refresh(o: Omit<Options, 'consent' | 'backupRoot'>): string[] {
     const rewritten = [];
     for (const v of [4, 3]) {
         const path = `${o.configDir}/gtk-${v}.0/${GENERATED}`;
-        const next = gtkStylesheet(v, o.scheme, o.glass, o.tint, o.surfaces, o.disabled);
+        const next = gtkStylesheet(v, v === 3 ? (o.scheme3 ?? o.scheme) : o.scheme, o.glass, o.tint, o.surfaces, o.disabled);
         if (read(path) === next) continue;
         write(path, next);
         rewritten.push(path);

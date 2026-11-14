@@ -70,7 +70,7 @@
       </choices>
       <default>'system'</default>
       <summary>Light or dark</summary>
-      <description>The scheme of the control panel and of the GTK theme integration. System follows GNOME.</description>
+      <description>The scheme of the control panel. System follows GNOME. Other applications keep following GNOME (GTK 4) or their theme (GTK 3): this choice does not change them.</description>
     </key>
     <key name="performance-mode" type="b">
       <default>false</default>

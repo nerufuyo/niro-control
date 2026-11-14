@@ -160,3 +160,12 @@ export function exclusionsDropped(current: string, next: string): string[] {
     const now = parseRules(current), after = parseRules(next);
     return Object.entries(now).filter(([id, r]) => r.mode === 'exclude' && after[id]?.mode !== 'exclude').map(([id]) => id).sort();
 }
+
+/**
+ * GTK 3 does not follow GNOME's colour scheme: its look is the theme's. A theme whose name says dark (Yaru-olive-dark, Adwaita-dark)
+ * or an application asking for the dark variant gives dark; anything else is taken as light. This is a heuristic about names, which
+ * is why the GTK 3 stylesheet also sets the text colour on the surfaces it paints.
+ */
+export function gtk3Scheme(themeName: string, preferDark = false): 'dark' | 'light' {
+    return preferDark || /dark/i.test(themeName ?? '') ? 'dark' : 'light';
+}
