@@ -81,7 +81,7 @@ export function windowEffect(appId: string, rules: Rules, o: {universal: boolean
 }
 
 // ---- Compatibility matrix: what is known about each family, and how it is known
-export type Status = 'native' | 'theme' | 'compositor' | 'limited' | 'unsupported';
+export type Status = 'native' | 'theme' | 'compositor' | 'limited' | 'unsupported' | 'unverified';
 export type Evidence = 'tested' | 'partly tested' | 'documented, not tested here';
 export type Applies = 'live' | 'restart' | 'login';
 export interface Family {
@@ -92,7 +92,7 @@ export interface Family {
     customizations: string[];
 }
 export const APPLIES_LABEL: Record<Applies, string> = {live: 'Applied live', restart: 'Application restart required', login: 'Requires new login'};
-export const STATUS_LABEL: Record<Status, string> = {native: 'Native integration', theme: 'Theme integration', compositor: 'Compositor effects only', limited: 'Limited support', unsupported: 'Unsupported'};
+export const STATUS_LABEL: Record<Status, string> = {native: 'Native integration', theme: 'Theme integration', compositor: 'Compositor effects only', limited: 'Limited support', unsupported: 'Unsupported', unverified: 'Not verified'};
 
 export const FAMILIES: Family[] = [
     {id: 'niro', name: 'Niro Control', match: /^org\.niro\./i, status: 'native', evidence: 'tested',
@@ -111,7 +111,7 @@ export const FAMILIES: Family[] = [
         how: 'Would need a Qt platform theme (qt5ct, Kvantum) that is not installed here', limit: 'No Qt integration is installed or written by Niro; blur and rounded corners by the shell only if the window is see-through', applies: 'live', customizations: ['Exclude from effects', 'Window fade (Advanced)']},
 ];
 /** What an application that matches no family gets: honest about not knowing. */
-export const UNKNOWN: Family = {id: 'unknown', name: 'Toolkit not identified', match: /$^/, status: 'limited', evidence: 'documented, not tested here', applies: 'live',
+export const UNKNOWN: Family = {id: 'unknown', name: 'Toolkit not identified', match: /$^/, status: 'unverified', evidence: 'documented, not tested here', applies: 'live',
     how: 'Blur behind the window by the shell, when the window is see-through', limit: 'Its content cannot be restyled from outside: whatever it paints stays as it is', customizations: ['Exclude from effects', 'Blur off', 'Window fade (Advanced)']};
 export function classify(appId: string, execLine = ''): Family | null {
     const hay = `${appId} ${execLine}`;
@@ -168,4 +168,17 @@ export function exclusionsDropped(current: string, next: string): string[] {
  */
 export function gtk3Scheme(themeName: string, preferDark = false): 'dark' | 'light' {
     return preferDark || /dark/i.test(themeName ?? '') ? 'dark' : 'light';
+}
+
+// ---- What is true of an application right now
+export interface Current {state: 'off' | 'excluded' | 'fade' | 'integrated' | 'not-integrated' | 'blur' | 'follows' | 'none'; text: string}
+/** The status line of an application: its rule, the global switches and whether the GTK integration is installed, in plain words. */
+export function currentStatus(f: Family, rule: Rule | undefined, o: {universal: boolean; safeMode: boolean; thirdParty: boolean; blur: boolean; gtkInstalled: boolean}): Current {
+    if (!o.universal) return {state: 'off', text: 'Universal Appearance is switched off'};
+    if (rule?.mode === 'exclude') return {state: 'excluded', text: 'Excluded: no effects'};
+    if (rule?.mode === 'fade') return {state: 'fade', text: o.thirdParty && !o.safeMode ? `Window fade ${rule.opacity ?? 80}%: its text fades too` : `Window fade ${rule.opacity ?? 80}% is set but not active (${o.safeMode ? 'safe mode' : 'window-level effects are off'})`};
+    if (o.safeMode) return {state: 'none', text: 'Safe mode: no effects'};
+    if (f.status === 'native') return {state: 'follows', text: 'Follows the Look'};
+    if (f.status === 'theme' || f.id === 'gtk3') return o.gtkInstalled ? {state: 'integrated', text: 'GTK integration installed: restart the application to see it'} : {state: 'not-integrated', text: 'GTK integration not installed: only compositor effects'};
+    return o.blur && rule?.blur !== false ? {state: 'blur', text: 'Blur behind the window only'} : {state: 'none', text: 'No effect'};
 }

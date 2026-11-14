@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {APPLIES_LABEL, UNKNOWN, classify, detectPreset, effective, FAMILIES, FLOORS, parseRules, PRESETS, serializeRules, setRule, windowEffect} from '../../control/build/appearance.js';
+import {STATUS_LABEL, currentStatus, APPLIES_LABEL, UNKNOWN, classify, detectPreset, effective, FAMILIES, FLOORS, parseRules, PRESETS, serializeRules, setRule, windowEffect} from '../../control/build/appearance.js';
 
 test('presets are recognised, anything else is custom', () => {
     for (const [name, v] of Object.entries(PRESETS)) assert.equal(detectPreset(v), name);
@@ -63,7 +63,7 @@ test('matrix: nothing is called supported on a toolkit alone, every entry says w
     // nothing is offered that does not take effect: Window fade only where the compositor can do it, and always marked Advanced
     for (const f of [...FAMILIES, UNKNOWN]) for (const c of f.customizations) assert.ok(!/fade/i.test(c) || /Advanced/.test(c), `${f.id}: ${c}`);
     assert.equal(classify('org.gnome.Nautilus').applies, 'restart');             // GTK styles load when an app starts
-    assert.equal(UNKNOWN.status, 'limited');
+    assert.equal(UNKNOWN.status, 'unverified');
     assert.equal(APPLIES_LABEL.restart, 'Application restart required');
     assert.equal(classify('org.gnome.Nautilus').status, 'theme');
     assert.equal(classify('google-chrome').status, 'compositor');
@@ -115,4 +115,25 @@ test('GTK 3 scheme follows the theme, not GNOME', () => {
     assert.equal(gtk3Scheme('Adwaita'), 'light');
     assert.equal(gtk3Scheme('Adwaita', true), 'dark');
     assert.equal(gtk3Scheme(''), 'light');
+});
+
+test('an application whose toolkit is not known is "Not verified", never "compatible"', () => {
+    assert.equal(UNKNOWN.status, 'unverified');
+    assert.equal(STATUS_LABEL.unverified, 'Not verified');
+});
+
+test('the status line says what is true now: switches, rule, integration', () => {
+    const on = {universal: true, safeMode: false, thirdParty: false, blur: true, gtkInstalled: false};
+    const files = classify('org.gnome.Nautilus'), chrome = classify('google-chrome'), niro = classify('org.niro.Control');
+    assert.equal(currentStatus(files, undefined, on).state, 'not-integrated');
+    assert.equal(currentStatus(files, undefined, {...on, gtkInstalled: true}).state, 'integrated');
+    assert.match(currentStatus(files, undefined, {...on, gtkInstalled: true}).text, /restart the application/);
+    assert.equal(currentStatus(chrome, undefined, on).state, 'blur');
+    assert.equal(currentStatus(chrome, {mode: 'inherit', blur: false}, on).state, 'none');
+    assert.equal(currentStatus(chrome, {mode: 'exclude'}, on).state, 'excluded');
+    assert.match(currentStatus(chrome, {mode: 'fade', opacity: 70}, on).text, /not active \(window-level effects are off\)/);
+    assert.match(currentStatus(chrome, {mode: 'fade', opacity: 70}, {...on, thirdParty: true}).text, /text fades too/);
+    assert.equal(currentStatus(niro, undefined, on).state, 'follows');
+    assert.equal(currentStatus(chrome, undefined, {...on, safeMode: true}).state, 'none');
+    assert.equal(currentStatus(chrome, {mode: 'exclude'}, {...on, universal: false}).state, 'off');
 });

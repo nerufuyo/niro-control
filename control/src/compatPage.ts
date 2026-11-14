@@ -6,13 +6,13 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
-import {APPLIES_LABEL, classify, effective, FAMILIES, parseRules, PRESET_KEYS, gtk3Scheme, resolveScheme, serializeRules, setRule, STATUS_LABEL, UNKNOWN} from './appearance.js';
+import {APPLIES_LABEL, classify, currentStatus, effective, FAMILIES, parseRules, PRESET_KEYS, gtk3Scheme, resolveScheme, serializeRules, setRule, STATUS_LABEL, UNKNOWN} from './appearance.js';
 import {CATALOG} from './catalog.js';
 import * as gtk from './gtkAdapter.js';
 
 const scrolled = child => new Gtk.ScrolledWindow({child, hscrollbar_policy: Gtk.PolicyType.NEVER, vexpand: true});
-const FILTERS = ['All applications', 'With a rule', 'Excluded', 'Theme integration', 'Compositor effects only', 'Limited support', 'Unsupported'];
-const FILTER_STATUS = {3: 'theme', 4: 'compositor', 5: 'limited', 6: 'unsupported'};
+const FILTERS = ['All applications', 'With a rule', 'Excluded', 'Theme integration', 'Compositor effects only', 'Limited support', 'Unsupported', 'Not verified'];
+const FILTER_STATUS = {3: 'theme', 4: 'compositor', 5: 'limited', 6: 'unsupported', 7: 'unverified'};
 const FADE_WARNING = 'Window fade lowers the opacity of the whole window, so its text, icons and controls fade with the background. It also needs "Window-level effects for other applications" on.';
 
 export const configDir = () => GLib.get_user_config_dir();
@@ -98,6 +98,10 @@ export function compatPage(model, ctx) {
         const fam = classify(id, info.get_commandline?.() ?? '') ?? UNKNOWN;
         const row = new Adw.ActionRow({title: GLib.markup_escape_text(info.get_name(), -1), subtitle_lines: 2,
             subtitle: GLib.markup_escape_text(`${wm} · ${fam.name}\n${STATUS_LABEL[fam.status]} · ${APPLIES_LABEL[fam.applies]}`, -1)});
+        row.set_subtitle_lines(3);
+        const flags = () => ({universal: model.read('niro.universal-enabled') !== false, safeMode: model.read('niro.safe-mode') === true, thirdParty: model.read('niro.affect-thirdparty') === true,
+            blur: model.read('niro.blur') !== false && model.read('niro.performance-mode') !== true, gtkInstalled: gtk.status(configDir(), backupRoot()).installed});
+        row._status_text = () => `${wm} · ${fam.name}\n${STATUS_LABEL[fam.status]} · ${APPLIES_LABEL[fam.applies]}\nNow: ${currentStatus(fam, rules[wm], flags()).text}`;
         row.set_tooltip_text(`${fam.how}\nLimit: ${fam.limit}\nCan be set: ${fam.customizations.join(', ')}\nEvidence: ${fam.evidence}`);
         row._text = `${info.get_name()} ${id} ${wm}`.toLowerCase(); row._wm = wm; row._status = fam.status;
         const icon = info.get_icon(); if (icon) row.add_prefix(new Gtk.Image({gicon: icon, pixel_size: 28}));
@@ -116,9 +120,10 @@ export function compatPage(model, ctx) {
             const r = rules[wm];
             drop.set_selected(r?.mode === 'exclude' ? 1 : 0); fade.set_active(r?.mode === 'fade'); amount.set_value(r?.opacity ?? 80);
             amount.set_sensitive(r?.mode === 'fade'); fade.set_sensitive(r?.mode !== 'exclude');
+            row.set_subtitle(GLib.markup_escape_text(row._status_text(), -1));
             busy = false;
         };
-        show();
+        show(); row.set_subtitle(GLib.markup_escape_text(row._status_text(), -1));
         drop.connect('notify::selected', () => { if (busy) return; save(setRule(rules, wm, drop.get_selected() === 1 ? {mode: 'exclude'} : null)); show(); });
         fade.connect('notify::active', () => { if (busy) return; save(setRule(rules, wm, fade.get_active() ? {mode: 'fade', opacity: amount.get_value()} : null)); show(); });
         amount.connect('value-changed', () => { if (busy || !fade.get_active()) return; save(setRule(rules, wm, {mode: 'fade', opacity: amount.get_value()})); });
