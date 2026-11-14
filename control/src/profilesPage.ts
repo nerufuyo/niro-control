@@ -7,8 +7,8 @@ import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
 import {CATALOG} from './catalog.js';
-import {describeValue, diff, inactiveNotes, stalePartsAffected} from './profileLogic.js';
-import type {Change} from './profileLogic.js';
+import {describeValue, diff, stalePartsAffected, summarize} from './profileLogic.js';
+import type {Change, Summary} from './profileLogic.js';
 import type {ProfileEngine} from './profiles.js';
 
 const MENUS = ['Look', 'Island', 'Dock', 'Windows', 'Search'];
@@ -43,19 +43,20 @@ export function profilesPage(engine: ProfileEngine, ctx) {
             hscrollbar_policy: Gtk.PolicyType.NEVER, propagate_natural_height: true});
     };
 
-    /** Shows what would change; `go` runs when the person agrees. */
-    const confirm = (title: string, changes: Change[], verb: string, go: () => void, notes: string[] = []) => {
+    /** Shows what would change: a headline and the areas first, the old and new values on request; `go` runs when the person agrees. */
+    const confirm = (title: string, changes: Change[], verb: string, go: () => void, sum?: Summary) => {
+        sum ??= summarize(changes, {...engine.capture(), ...Object.fromEntries(changes.map(c => [c.id, c.to]))}, engine.items, ctx.stale ?? []);
         const empty = !changes.length;
-        const d = Adw.AlertDialog.new(title, empty ? 'Nothing to change: the settings already match.' : `${plural(changes.length, 'setting')} will change. Nothing else is touched.`);
+        const d = Adw.AlertDialog.new(title, sum.headline);
         if (!empty) {
-            if (notes.length) {
-                const box = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 8});
-                box.append(changeList(changes));
-                box.append(new Gtk.Label({label: notes.join('\n'), wrap: true, xalign: 0, css_classes: ['caption', 'warning']}));
-                d.set_extra_child(box);
-            } else {
-                d.set_extra_child(changeList(changes));
-            }
+            const box = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 8});
+            box.append(new Gtk.Label({label: sum.categories.map(c => `${c.menu} ${c.count}`).join('   ·   '), xalign: 0, css_classes: ['heading']}));
+            const more = new Gtk.Expander({label: 'Show old and new values', child: changeList(changes)});
+            more.update_property([Gtk.AccessibleProperty.DESCRIPTION], [sum.headline]);
+            box.append(more);
+            for (const [text, css] of [...sum.conflicts.map(c => [`Note: ${c}.`, 'warning']), ...(sum.login ? [[sum.login, 'warning']] : []), [sum.undo, 'dim-label']])
+                box.append(new Gtk.Label({label: text, wrap: true, xalign: 0, css_classes: ['caption', css]}));
+            d.set_extra_child(box);
         }
         d.add_response('cancel', 'Cancel');
         if (!empty) { d.add_response('go', verb); d.set_response_appearance('go', Adw.ResponseAppearance.SUGGESTED); d.set_default_response('go'); }
@@ -87,8 +88,8 @@ export function profilesPage(engine: ProfileEngine, ctx) {
     const apply = (profile) => {
         const target = engine.settingsOf(profile);
         const changes = engine.preview(target);
-        const notes = inactiveNotes(changes, {...engine.capture(), ...target}, engine.items).map(n => `Note: ${n.text}.`);
-        confirm(`Apply "${profile.name}"?`, changes, 'Apply', () => attempt('Apply failed', () => report(profile.name, engine.apply(profile.id))), notes);
+        confirm(`Apply "${profile.name}"?`, changes, 'Apply', () => attempt('Apply failed', () => report(profile.name, engine.apply(profile.id))),
+            summarize(changes, {...engine.capture(), ...target}, engine.items, ctx.stale ?? []));
     };
 
     const ask = (title: string, body: string, initial: string, verb: string, go: (text: string, menus: string[]) => void, scopes = false) => {
@@ -197,8 +198,10 @@ export function profilesPage(engine: ProfileEngine, ctx) {
     act('update', p => {
         if (protectedMsg(p)) return;
         const ids = Object.keys(p.settings);
-        confirm(`Update "${p.name}" from the current settings?`, diff(p.settings, engine.capture(ids), engine.items), 'Update', () =>
-            attempt('Not updated', () => { engine.updateFromCurrent(p.id); refresh(); ctx.toast(`Updated "${p.name}"`); }));
+        const changes = diff(p.settings, engine.capture(ids), engine.items);
+        confirm(`Update "${p.name}" from the current settings?`, changes, 'Update', () =>
+            attempt('Not updated', () => { engine.updateFromCurrent(p.id); refresh(); ctx.toast(`Updated "${p.name}"`); }),
+            summarize(changes, {}, [], [], 'The profile is rewritten from the settings in force now. The settings themselves stay as they are.'));
     });
     act('export', p => fileDialog('Export profile', true, `${p.id}.json`, path => attempt('Not exported', () => { engine.exportTo(p.id, path); ctx.toast(`Exported to ${path}`); })));
     act('delete', p => {
@@ -257,7 +260,7 @@ export function profilesPage(engine: ProfileEngine, ctx) {
             const restore = new Gtk.Button({label: 'Restore', valign: Gtk.Align.CENTER});
             restore.connect('clicked', () => attempt('Restore failed', () => {
                 const target = JSON.parse(new TextDecoder().decode(GLib.file_get_contents(b.file)[1])).settings;
-                confirm(`Restore "${b.label}"?`, engine.preview(target), 'Restore', () => attempt('Restore failed', () => report('the backup', engine.restore(b.file))));
+                { const changes = engine.preview(target); confirm(`Restore "${b.label}"?`, changes, 'Restore', () => attempt('Restore failed', () => report('the backup', engine.restore(b.file))), summarize(changes, {...engine.capture(), ...target}, engine.items, ctx.stale ?? [], 'The settings as they are now are backed up first.')); }
             }));
             const del = new Gtk.Button({icon_name: 'user-trash-symbolic', css_classes: ['flat'], valign: Gtk.Align.CENTER, tooltip_text: 'Delete this backup'});
             del.update_property([Gtk.AccessibleProperty.LABEL], [`Delete backup ${b.label}`]);

@@ -168,3 +168,21 @@ test('dependency rules: the ones the code did not support are gone, unverified o
     assert.equal(dependencyBlocks(byId['island.hover-delay'], () => 'click'), true);
     assert.equal(dependencyBlocks(byId['island.hover-delay'], () => 'hover'), false);
 });
+
+import {summarize} from '../../control/build/profileLogic.js';
+test('change summary: counts, areas largest first, conflicts, pending login, undo line', () => {
+    const c = (id, menu) => ({id, title: id, menu, group: 'g', from: 1, to: 2});
+    const changes = [c('dock.icon-size', 'Dock'), c('island.hover-delay', 'Island'), c('island.auto-hide', 'Island')];
+    const s = summarize(changes, {'island.hover-delay': 300, 'island.open-on': 'click'}, CATALOG, ['Dock']);
+    assert.equal(s.headline, '3 settings will change');
+    assert.deepEqual(s.categories.map(x => `${x.menu}:${x.count}`), ['Island:2', 'Dock:1']);
+    assert.equal(s.conflicts.length, 1);
+    assert.match(s.conflicts[0], /hover-delay|Hover/i);
+    assert.match(s.login, /^Dock has an update that loads at your next login/);
+    assert.match(s.undo, /Undo restores/);
+    const none = summarize([], {}, CATALOG, []);
+    assert.equal(none.total, 0);
+    assert.match(none.headline, /Nothing to change/);
+    assert.equal(none.login, null);
+    assert.equal(summarize([c('dock.icon-size', 'Dock')], {}, CATALOG, []).headline, '1 setting will change');
+});

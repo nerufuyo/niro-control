@@ -242,3 +242,33 @@ export function describeParseError(message: string, text: string): string {
     }
     return message;
 }
+
+// ---- The summary shown before a profile is applied
+
+export interface Summary {
+    total: number;
+    /** One line: "7 settings will change" */
+    headline: string;
+    /** Per area (Island, Dock, Look…), largest first */
+    categories: {menu: string; count: number; changes: Change[]}[];
+    /** Changes that would have no effect once applied */
+    conflicts: string[];
+    /** A line when a part updated on disk loads only at the next login, else null */
+    login: string | null;
+    undo: string;
+}
+
+export function summarize(changes: Change[], after: Settings, catalog: Item[], stale: string[], undo = 'A backup is made first. Undo restores it.'): Summary {
+    const by = new Map<string, Change[]>();
+    for (const c of changes) by.set(c.menu, [...(by.get(c.menu) ?? []), c]);
+    const categories = [...by.entries()].map(([menu, list]) => ({menu, count: list.length, changes: list})).sort((a, b) => b.count - a.count || a.menu.localeCompare(b.menu));
+    const pending = stalePartsAffected(changes, stale, catalog);
+    return {
+        total: changes.length,
+        headline: changes.length ? `${changes.length} setting${changes.length === 1 ? '' : 's'} will change` : 'Nothing to change: the settings already match.',
+        categories,
+        conflicts: inactiveNotes(changes, after, catalog).map(n => n.text),
+        login: pending.length ? `${pending.join(', ')} ${pending.length === 1 ? 'has' : 'have'} an update that loads at your next login: until then the new values may not show.` : null,
+        undo,
+    };
+}
