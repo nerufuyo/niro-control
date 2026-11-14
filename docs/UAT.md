@@ -26,6 +26,6 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 20 | Recovery | Not easy to stage by hand: run `tests/gjs/profiles.test.js` for the logic; in a session, kill `niro-control --apply-profile gaming` mid-way and reopen Home | A Recovery row offers Restore backup |
 | 21 | Log out notice | After installing a new package without logging out | "Log out needed" says which part, with a Log out button |
 | 22 | Light and dark | Switch the system theme | Panel and Search stay legible; focus rings visible with Tab |
-| 23 | Idle CPU | `top -p $(pgrep -xo gnome-shell)` for a minute with nothing moving | Note the CPU; the baseline report measured about 18% on the maintainer's machine (see reports/performance) and a headless shell about 0.5%: if yours is high, bisect with `gnome-extensions disable` one Niro extension at a time |
+| 23 | Idle CPU | `top -p $(pgrep -xo gnome-shell)` for a minute with nothing moving | Note the CPU. Two read-only samples on the author's machine gave 17.9% and 2.7% (the first was probably transient load, not reproduced): if yours stays high, bisect with `gnome-extensions disable` one Niro extension at a time |
 
 Nothing in this list has been run by the author yet; the report says so.
