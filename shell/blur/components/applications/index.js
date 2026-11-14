@@ -436,9 +436,12 @@ export const ApplicationsBlur = class ApplicationsBlur {
         else
             blur_actor.hide();
 
+        // The control panel paints its own glass (its background follows Look > Opacity), so fading the whole window here would
+        // fade its text and controls too: it gets the blur behind it and keeps full opacity.
+        const paints_own_glass = meta_window.get_wm_class() === 'org.niro.Control';
         this.window_opacity.set(
             window_actor,
-            show_blur ? this.settings.applications.OPACITY : 255,
+            show_blur && !paints_own_glass ? this.settings.applications.OPACITY : 255,
             blur_actor
         );
     }

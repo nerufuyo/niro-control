@@ -1,6 +1,7 @@
 // Opens the control panel on the page named by NIRO_PAGE (a module id) and stays open: used by scripts/screenshots.sh.
 import Adw from 'gi://Adw?version=1';
 import Gtk from 'gi://Gtk?version=4.0';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 import {buildWindow} from '../control/build/window.js';
@@ -8,6 +9,8 @@ import {buildWindow} from '../control/build/window.js';
 const app = new Adw.Application({application_id: 'org.niro.Screenshot'});
 const find = (w, test) => { if (test(w)) return w; for (let c = w.get_first_child(); c; c = c.get_next_sibling()) { const r = find(c, test); if (r) return r; } return null; };
 app.connect('activate', () => {
+    // NIRO_SET_OPACITY: the Look opacity to show (a throw-away settings backend is expected, see scripts/glass-matrix.sh)
+    if (GLib.getenv('NIRO_SET_OPACITY')) { new Gio.Settings({schema_id: 'org.niro.control'}).set_int('opacity', Number(GLib.getenv('NIRO_SET_OPACITY'))); }
     const {window} = buildWindow(app);
     window.present();
     GLib.timeout_add(GLib.PRIORITY_DEFAULT, 800, () => {

@@ -11,6 +11,7 @@ import {CATALOG} from './catalog.js';
 import {settingsSearch} from './components.js';
 import {searchItems} from './logic.js';
 import {aboutPage, dockPage, islandPage, lookPage, Model, resultsPage, searchPage, windowsPage} from './pages.js';
+import {stylesheet} from './glass.js';
 import {homePage} from './homePage.js';
 import {profilesPage} from './profilesPage.js';
 
@@ -22,20 +23,6 @@ const MODULES = [
     ['profiles', 'Profiles', 'user-bookmarks-symbolic', (model, shared) => shared.profiles.widget], ['about', 'About', 'help-about-symbolic', aboutPage],
 ];
 
-const CSS = `
-.niro-window { background-color: alpha(@window_bg_color, 0.93); }
-/* round every corner of the window itself: the shell's corner effect skips libadwaita apps */
-window.niro-window:not(.maximized):not(.fullscreen):not(.tiled), window.niro-window.csd:not(.maximized):not(.fullscreen):not(.tiled) { border-radius: 14px; }
-.niro-sidebar { background-color: alpha(@sidebar_bg_color, 0.86); }
-.niro-window .boxed-list, .niro-window preferencesgroup > box > box > list { background-color: alpha(@card_bg_color, 0.88); }
-.niro-subnav { background-color: alpha(@sidebar_bg_color, 0.6); }
-.niro-subnav row { border-radius: 8px; margin: 1px 6px; }
-.niro-preview { border-radius: 12px; background-color: alpha(@card_bg_color, 0.55); }
-.niro-card { border-radius: 14px; background-color: alpha(@card_bg_color, 0.88); }
-.niro-card-active { background-color: alpha(@accent_bg_color, 0.14); border-radius: 14px; }
-.niro-preset { padding: 6px 10px; border-radius: 9px; }
-.niro-sidebar row.activatable { border-radius: 9px; margin: 1px 6px; }
-`;
 
 export /** The parts of the shell that were updated on disk after the shell started: they run their old code until the next login. */
 function staleParts(): string[] {
@@ -54,8 +41,13 @@ function staleParts(): string[] {
 
 export function buildWindow(app) {
     const provider = new Gtk.CssProvider();
-    provider.load_from_string(CSS);
-    Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+    const manager = Adw.StyleManager.get_default();
+    let model;
+    // the glass follows Look > Opacity and the dark/light scheme; nothing else in the panel does
+    const restyle = () => provider.load_from_string(stylesheet(manager.get_dark() ? 'dark' : 'light', Number(model?.read('niro.opacity') ?? 80), model?.read('niro.tint')));
+    restyle();
+    // above USER (800): a user-wide ~/.config/gtk-4.0/gtk.css theme must not repaint the panel's layers (it set opaque backgrounds and a fixed text colour)
+    Gtk.StyleContext.add_provider_for_display(Gdk.Display.get_default(), provider, Gtk.STYLE_PROVIDER_PRIORITY_USER + 50);
 
     const overlay = new Adw.ToastOverlay();
     const window = new Adw.ApplicationWindow({application: app, title: 'Niro Control', default_width: 1060, default_height: 740, css_classes: ['niro-window']});
@@ -83,7 +75,10 @@ export function buildWindow(app) {
             else if (surface?.restore_system_shortcuts && !on) surface.restore_system_shortcuts();
         },
     };
-    const model = new Model(ctx);
+    model = new Model(ctx);
+    for (const id of ['niro.opacity', 'niro.tint']) { const b = model.binding(CATALOG.find(i => i.id === id)); if (b && !Array.isArray(b)) b.subscribe(restyle); }
+    manager.connect('notify::dark', restyle);
+    restyle();
     const stale = GLib.getenv('NIRO_NOBANNER') ? [] : staleParts();
     ctx.stale = stale;
     const shared = {};
@@ -140,7 +135,7 @@ export function buildWindow(app) {
 
     const pageBox = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL});
     const contentHeader = new Adw.HeaderBar({title_widget: contentTitle});
-    const contentView = new Adw.ToolbarView({content: pageBox}); contentView.add_top_bar(contentHeader);
+    const contentView = new Adw.ToolbarView({content: pageBox, css_classes: ['niro-content']}); contentView.add_top_bar(contentHeader);
     // Simple shows the common settings; Advanced shows all of them. Only what is shown changes, never a value.
     const modeBox = new Gtk.Box({css_classes: ['linked'], valign: Gtk.Align.CENTER});
     const simple = new Gtk.ToggleButton({label: 'Simple', tooltip_text: 'Common settings'});

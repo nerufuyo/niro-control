@@ -113,3 +113,15 @@ A dependency rule in `scripts/control-panel-items.py` (`DEPENDS`) greys a row ou
 - Headless GNOME Shell: `make test-shell` (needs the installed package).
 - Installed files match the build: `scripts/verify-install.sh`.
 - Real session: `docs/UAT.md`. Nothing is called verified in a real session until that checklist has been run.
+
+## The panel's glass (layers)
+
+`control/src/glass.ts` (pure, tested) defines the panel's look as three layers, and `window.ts` loads its `stylesheet()` at a priority above the user's own `~/.config/gtk-4.0/gtk.css` (that file can carry a whole-desktop GTK theme that would otherwise repaint the panel with opaque backgrounds and a fixed text colour):
+
+1. glass: the window's own background. The only layer that follows Look > Opacity (and the Look tint in the dark scheme).
+2. surfaces: sidebar, content, groups, raised things: fixed alphas, high enough to carry text over any wallpaper.
+3. foreground: text and dividers: fixed colours. Nothing sets `opacity` on a container; libadwaita's dimming of secondary text (an `opacity`) is replaced by a colour, because opacity over glass dims the text with it.
+
+The shell's blur extension used to fade whole windows by the Look opacity; the panel (`org.niro.Control`) is now exempt (it still gets the blur behind it) because it paints its own glass. That change is in `shell/blur/components/applications/index.js` and loads at the next login.
+
+`scripts/glass-matrix.sh` takes screenshots over four wallpapers, several opacities and both schemes in a private headless shell (it loads the repository's blur extension, not the installed one). `tests/island/glass.test.js` checks that no token but the glass follows the opacity and that primary and secondary text reach WCAG AA over black, white and mid wallpapers at every opacity.

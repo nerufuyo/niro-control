@@ -51,7 +51,7 @@ export class Model {
         this.simpleHints.forEach(w => w.set_visible(!advanced));
         for (const rows of this.rows.values())
             for (const row of rows)
-                if (row._sub !== undefined) row.set_subtitle(row._sub + (advanced && row._key ? `\n<span font_family="monospace" size="small" alpha="55%">${GLib.markup_escape_text(row._key, -1)}</span>` : ''));
+                if (row._sub !== undefined) row.set_subtitle(row._sub + (advanced && row._key ? `\n<span font_family="monospace" size="small" alpha="70%">${GLib.markup_escape_text(row._key, -1)}</span>` : ''));
         if (save) {
             try {
                 GLib.mkdir_with_parents(this.engine.root, 0o755);
@@ -134,7 +134,7 @@ export class Model {
     }
 
     setRowKey(row) {
-        row.set_subtitle(row._sub + `\n<span font_family="monospace" size="small" alpha="55%">${GLib.markup_escape_text(row._key, -1)}</span>`);
+        row.set_subtitle(row._sub + `\n<span font_family="monospace" size="small" alpha="70%">${GLib.markup_escape_text(row._key, -1)}</span>`);
     }
 
     applyDependency(item: Item, row) {
