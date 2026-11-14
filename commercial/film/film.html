@@ -1,0 +1,209 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>NIRO — 45 seconds</title>
+<style>
+  @font-face { font-family: "NiroSans"; src: local("Inter Variable"), local("Inter"); font-weight: 100 900; }
+  html, body { margin: 0; background: #02040b; overflow: hidden; }
+  body { font-family: "Inter Variable", "Inter", "Noto Sans", sans-serif; color: #fff; -webkit-font-smoothing: antialiased; }
+  #view { position: absolute; left: 0; top: 0; overflow: hidden; background: #02040b; }
+  #wall { position: absolute; left: 0; top: 0; will-change: transform; }
+  #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; will-change: transform; }
+  #stage img.L { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; opacity: 0; will-change: opacity, clip-path; }
+  .fx { position: absolute; pointer-events: none; }
+  #cover { position: absolute; inset: 0; background: radial-gradient(120% 90% at 50% 45%, #060a1c 0%, #02040b 70%); }
+  .orb { position: absolute; border-radius: 50%; filter: blur(90px); will-change: transform, opacity; }
+  #spark { position: absolute; border-radius: 50%; background: radial-gradient(circle, rgba(190,225,255,1) 0%, rgba(120,170,255,.75) 22%, rgba(90,120,255,.28) 48%, rgba(60,80,220,0) 72%); mix-blend-mode: screen; }
+  #glass { position: absolute; will-change: transform, width, height, border-radius;
+    background: linear-gradient(145deg, rgba(255,255,255,.34) 0%, rgba(190,215,255,.12) 38%, rgba(120,110,255,.10) 62%, rgba(255,255,255,.22) 100%);
+    backdrop-filter: blur(22px) saturate(1.7) brightness(1.15);
+    box-shadow: inset 0 1.5px 1px rgba(255,255,255,.55), inset 0 -2px 6px rgba(120,160,255,.35), inset 14px 20px 40px rgba(255,255,255,.10), 0 30px 80px rgba(20,30,120,.55), 0 0 0 1px rgba(255,255,255,.20); }
+  #glass::before { content: ""; position: absolute; inset: 6% 10% 52% 12%; border-radius: 50%; background: linear-gradient(180deg, rgba(255,255,255,.65), rgba(255,255,255,0)); filter: blur(5px); opacity: .8; }
+  #glass::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: conic-gradient(from 210deg, rgba(120,200,255,0), rgba(130,120,255,.35), rgba(120,200,255,0) 40%, rgba(255,255,255,.25) 60%, rgba(120,200,255,0)); mix-blend-mode: screen; opacity: .65; }
+  .title { position: absolute; left: 0; right: 0; text-align: center; font-weight: 300; letter-spacing: .035em; color: rgba(255,255,255,.94); text-shadow: 0 2px 30px rgba(0,0,10,.55); will-change: opacity, transform, filter; opacity: 0; }
+  #vignette { position: absolute; inset: 0; background: radial-gradient(130% 110% at 50% 50%, rgba(0,0,0,0) 55%, rgba(0,2,10,.55) 100%); }
+  #grain { position: absolute; inset: 0; opacity: .05; mix-blend-mode: overlay; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"); }
+  #cursor { position: absolute; width: 30px; height: 30px; opacity: 0; transform-origin: 3px 2px; filter: drop-shadow(0 3px 5px rgba(0,0,20,.55)); }
+  .ring { position: absolute; border-radius: 50%; border: 2px solid rgba(190,225,255,.9); opacity: 0; box-shadow: 0 0 24px rgba(140,190,255,.6); }
+  #wavepanel { position: absolute; left: 1010px; top: 62px; width: 600px; height: 262px; border-radius: 28px; opacity: 0; overflow: hidden;
+    background: linear-gradient(160deg, rgba(10,14,40,.97), rgba(24,26,70,.95)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.10), 0 10px 40px rgba(0,0,30,.45); }
+  #wavepanel canvas { position: absolute; left: 0; top: 0; }
+  .sweep { position: absolute; opacity: 0; mix-blend-mode: screen; background: linear-gradient(105deg, rgba(255,255,255,0) 35%, rgba(190,215,255,.26) 48%, rgba(255,255,255,.34) 50%, rgba(190,215,255,.2) 52%, rgba(255,255,255,0) 65%); background-size: 260% 100%; border-radius: 22px; }
+  #keys { position: absolute; left: 0; right: 0; display: flex; justify-content: center; gap: 28px; opacity: 0; }
+  .key { min-width: 190px; height: 118px; padding: 0 34px; box-sizing: border-box; border-radius: 26px; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 500; letter-spacing: .02em;
+    background: linear-gradient(160deg, rgba(255,255,255,.30), rgba(150,170,255,.12)); backdrop-filter: blur(18px); box-shadow: inset 0 1.5px 1px rgba(255,255,255,.55), 0 14px 36px rgba(10,20,90,.5), 0 0 0 1px rgba(255,255,255,.22); }
+  #logo { position: absolute; left: 0; right: 0; text-align: center; opacity: 0; }
+  #logo .word { font-weight: 600; letter-spacing: .22em; padding-left: .22em; background: linear-gradient(100deg, #ffffff 0%, #cfe6ff 40%, #b9b0ff 75%, #ffffff 100%); background-size: 220% 100%; -webkit-background-clip: text; color: transparent; filter: drop-shadow(0 0 40px rgba(130,160,255,.55)); }
+  #logo .tag { font-weight: 300; letter-spacing: .14em; color: rgba(220,232,255,.9); }
+  #slabglow { position: absolute; border-radius: 34px; opacity: 0; box-shadow: 0 0 0 1.5px rgba(210,230,255,.55), 0 0 90px 10px rgba(120,170,255,.45), 0 0 220px 40px rgba(130,110,255,.28); }
+  #fade { position: absolute; inset: 0; background: #000; opacity: 0; }
+</style>
+<div id="view">
+  <img id="wall" src="../assets/wallpaper.png">
+  <div id="stage"></div>
+  <div id="cover"></div>
+  <div class="orb" id="o1"></div><div class="orb" id="o2"></div><div class="orb" id="o3"></div>
+  <div id="spark" class="fx"></div>
+  <div id="glass"></div>
+  <div id="slabglow"></div>
+  <div id="keys"><div class="key">Super</div><div class="key">Space</div></div>
+  <div id="logo"><div class="word">NIRO.</div><div class="tag">Make Linux Feel Different.</div></div>
+  <div class="title" id="t1">Something feels different.</div>
+  <div class="title" id="t2">Alive with every moment.</div>
+  <div class="title" id="t3">Feel every beat.</div>
+  <div class="title" id="t4">Fluid by design.</div>
+  <div class="title" id="t5">Designed to feel seamless.</div>
+  <div class="title" id="t6">Everything. One shortcut away.</div>
+  <div class="title" id="t7">Make it yours.</div>
+  <div id="vignette"></div><div id="grain"></div><div id="fade"></div>
+</div>
+<script>
+const Q = new URLSearchParams(location.search), TALL = Q.get('aspect') === 'tall';
+const W = TALL ? 1080 : 1920, H = TALL ? 1920 : 1080, KB = TALL ? 1920 / 1080 : 1;           // KB: css px per world px at zoom 1
+const $ = id => document.getElementById(id), view = $('view'); view.style.width = W + 'px'; view.style.height = H + 'px';
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x)), sm = x => (x = clamp(x), x * x * (3 - 2 * x)), lerp = (a, b, x) => a + (b - a) * x;
+const xf = (t, a, b) => sm((t - a) / (b - a));                         // 0 before a, 1 after b, smooth between
+const spring = (t, t0, a, b, w = 11, z = 0.52) => { if (t <= t0) return a; const x = t - t0, d = w * Math.sqrt(1 - z * z); return a + (b - a) * (1 - Math.exp(-z * w * x) * (Math.cos(d * x) + z * w / d * Math.sin(d * x))); };
+// ---- assets
+const NAMES = ['d-idle','d-pill','d-closed','b2-windows','s2-open','s2-fire','s2-calc','s2-setting','c-look-a','c-look-accent','c-look-crystal','e-0','e-hover','e-dialog','e-1','e-2','g-pill-paused','g-pill-playing','g-open-paused','g-open-playing','hs-calc','hs-setting', ...Array.from({length: 12}, (_, i) => 'm-' + String(i).padStart(2, '0'))];
+const L = {}; for (const n of NAMES) { const im = new Image(); im.className = 'L'; im.src = `../assets/shots/${n}.jpg`; L[n] = im; $('stage').appendChild(im); }
+let ENV = [], ready = 0;
+const wall = $('wall');
+// ---- overlays that live in the stage (world coordinates)
+const stage = $('stage');
+const cursor = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); cursor.id = 'cursor'; cursor.setAttribute('viewBox', '0 0 30 30');
+cursor.innerHTML = '<path d="M4 2 L4 22.5 L9.4 17.6 L13 25.5 L16.2 24 L12.7 16.4 L19.8 16.2 Z" fill="#fff" stroke="#0a0e22" stroke-width="1.6" stroke-linejoin="round"/>'; stage.appendChild(cursor);
+const rings = [0, 1, 2].map(() => { const r = document.createElement('div'); r.className = 'ring'; stage.appendChild(r); return r; });
+const panel = document.createElement('div'); panel.id = 'wavepanel'; const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 524; cv.style.width = '600px'; cv.style.height = '262px'; panel.appendChild(cv); stage.appendChild(panel);
+const sweeps = [[260, 350, 850, 550], [980, 260, 750, 525]].map(([x, y, w, h]) => { const s = document.createElement('div'); s.className = 'sweep'; Object.assign(s.style, {left: x + 'px', top: y + 'px', width: w + 'px', height: h + 'px'}); stage.appendChild(s); return s; });
+const g2 = cv.getContext('2d'); if (TALL) Object.assign(panel.style, {left: '300px', top: '440px'});
+// ---- camera: keyframes of {t, cx, cy, z}; wide and tall have their own paths
+function K(t, keys) { if (t <= keys[0].t) return keys[0]; for (let i = 1; i < keys.length; i++) if (t <= keys[i].t) { const a = keys[i - 1], b = keys[i], x = sm((t - a.t) / (b.t - a.t)); return {cx: lerp(a.cx, b.cx, x), cy: lerp(a.cy, b.cy, x), z: lerp(a.z, b.z, x)}; } return keys[keys.length - 1]; }
+const CAM = TALL ? [
+  {t: 0, cx: 960, cy: 540, z: 1}, {t: 5, cx: 960, cy: 540, z: 1.02}, {t: 8.8, cx: 960, cy: 520, z: 1.12}, {t: 9.6, cx: 960, cy: 500, z: 1.1}, {t: 10.0, cx: 880, cy: 500, z: 1.1}, {t: 10.6, cx: 520, cy: 500, z: 1.1}, {t: 14.6, cx: 540, cy: 500, z: 1.12},
+  {t: 15.4, cx: 960, cy: 500, z: 1.1}, {t: 17.2, cx: 960, cy: 500, z: 1.12}, {t: 17.45, cx: 1000, cy: 640, z: 1.15}, {t: 19.7, cx: 889, cy: 640, z: 1.2}, {t: 21, cx: 960, cy: 560, z: 1.1}, {t: 23, cx: 760, cy: 560, z: 1.12}, {t: 28.8, cx: 1150, cy: 540, z: 1.2}, {t: 29.4, cx: 975, cy: 380, z: 1.6},
+  {t: 31.6, cx: 975, cy: 380, z: 1.6}, {t: 32.0, cx: 960, cy: 500, z: 1.1}, {t: 34, cx: 960, cy: 500, z: 1.1}, {t: 34.8, cx: 1040, cy: 540, z: 1}, {t: 36.6, cx: 1040, cy: 560, z: 1.0}, {t: 39.6, cx: 1000, cy: 540, z: 1.0}, {t: 40, cx: 960, cy: 540, z: 1}, {t: 42, cx: 960, cy: 540, z: .58}, {t: 45, cx: 960, cy: 540, z: .58}] : [
+  {t: 0, cx: 960, cy: 540, z: 1}, {t: 5, cx: 960, cy: 540, z: 1.04}, {t: 8.8, cx: 960, cy: 430, z: 1.28}, {t: 9, cx: 960, cy: 470, z: 1.15}, {t: 10.2, cx: 960, cy: 470, z: 1.15}, {t: 12.5, cx: 980, cy: 470, z: 1.18}, {t: 15.6, cx: 960, cy: 440, z: 1.25}, {t: 17.2, cx: 960, cy: 440, z: 1.22},
+  {t: 17.4, cx: 960, cy: 560, z: 1.0}, {t: 19.7, cx: 930, cy: 650, z: 1.3}, {t: 21, cx: 960, cy: 540, z: 1.0}, {t: 23, cx: 960, cy: 540, z: 1.0}, {t: 28.8, cx: 1020, cy: 540, z: 1.25}, {t: 29.4, cx: 970, cy: 440, z: 1.5},
+  {t: 31.6, cx: 970, cy: 440, z: 1.5}, {t: 32.0, cx: 960, cy: 540, z: 1.0}, {t: 34, cx: 960, cy: 540, z: 1.02}, {t: 34.8, cx: 960, cy: 555, z: 1.15}, {t: 36.6, cx: 960, cy: 560, z: 1.18}, {t: 39.6, cx: 960, cy: 600, z: 1.1}, {t: 40, cx: 960, cy: 540, z: 1}, {t: 42, cx: 960, cy: 540, z: .62}, {t: 45, cx: 960, cy: 540, z: .62}];
+// the hero scene's search close-up has its own (scale-4) shots: the camera above is kept for the shared world
+let camNow;
+const w2s = (x, y) => ({x: W / 2 + (x - camNow.cx) * KB * camNow.z, y: H / 2 + (y - camNow.cy) * KB * camNow.z});
+// ---- cursor path: [t, x, y] in world coordinates, smooth
+const CUR = [
+  [9.0, 1500, 760], [9.7, 1100, 250], [10.05, 960, 60], [10.4, 514, 318], [10.5, 514, 318], [11.4, 760, 420], [14.6, 1200, 60], [15.0, 1500, 500], [15.7, 1560, 700],
+  [17.6, 1110, 1050], [19.7, 889, 1054], [19.95, 889, 1054], [20.8, 1180, 880], [22.4, 1500, 760],
+  [34.2, 1180, 700], [37.2, 1064, 484], [37.5, 1064, 484], [38.1, 1140, 470], [38.4, 1140, 470], [39.0, 1500, 500]];
+const curAt = t => { if (t <= CUR[0][0] || t >= CUR[CUR.length - 1][0]) return null; for (let i = 1; i < CUR.length; i++) if (t <= CUR[i][0]) { const a = CUR[i - 1], b = CUR[i], x = sm((t - a[0]) / (b[0] - a[0])); return [lerp(a[1], b[1], x), lerp(a[2], b[2], x)]; } };
+const CLICKS = [10.4, 19.9, 37.45];                                      // cursor press times (island Play, dock Files, Deep Work)
+function titles(t, id, a, b, c, d) { const e = $(id), vin = xf(t, a, b), vout = 1 - xf(t, c, d), v = vin * vout; e.style.opacity = v; e.style.transform = `translateY(${(1 - vin) * 16}px)`; e.style.filter = `blur(${(1 - vin) * 8 + (1 - vout) * 6}px)`; }
+const FS = TALL ? 56 : 46; for (let i = 1; i <= 7; i++) { const e = $('t' + i); e.style.fontSize = FS + 'px'; e.style.top = (TALL ? H * 0.74 : H * 0.84) + 'px'; e.style.padding = '0 6%'; e.style.boxSizing = 'border-box'; }
+$('t7').style.top = (TALL ? H * 0.06 : H * 0.035) + 'px';
+// ---- the render of one frame
+function render(t) {
+  const cam = camNow = K(t, CAM), s = KB * cam.z;
+  stage.style.transform = `translate(${W / 2 - cam.cx * s}px, ${H / 2 - cam.cy * s}px) scale(${s})`;
+  const wk = Math.max(W / 1920, H / 1080) * 1.12; wall.style.width = 1920 * wk + 'px'; wall.style.height = 1080 * wk + 'px';
+  wall.style.transform = `translate(${(W - 1920 * wk) / 2 - (cam.cx - 960) * 0.04}px, ${(H - 1080 * wk) / 2}px)`;
+  for (const n of NAMES) L[n].style.opacity = 0;
+  const op = (n, v) => { if (v > L[n].__v || L[n].__v === undefined || true) L[n].style.opacity = clamp(v); };
+  const full = n => { L[n].style.clipPath = 'none'; };
+  // ---- S1 (0-5) and S2 (5-9): the glass object and the island forming
+  const reveal = xf(t, 5.4, 8.4);
+  $('cover').style.opacity = 1 - reveal;
+  const orbA = 1 - xf(t, 7.6, 9.2);
+  [['o1', 0.22, 0.30, 560, 'rgba(70,90,255,.55)', .05, .8], ['o2', 0.74, 0.62, 640, 'rgba(130,90,255,.42)', .04, 1.1], ['o3', 0.5, 0.18, 420, 'rgba(110,200,255,.38)', .06, 1.4]].forEach(([id, fx, fy, r, col, sp, ph]) => {
+    const e = $(id), k = TALL ? 0.7 : 1; e.style.width = e.style.height = r * k + 'px'; e.style.background = col;
+    e.style.left = (W * fx - r * k / 2 + Math.sin(t * sp * 6 + ph) * 90) + 'px'; e.style.top = (H * fy - r * k / 2 + Math.cos(t * sp * 5 + ph) * 70) + 'px'; e.style.opacity = orbA * (0.25 + 0.75 * xf(t, 0.3, 3));
+  });
+  const sp = $('spark'), spr = lerp(0, TALL ? 150 : 190, xf(t, 0.25, 2.4)) * (1 + 0.04 * Math.sin(t * 5)), sa = (1 - xf(t, 2.6, 3.6)) * xf(t, 0.2, 0.9);
+  sp.style.width = sp.style.height = spr * 2 + 'px'; sp.style.left = W / 2 - spr + 'px'; sp.style.top = H / 2 - spr + 'px'; sp.style.opacity = sa;
+  // the glass: appears at 2.2, floats and breathes, then becomes the island's pill at the top
+  const g = $('glass'), gIn = xf(t, 2.0, 3.6), baseS = TALL ? 300 : 380;
+  const p4 = w2s(960, 14), pillW = 150 * KB * cam.z, pillH = 27 * KB * cam.z;                  // the real pill (scale-2 capture): about 150 x 27 world px
+  const mph = spring(t, 5.0, 0, 1, 9, 0.55), blobR = `${46 + 6 * Math.sin(t * 1.3)}% ${54 - 6 * Math.sin(t * 1.1)}% ${52 + 5 * Math.sin(t * 0.9)}% ${48 - 5 * Math.sin(t * 1.4)}% / ${50 + 6 * Math.sin(t * 0.8)}% ${48 + 5 * Math.cos(t * 1.2)}% ${52 - 6 * Math.sin(t * 1.0)}% ${50 - 5 * Math.cos(t * 0.7)}%`;
+  const gw = lerp(baseS * (1 + 0.04 * Math.sin(t * 1.7)), pillW, clamp(mph)), gh = lerp(baseS * (1 + 0.04 * Math.cos(t * 1.5)), pillH, clamp(mph));
+  const gx = lerp(W / 2 + Math.sin(t * 0.7) * 12, p4.x, clamp(mph)), gy = lerp(H / 2 + Math.cos(t * 0.6) * 14, p4.y, clamp(mph));
+  Object.assign(g.style, {width: gw + 'px', height: gh + 'px', left: gx - gw / 2 + 'px', top: gy - gh / 2 + 'px', borderRadius: mph > 0.97 ? '999px' : mph > 0.02 ? `${lerp(46, 50, 1 - mph)}% / ${lerp(46, 50, 1 - mph)}%` : blobR, opacity: gIn * (1 - xf(t, 8.1, 8.7)), transform: `rotate(${Math.sin(t * 0.5) * 6 * (1 - mph)}deg)`});
+  if (mph > 0.02 && mph < 0.97) g.style.borderRadius = `${lerp(48, Math.min(gw, gh) / 2, clamp(mph * 1.2))}px`;
+  op('d-idle', reveal * (1 - xf(t, 8.7, 9.3)));
+  op('d-pill', 0);
+  // ---- S3 (9-17): the island, the hero
+  const hero = xf(t, 8.7, 9.3) * (1 - xf(t, 17.0, 17.4));
+  const playT = 10.45, openIn = 9.75, closeAt = 14.95;
+  const open = spring(t, openIn, 0, 1, 12, 0.6) * (t < closeAt ? 1 : 0) + (t >= closeAt ? 1 - spring(t, closeAt, 0, 1, 11, 0.7) : 0);
+  const pillRect = [809, 0, 1111, 56], isl = [241, 6, 1644, 404];
+  const rect = pillRect.map((v, i) => lerp(v, isl[i], clamp(open, 0, 1.04)));
+  const clip = `inset(${rect[1]}px ${1920 - rect[2]}px ${1080 - rect[3]}px ${rect[0]}px round ${lerp(28, 52, clamp(open))}px)`;
+  const playing = t >= playT, swap = xf(t, playT - 0.04, playT + 0.14);
+  op('g-pill-paused', hero * (1 - swap)); op('g-pill-playing', hero * swap);
+  for (const n of ['g-open-paused', 'g-open-playing']) L[n].style.clipPath = clip;
+  const vis = open > 0.01 ? 1 : 0; op('g-open-paused', hero * vis * (1 - swap)); op('g-open-playing', hero * vis * swap);
+  // the waveform follows the soundtrack's actual amplitude envelope
+  const wa = xf(t, 10.5, 11.1) * (1 - xf(t, 14.7, 15.0)) * hero; panel.style.opacity = wa; panel.style.transform = `scale(${lerp(.94, 1, wa)})`;
+  if (wa > 0.01) {
+    g2.clearRect(0, 0, 1200, 524); const N = 40, f0 = Math.floor(t * 60), bw = 1200 / N;
+    for (let i = 0; i < N; i++) {
+      const e = ENV[Math.max(0, f0 - i * 2)] ?? 0, a = Math.pow(e, 0.8), hgt = 18 + a * 340 * (0.55 + 0.45 * Math.sin(i * 0.7 + t * 2)), x = i * bw + bw * 0.5, y = 262;
+      const gr = g2.createLinearGradient(0, y - hgt, 0, y + hgt); gr.addColorStop(0, 'rgba(160,215,255,.95)'); gr.addColorStop(.5, 'rgba(145,150,255,.95)'); gr.addColorStop(1, 'rgba(160,215,255,.6)');
+      g2.fillStyle = gr; g2.beginPath(); g2.roundRect(x - bw * 0.3, y - hgt, bw * 0.6, hgt * 2, bw * 0.3); g2.fill();
+    }
+    g2.fillStyle = 'rgba(255,255,255,.12)'; g2.fillRect(60, 486, 1080, 5); g2.fillStyle = 'rgba(180,220,255,.95)'; g2.fillRect(60, 486, 1080 * clamp((t - 10.5) / 4.4), 5);
+  }
+  // ---- S4 (17-23): the desktop, the dock, an app opens
+  const desk = xf(t, 17.1, 17.5);
+  op('d-closed', desk * (1 - xf(t, 21.6, 21.9)));   // the base of the desktop, until the windows have opened over it
+  // the dock sweep: the pointer travels along the dock; the capture closest to it is shown (neighbours blended)
+  const sweepA = xf(t, 17.5, 17.8) * (1 - xf(t, 19.7, 20.0));
+  const fi = clamp(lerp(11, 3.6, sm((t - 17.6) / 2.1)), 0, 11), i0 = Math.floor(fi), fr = fi - i0;
+  const mname = i => 'm-' + String(clamp(i, 0, 11)).padStart(2, '0');
+  if (sweepA > 0.001) { op(mname(i0), Math.max(sweepA * (1 - fr) * 1.0, 0)); if (fr > 0.01 && i0 < 11) op(mname(i0 + 1), sweepA * fr); }
+  // the window opens from the dock icon: a growing reveal with the content scaling out of the icon
+  const rev = spring(t, 19.92, 0, 1, 9, 0.8);
+  const b2 = (t >= 19.9 && t < 29.85 ? (t < 29.55 ? 1 : 1 - xf(t, 29.55, 29.85)) : 0) + (t >= 39.9 ? xf(t, 39.9, 40.4) : 0);
+  op('b2-windows', b2);
+  const opening = t >= 19.9 && t < 23.5 && rev < 0.999;
+  L['b2-windows'].style.clipPath = opening ? `circle(${clamp(rev) * 1500}px at 889px 1054px)` : 'none';
+  L['b2-windows'].style.transformOrigin = '889px 1054px'; L['b2-windows'].style.transform = opening ? `scale(${lerp(0.9, 1, clamp(rev))})` : 'none';
+  // ---- S5 (23-29): the glass: a slow light moves across the real windows
+  sweeps.forEach((s, i) => { const a = xf(t, 23.3 + i * 0.4, 24.3 + i * 0.4) * (1 - xf(t, 28.0, 29.0)); s.style.opacity = a; s.style.backgroundPosition = `${lerp(120, -20, clamp((t - 23.3 - i * 0.4) / 4.8))}% 0`; });
+  // ---- S6 (29-34): Search
+  const keyA = xf(t, 28.9, 29.2) * (1 - xf(t, 29.8, 30.1)), press = 1 - 0.07 * (xf(t, 29.3, 29.36) - xf(t, 29.45, 29.55));
+  const ks = $('keys'); ks.style.opacity = keyA; ks.style.top = (TALL ? H * 0.74 : H * 0.7) + 'px'; ks.style.transform = `scale(${press * (TALL ? 0.75 : 1)})`;
+  const sIn = xf(t, 29.5, 29.8), sOut = 1 - xf(t, 31.5, 31.9);
+  op('s2-open', sIn * (1 - xf(t, 30.25, 30.5)) * (t < 31.9 ? 1 : 0));
+  op('s2-fire', xf(t, 30.25, 30.5) * (1 - xf(t, 31.75, 32.0)) * (t < 31.95 ? 1 : 0));
+  // close-up (scale-4 captures): the calculation, then the setting
+  op('hs-calc', xf(t, 31.8, 32.1) * (1 - xf(t, 33.0, 33.25)));
+  op('hs-setting', xf(t, 33.0, 33.25) * (1 - xf(t, 33.95, 34.25)));
+  // ---- S7 (34-40): NIRO Control
+  const pIn = spring(t, 34.1, 0, 1, 10, 0.75), personal = xf(t, 34.05, 34.4) * (1 - xf(t, 40.1, 40.6));
+  const A1 = personal * (1 - xf(t, 34.9, 35.12)), A2 = personal * xf(t, 34.9, 35.12) * (1 - xf(t, 35.9, 36.12)), A3 = personal * xf(t, 35.9, 36.12) * (1 - xf(t, 36.55, 36.85));
+  op('c-look-a', A1); op('c-look-accent', A2); op('c-look-crystal', A3);
+  const prof = personal * xf(t, 36.55, 36.85);
+  op('e-0', prof * (1 - xf(t, 37.0, 37.1))); op('e-hover', prof * xf(t, 37.0, 37.1) * (1 - xf(t, 37.5, 37.6))); op('e-dialog', prof * xf(t, 37.5, 37.6) * (1 - xf(t, 38.35, 38.5))); op('e-1', prof * xf(t, 38.35, 38.5) * (1 - xf(t, 39.4, 39.7))); op('e-2', prof * xf(t, 39.4, 39.7));
+  for (const n of ['c-look-a', 'c-look-accent', 'c-look-crystal', 'e-0', 'e-hover', 'e-dialog', 'e-1', 'e-2']) { L[n].style.transformOrigin = '960px 555px'; L[n].style.transform = `scale(${lerp(0.94, 1, clamp(pIn))})`; }
+  const ringAt = (i, t0, x, y, r) => { const e = rings[i], p = clamp((t - t0) / 0.9); e.style.opacity = p > 0 && p < 1 ? (1 - p) * 0.95 : 0; e.style.width = e.style.height = r * (1 + p * 1.6) + 'px'; e.style.left = x - r * (1 + p * 1.6) / 2 + 'px'; e.style.top = y - r * (1 + p * 1.6) / 2 + 'px'; };
+  ringAt(0, 34.95, 1405, 622, 44); ringAt(1, 35.9, 1315, 845, 60); ringAt(2, 38.4, 1100, 470, 60);
+  // ---- S8 (40-45): the desktop becomes a luminous glass form, then the name
+  const slab = $('stage'); slab.style.clipPath = t >= 40 ? `inset(0 round ${lerp(0, 38, xf(t, 40.3, 41.6))}px)` : 'none';
+  const sg = $('slabglow'), sA = xf(t, 40.5, 41.6) * (1 - xf(t, 43.2, 43.9)); const tl = w2s(0, 0), br = w2s(1920, 1080);
+  Object.assign(sg.style, {left: tl.x + 'px', top: tl.y + 'px', width: br.x - tl.x + 'px', height: br.y - tl.y + 'px', opacity: sA, borderRadius: lerp(0, 38, xf(t, 40.3, 41.6)) * KB * cam.z + 'px'});
+  const stOp = 1 - xf(t, 42.1, 43.3); if (t >= 41.6) slab.style.opacity = stOp; else slab.style.opacity = 1;
+  $('cover').style.opacity = Math.max(1 - reveal, xf(t, 42.6, 43.8) * 0.9);
+  const lg = $('logo'), la = xf(t, 42.8, 43.8) * (1 - xf(t, 44.5, 45)), ws = TALL ? 150 : 210;
+  lg.style.opacity = la; lg.style.top = (TALL ? H * 0.4 : H * 0.34) + 'px'; lg.querySelector('.word').style.fontSize = ws + 'px'; lg.querySelector('.word').style.backgroundPosition = `${lerp(0, 100, clamp((t - 42.8) / 2.2))}% 0`;
+  lg.querySelector('.tag').style.fontSize = (TALL ? 34 : 40) + 'px'; lg.querySelector('.tag').style.marginTop = ws * 0.22 + 'px'; lg.style.transform = `scale(${lerp(0.96, 1, xf(t, 42.8, 44.5))})`; lg.querySelector('.tag').style.opacity = xf(t, 43.4, 44.1);
+  // titles
+  titles(t, 't1', 1.9, 2.7, 4.2, 4.8); titles(t, 't2', 5.9, 6.6, 8.2, 8.8); titles(t, 't3', 11.6, 12.4, 14.4, 15.0); titles(t, 't4', 17.9, 18.6, 21.4, 22.0); titles(t, 't5', 24.0, 24.8, 28.0, 28.7); titles(t, 't6', 30.6, 31.3, 33.4, 34.0); titles(t, 't7', 34.6, 35.2, 39.4, 40.0);
+  // cursor and clicks
+  const cp = curAt(t), cu = cursor;
+  if (cp && !(t > 22.6 && t < 34.2) && !(t > 39.2)) { cu.style.opacity = xf(t, CUR[0][0], CUR[0][0] + 0.3) * 1; cu.style.left = cp[0] - 3 + 'px'; cu.style.top = cp[1] - 2 + 'px'; const c = CLICKS.find(c => Math.abs(t - c) < 0.18); cu.style.transform = `scale(${(c ? 0.86 : 1) * (hero > 0.5 && t < 17 ? 1.9 : 1)})`; } else cu.style.opacity = 0;
+  $('vignette').style.opacity = 0.8; $('fade').style.opacity = xf(t, 44.3, 45) + (1 - xf(t, 0, 0.35));
+}
+window.__render = render;
+(async () => {
+  try { ENV = (await (await fetch('../audio/envelope.json')).json()).values; } catch (e) { ENV = []; }
+  await document.fonts.ready; await Promise.all(Object.values(L).map(im => im.decode().catch(() => 0))); await wall.decode().catch(() => 0);
+  render(0); window.__ready = true;
+})();
+</script>

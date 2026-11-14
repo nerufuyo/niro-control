@@ -6,3 +6,7 @@ shell/search/build/
 shell/dock/dist/
 control/build/
 shell/emulator/build/
+commercial/out/
+commercial/deliverables/
+commercial/assets/shots/
+commercial/audio/*.wav
