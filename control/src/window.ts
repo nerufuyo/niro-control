@@ -126,7 +126,9 @@ export function buildWindow(app) {
     };
     const search = settingsSearch(find, () => { content.set_visible_child_name(current); contentTitle.set_title(titles.get(current)); });
 
-    const sideTop = new Adw.HeaderBar({show_title: false, css_classes: ['flat']});
+    // the window buttons (close, minimise, maximise) sit at the left, on the sidebar's header, whatever the system layout says
+    const LEFT = 'close,minimize,maximize:';
+    const sideTop = new Adw.HeaderBar({show_title: false, css_classes: ['flat'], decoration_layout: LEFT});
     const sideBody = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL});
     const searchBox = new Gtk.Box({margin_start: 10, margin_end: 10, margin_bottom: 8}); searchBox.append(search);
     sideBody.append(searchBox); sideBody.append(list);
@@ -134,7 +136,7 @@ export function buildWindow(app) {
     sideView.add_css_class('niro-sidebar');
 
     const pageBox = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL});
-    const contentHeader = new Adw.HeaderBar({title_widget: contentTitle});
+    const contentHeader = new Adw.HeaderBar({title_widget: contentTitle, decoration_layout: ':'});
     const contentView = new Adw.ToolbarView({content: pageBox, css_classes: ['niro-content']}); contentView.add_top_bar(contentHeader);
     // Simple shows the common settings; Advanced shows all of them. Only what is shown changes, never a value.
     const modeBox = new Gtk.Box({css_classes: ['linked'], valign: Gtk.Align.CENTER});
@@ -156,6 +158,7 @@ export function buildWindow(app) {
     window.set_content(split);
     const bp = Adw.Breakpoint.new(Adw.BreakpointCondition.parse('max-width: 760sp'));
     bp.add_setter(split, 'collapsed', true);
+    bp.add_setter(contentHeader, 'decoration-layout', LEFT); // narrow: the sidebar is hidden, the buttons move to the page's header
     bp.connect('apply', () => split.set_show_content(true)); // narrow: start on the page, the back arrow shows the modules
     // narrow: the sections list of Island and Dock becomes a menu above the page (watched by hand: breakpoints are one at a time)
     let narrow = null;
