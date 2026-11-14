@@ -160,6 +160,20 @@ if (Gtk.init_check()) {
     const d = homeData(model, []);
     if (d.config.total !== CATALOG.filter(i => !i.managed).length) fail(`home counts ${d.config.total} settings`);
     if (!d.look.accent || !d.dock.position) fail('home is missing the look or the dock');
+    // accessibility audit: a button with an icon and no text must say what it does (a tooltip, which screen readers also use),
+    // every entry and switch must be reachable by keyboard
+    const unlabeled = [], unfocusable = [];
+    const audit = w => {
+        const name = w.constructor.name;
+        // only the buttons this project makes: GTK's own parts (spin arrows, back button, window controls) label themselves
+        const ours = !(w.get_parent() instanceof Gtk.SpinButton) && w.get_parent()?.constructor.name !== 'unknown_AdwBackButton';
+        if ((w instanceof Gtk.Button || w instanceof Gtk.MenuButton) && w.get_icon_name?.() && ours && !w.get_tooltip_text()) unlabeled.push(`${name}:${w.get_icon_name()}`);
+        if ((w instanceof Gtk.Switch || w instanceof Gtk.Entry || w instanceof Gtk.SearchEntry || w instanceof Gtk.Scale) && !w.get_focusable() && !w.get_can_focus()) unfocusable.push(name);
+        for (let c = w.get_first_child(); c; c = c.get_next_sibling()) audit(c);
+    };
+    audit(window);
+    if (unlabeled.length) fail(`icon-only buttons without a tooltip: ${[...new Set(unlabeled)].join(', ')}`);
+    if (unfocusable.length) fail(`controls the keyboard cannot reach: ${unfocusable.join(', ')}`);
     const ids = d.health.map(h => h.id);
     if (JSON.stringify(ids) !== JSON.stringify(['configuration', 'extensions', 'service', 'profile', 'recovery', 'restart'])) fail(`health rows: ${ids}`);
     if (d.health.some(h => !['healthy', 'attention', 'recovery', 'unavailable'].includes(h.state))) fail('a health row has no valid state');
