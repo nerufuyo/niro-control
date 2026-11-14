@@ -130,7 +130,7 @@ if (Gtk.init_check()) {
     const {homeData} = await import('../../control/build/homePage.js');
     const app = new Adw.Application({application_id: 'org.niro.ControlModeTest'});
     app.register(null);
-    const {window, model} = buildWindow(app);
+    const {window, model, ensureAll} = buildWindow(app);
     const engine = new ProfileEngine(model.stores);
     const rowsNow = () => {
         const names = new Set(); const hidden = [];
@@ -174,6 +174,7 @@ if (Gtk.init_check()) {
     audit(window);
     if (unlabeled.length) fail(`icon-only buttons without a tooltip: ${[...new Set(unlabeled)].join(', ')}`);
     if (unfocusable.length) fail(`controls the keyboard cannot reach: ${unfocusable.join(', ')}`);
+    ensureAll();   // the Compatibility page is built when first shown
     // Compatibility: Window fade (with its warning) exists per application, but only in Advanced mode
     const fadeBoxes = model.advancedWidgets.filter(w => { let found = false; const walk = x => { if (x instanceof Gtk.Switch && /Window fade lowers the opacity/.test(x.get_tooltip_text() ?? '')) found = true; for (let c = x.get_first_child?.(); c; c = c.get_next_sibling()) walk(c); }; walk(w); return found; });
     if (!fadeBoxes.length) fail('no Window fade control with its warning was found in Compatibility');

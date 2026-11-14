@@ -27,7 +27,23 @@ export function adapterOptions(model, dark: boolean) {
         surfaces: {sidebar: e.sidebar, content: e.content, elevated: e.elevated}};
 }
 
+/**
+ * The page is built the first time it is shown: it lists every installed application, which costs memory and start-up time the
+ * panel should not pay for a page most visits never open. `ensure()` builds it now (tests do).
+ */
 export function compatPage(model, ctx) {
+    const holder = new Gtk.Box({vexpand: true});
+    let built = false;
+    const ensure = () => {
+        if (built) return;
+        built = true;
+        holder.append(buildCompat(model, ctx));
+    };
+    holder.connect('map', ensure);
+    return {widget: holder, ensure};
+}
+
+function buildCompat(model, ctx) {
     const root = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 18, margin_top: 18, margin_bottom: 24, margin_start: 18, margin_end: 18});
     const niro = model.stores.by.niro;
     const dark = () => Adw.StyleManager.get_default().get_dark();
@@ -175,5 +191,5 @@ export function compatPage(model, ctx) {
     });
     root.append(testBtn);
 
-    return {widget: scrolled(new Adw.Clamp({child: root, maximum_size: 760, tightening_threshold: 600}))};
+    return scrolled(new Adw.Clamp({child: root, maximum_size: 760, tightening_threshold: 600}));
 }

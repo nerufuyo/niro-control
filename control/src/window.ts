@@ -213,6 +213,6 @@ export function buildWindow(app) {
     select(MODULES.some(m => m[0] === first) ? first : 'home');
     const query = GLib.getenv('NIRO_SEARCH');
     if (query) search.set_text(query);
-    return {window, model, search, select};
+    return {window, model, search, select, ensureAll: () => shared.compat.ensure()};
 }
 

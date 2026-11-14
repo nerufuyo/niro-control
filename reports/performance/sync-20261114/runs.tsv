@@ -1,1 +1,4 @@
 rep	status	load_start	load_end	gtk_ms_median	gtk_ms_p95	shell_ms_median	shell_ms_p95	pss_before_mb	pss_after_mb	note
+1	ok	1.34	1.07	404.5	406.3	276.1	288.4	246.6	246.7	
+2	ok	1.07	0.55	405.1	406.6	274.0	277.9	241.7	241.8	
+3	ok	0.55	0.45	404.7	406.3	273.5	276.9	238.6	238.8	
