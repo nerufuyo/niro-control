@@ -30,8 +30,36 @@ export class Model {
         this.cache = new Map();
         this.rows = new Map();     // item id -> the rows showing it (to grey them out when a dependency is off)
         this.byId = new Map(CATALOG.map(i => [i.id, i]));
+        this.advancedWidgets = []; // the Advanced groups, shown only in Advanced mode
+        this.simpleHints = [];     // "N more settings in Advanced" rows, shown only in Simple mode
+        this.mode = this.readMode();
         this.narrow = [];          // [widget, property, value] the window sets when it is narrow
         this.system = this.readSystemShortcuts();
+    }
+
+    // ---- Simple / Advanced: which rows are shown. It never touches a value, and search finds every setting in both.
+    get modePath() { return `${this.engine.root}/ui.json`; }
+
+    readMode(): 'simple' | 'advanced' {
+        try { return JSON.parse(new TextDecoder().decode(GLib.file_get_contents(this.modePath)[1])).mode === 'advanced' ? 'advanced' : 'simple'; } catch (_e) { return 'simple'; }
+    }
+
+    setMode(mode: 'simple' | 'advanced', save = true) {
+        this.mode = mode;
+        const advanced = mode === 'advanced';
+        this.advancedWidgets.forEach(w => w.set_visible(advanced));
+        this.simpleHints.forEach(w => w.set_visible(!advanced));
+        for (const rows of this.rows.values())
+            for (const row of rows)
+                if (row._sub !== undefined) row.set_subtitle(row._sub + (advanced && row._key ? `\n<span font_family="monospace" size="small" alpha="55%">${GLib.markup_escape_text(row._key, -1)}</span>` : ''));
+        if (save) {
+            try {
+                GLib.mkdir_with_parents(this.engine.root, 0o755);
+                GLib.file_set_contents(this.modePath, JSON.stringify({mode}));
+            } catch (_e) { /* the choice is not kept */ }
+        }
+        this.onMode?.(mode);
+        this.onModeChanged?.(mode);
     }
 
     item(id: string): Item {
@@ -95,6 +123,7 @@ export class Model {
 
     // ---- Dependencies
     track(item: Item, row) {
+        if (row.get_subtitle && !row._sub) { row._sub = GLib.markup_escape_text(item.help ?? '', -1); row._key = item.id; row.set_use_markup?.(true); if (this.mode === 'advanced') this.setRowKey(row); }
         if (!this.rows.has(item.id)) this.rows.set(item.id, []);
         this.rows.get(item.id).push(row);
         this.applyDependency(item, row);
@@ -102,6 +131,10 @@ export class Model {
             const dep = this.item(item.depends.id), b = dep && this.binding(dep);
             if (b && !Array.isArray(b)) b.subscribe(() => this.applyDependency(item, row));
         }
+    }
+
+    setRowKey(row) {
+        row.set_subtitle(row._sub + `\n<span font_family="monospace" size="small" alpha="55%">${GLib.markup_escape_text(row._key, -1)}</span>`);
     }
 
     applyDependency(item: Item, row) {
@@ -196,6 +229,17 @@ export class Model {
             const more = advancedDisclosure();
             advanced.forEach(i => more.add_row(this.row(i)));
             group.add(more);
+            this.advancedWidgets.push(more);
+            more.set_visible(this.mode === 'advanced');
+            const hint = new Adw.ActionRow({title: `${advanced.length} more setting${advanced.length === 1 ? '' : 's'} in Advanced mode`,
+                subtitle: 'Search finds every setting in either mode'});
+            hint.add_css_class('dim-label');
+            const show = new Gtk.Button({label: 'Show', valign: Gtk.Align.CENTER, css_classes: ['flat']});
+            show.connect('clicked', () => this.setMode('advanced'));
+            hint.add_suffix(show);
+            group.add(hint);
+            this.simpleHints.push(hint);
+            hint.set_visible(this.mode !== 'advanced');
         }
         return group;
     }
@@ -275,6 +319,8 @@ export function lookPage(model: Model) {
         row.add_suffix(hex.widget); more.add_row(row);
     }
     toneGroup.add(more);
+    model.advancedWidgets.push(more);
+    more.set_visible(model.mode === 'advanced');
     const glass = model.section('Glass', items.filter(i => i.group === 'Glass'), 'Shared by the island, the dock and the windows');
     return page(previewBlock(model, lookPreview(model.read)), tone && box, toneGroup, glass);
 }

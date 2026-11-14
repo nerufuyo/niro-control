@@ -11,11 +11,12 @@ Built for **Ubuntu 24.04 / GNOME Shell 46** (Wayland). The extensions declare su
 |---|---|
 | **Island** | A notch on the top bar that opens into music with synced lyrics, calls, a focus timer, reminders, a clipboard and file shelf, calendar, notifications, system stats, power controls, AI plan usage, and a voice assistant. Alerts for volume, battery, Bluetooth, meetings and more. |
 | **Dock** | A dock with icon magnification, window previews, genie minimise, running indicators, auto-hide and four positions. |
-| **Search** | `Super+Space` opens a centred panel that finds installed applications as you type. |
+| **Search** | `Super+Space`: a command palette for applications, a calculator, unit conversion, open windows, every Niro setting, profiles, system actions (lock, Do Not Disturb, suspend, log out…) and the island's clipboard history. One typed action registry, also on D-Bus. |
 | **Window blur** | Frosted glass behind application windows, with one strength and opacity for everything. |
 | **Rounded corners** | Round corners and shadows for every window, including Chrome and Electron apps. |
 | **Emoji, Emulator** | An emoji picker; keeps the Android Emulator window on top. |
-| **Niro Control** | The control panel: a sidebar with search over all 132 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
+| **Profiles** | Save the whole desktop as a profile and switch with one action: four built-ins (Everyday, Deep Work, Creative, Gaming), preview before applying, backups, rollback, import and export. |
+| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 132 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
 
 Opacity, blur, blur strength, accent and tint are set once, in **Look**, and the island, dock, search and windows follow.
 Light and dark appearance both work, and the panel adapts to narrow windows.
@@ -56,7 +57,7 @@ docs/           maintenance notes, the island's guide and D-Bus API, the list of
 
 | | |
 |---|---|
-| `make test` | build the TypeScript; run the 82 node tests, the GJS tests (every setting binds, writes and resets), and the Rust tests |
+| `make test` | build the TypeScript; run the node tests, the GJS tests (every setting binds, writes and resets), and the Rust tests |
 | `make deb` | build `out/niro-control_<version>+git<commits>_amd64.deb` |
 | `make catalog` | regenerate the control panel's settings catalog from the schemas |
 | `make lint` | check the dock's code with Biome |

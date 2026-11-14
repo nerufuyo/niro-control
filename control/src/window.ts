@@ -11,13 +11,15 @@ import {CATALOG} from './catalog.js';
 import {settingsSearch} from './components.js';
 import {searchItems} from './logic.js';
 import {aboutPage, dockPage, islandPage, lookPage, Model, resultsPage, searchPage, windowsPage} from './pages.js';
+import {homePage} from './homePage.js';
 import {profilesPage} from './profilesPage.js';
 
 const MODULES = [
+    ['home', 'Home', 'go-home-symbolic', (model, shared) => shared.home.widget],
     ['look', 'Look', 'preferences-desktop-theme-symbolic', lookPage], ['island', 'Island', 'view-pin-symbolic', islandPage],
     ['dock', 'Dock', 'view-app-grid-symbolic', dockPage], ['windows', 'Windows', 'window-new-symbolic', windowsPage],
     ['search', 'Search', 'system-search-symbolic', searchPage],
-    ['profiles', 'Profiles', 'user-bookmarks-symbolic', model => profilesPage(model.engine, model.ctx).widget], ['about', 'About', 'help-about-symbolic', aboutPage],
+    ['profiles', 'Profiles', 'user-bookmarks-symbolic', (model, shared) => shared.profiles.widget], ['about', 'About', 'help-about-symbolic', aboutPage],
 ];
 
 const CSS = `
@@ -68,6 +70,9 @@ export function buildWindow(app) {
             overlay.add_toast(t);
         },
         openLook: () => select('look'),
+        go: id => select(id),
+        focusSearch: () => search.grab_focus(),
+        logout: () => { try { Gio.Subprocess.new(['gnome-session-quit', '--logout'], Gio.SubprocessFlags.NONE); } catch (e) { ctx.toast(`Couldn't log out: ${e.message}`); } },
         takenShortcuts: except => model.takenShortcuts(except),
         inhibitShortcuts: on => {
             // Super+… would go to the shell instead of the recorder: ask it to leave the keys to this window
@@ -77,11 +82,15 @@ export function buildWindow(app) {
         },
     };
     const model = new Model(ctx);
+    const stale = GLib.getenv('NIRO_NOBANNER') ? [] : staleParts();
+    const shared = {};
+    shared.profiles = profilesPage(model.engine, ctx);
+    shared.home = homePage(model, ctx, shared.profiles, stale);
 
     const content = new Gtk.Stack({hexpand: true, vexpand: true, transition_type: Gtk.StackTransitionType.CROSSFADE, transition_duration: 120});
     const titles = new Map();
     for (const [id, title, , make] of MODULES) {
-        content.add_named(make(model), id);
+        content.add_named(make(model, shared), id);
         titles.set(id, title);
     }
 
@@ -94,8 +103,8 @@ export function buildWindow(app) {
         const row = new Gtk.ListBoxRow({child: box}); row.set_name(id);
         list.append(row);
     }
-    let current = 'look';
-    const contentTitle = new Adw.WindowTitle({title: 'Look'});
+    let current = 'home';
+    const contentTitle = new Adw.WindowTitle({title: 'Home'});
     const select = (id) => { current = id; list.select_row(list.get_row_at_index(MODULES.findIndex(m => m[0] === id))); };
     list.connect('row-selected', (_l, row) => {
         if (!row) return;
@@ -103,6 +112,7 @@ export function buildWindow(app) {
         search.set_text('');
         content.set_visible_child_name(current);
         contentTitle.set_title(titles.get(current));
+        banner.set_revealed(stale.length > 0 && current !== 'home');   // Home lists it already
         split.set_show_content(true);
     });
 
@@ -126,8 +136,19 @@ export function buildWindow(app) {
     sideView.add_css_class('niro-sidebar');
 
     const pageBox = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL});
-    const contentView = new Adw.ToolbarView({content: pageBox}); contentView.add_top_bar(new Adw.HeaderBar({title_widget: contentTitle}));
-    const stale = GLib.getenv('NIRO_NOBANNER') ? [] : staleParts();
+    const contentHeader = new Adw.HeaderBar({title_widget: contentTitle});
+    const contentView = new Adw.ToolbarView({content: pageBox}); contentView.add_top_bar(contentHeader);
+    // Simple shows the common settings; Advanced shows all of them. Only what is shown changes, never a value.
+    const modeBox = new Gtk.Box({css_classes: ['linked'], valign: Gtk.Align.CENTER});
+    const simple = new Gtk.ToggleButton({label: 'Simple', tooltip_text: 'Common settings'});
+    const advanced = new Gtk.ToggleButton({label: 'Advanced', group: simple, tooltip_text: 'Every setting, raw keys and diagnostics'});
+    modeBox.append(simple); modeBox.append(advanced);
+    modeBox.update_property([Gtk.AccessibleProperty.LABEL], ['Settings detail: Simple or Advanced']);
+    (model.mode === 'advanced' ? advanced : simple).set_active(true);
+    advanced.connect('toggled', () => model.setMode(advanced.get_active() ? 'advanced' : 'simple'));
+    contentHeader.pack_end(modeBox);
+    model.setMode(model.mode, false);
+    model.onModeChanged = m => (m === 'advanced' ? advanced : simple).get_active() || (m === 'advanced' ? advanced : simple).set_active(true);
     const banner = new Adw.Banner({title: `A newer ${stale.join(', ')} is installed. Log out and in to load it.`, button_label: 'Log out', revealed: stale.length > 0});
     banner.connect('button-clicked', () => { try { Gio.Subprocess.new(['gnome-session-quit', '--logout'], Gio.SubprocessFlags.NONE); } catch (e) { ctx.toast(`Couldn't log out: ${e.message}`); } });
     pageBox.append(banner); pageBox.append(content); // in the page, not a top bar: a banner that wraps would cover the first rows
@@ -157,7 +178,7 @@ export function buildWindow(app) {
     const scheme = GLib.getenv('NIRO_SCHEME'); // light / dark: to look at the other appearance
     if (scheme) Adw.StyleManager.get_default().set_color_scheme(scheme === 'light' ? Adw.ColorScheme.FORCE_LIGHT : Adw.ColorScheme.FORCE_DARK);
     const first = GLib.getenv('NIRO_PAGE');
-    select(MODULES.some(m => m[0] === first) ? first : 'look');
+    select(MODULES.some(m => m[0] === first) ? first : 'home');
     const query = GLib.getenv('NIRO_SEARCH');
     if (query) search.set_text(query);
     return {window, model, search, select};

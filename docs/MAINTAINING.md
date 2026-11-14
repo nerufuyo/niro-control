@@ -70,3 +70,29 @@ control/src/window.ts      the window: sidebar, search, stack, banner, keyboard 
   appearance (`gjs -m control/build/niro-control.js`).
 - **Tests:** `tests/island/controlLogic.test.js` (catalog, search, conflicts), `tests/gjs/controlUi.test.js` (every setting binds,
   writes, reads back and resets against real schemas; with a display, every setting has a row and no raw HTML entity is shown).
+
+## Profiles
+
+`control/src/profileLogic.ts` (pure) and `profiles.ts` (the engine, GJS, no GTK). A profile is a versioned JSON file
+(`format: niro-profile`, `version: 1`, `settings: {item id: value}`, optional `extends`). Built-ins ship in
+`control/profiles/*.json` (installed to `/usr/share/niro-control/profiles`); yours live in `~/.config/niro-control/profiles`.
+A profile may name only some settings (partial). Settings Look owns (`managed`) are never in a profile: their owner is.
+Applying makes a backup first, writes Look first, and puts everything back if a write fails. `state.json` holds the active
+profile; "modified" is just a diff of the live settings against it. Command line: `niro-control --list-profiles`,
+`--apply-profile <id>`, `--current-profile`, `--restore-backup latest`. dconf writes are queued, so the engine calls
+`Gio.Settings.sync()` before a short-lived process exits.
+
+## Search and the action registry
+
+`shell/search/registry.ts` (pure) is the one list of what Niro can do: typed parameters (unknown ones refused), availability,
+and a permission (`none`, or `confirm`). `actions.ts` holds the handlers; `extension.ts` the palette. `calc.ts` and `units.ts`
+are small parsers (no eval). Settings come from `settings-index.ts`, generated with the catalog. Clipboard history is only
+searched when the query starts with `clip`. The registry is also on the session bus as `org.niro.Search` at `/org/niro/Search`:
+`ListActions()` and `RunAction(id, args_json)`. From outside the palette every action that is not `none` asks on screen first.
+A shortcut or script can run one with `gdbus call --session --dest org.niro.Search --object-path /org/niro/Search --method
+org.niro.Search.RunAction profile.apply '{"id":"gaming"}'`. The island's assistant (Rust) does not call it yet.
+
+## Home and the two modes
+
+Home (`homePage.ts`) only reads. Simple/Advanced (`Model.setMode`) hides the Advanced groups and shows a hint with their count;
+it saves to `ui.json` in the config folder and never writes a setting. Search results show every setting in both modes.

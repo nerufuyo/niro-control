@@ -122,3 +122,43 @@ if (Gtk.init_check()) {
     music.reset();
     print('controlUi: shortcut recorder ok');
 }
+
+// Simple and Advanced: only what is shown changes. Every setting keeps a row in both modes, and no value moves.
+if (Gtk.init_check()) {
+    const {buildWindow} = await import('../../control/build/window.js');
+    const {ProfileEngine} = await import('../../control/build/profiles.js');
+    const {homeData} = await import('../../control/build/homePage.js');
+    const app = new Adw.Application({application_id: 'org.niro.ControlModeTest'});
+    app.register(null);
+    const {window, model} = buildWindow(app);
+    const engine = new ProfileEngine(model.stores);
+    const rowsNow = () => {
+        const names = new Set(); const hidden = [];
+        const walk = w => {
+            if (w.get_name && CATALOG.some(i => i.id === w.get_name())) { names.add(w.get_name()); if (!w.get_mapped?.() && w.get_visible?.() === false) hidden.push(w.get_name()); }
+            for (let c = w.get_first_child(); c; c = c.get_next_sibling()) walk(c);
+        };
+        walk(window);
+        return {names, hidden};
+    };
+    const values = JSON.stringify(engine.capture());
+    model.setMode('simple', false);
+    const simple = rowsNow();
+    model.setMode('advanced', false);
+    const advanced = rowsNow();
+    model.setMode('simple', false);
+    if (simple.names.size !== 132 || advanced.names.size !== 132) fail(`rows: simple ${simple.names.size}, advanced ${advanced.names.size}`);
+    if (JSON.stringify(engine.capture()) !== values) fail('switching mode changed a value');
+    if (model.advancedWidgets.length < 5) fail('the Advanced groups were not found');
+    // in Simple mode the advanced groups are hidden and a hint says how many are; in Advanced the reverse
+    model.setMode('simple', false);
+    if (model.advancedWidgets.some(w => w.get_visible())) fail('an Advanced group is shown in Simple mode');
+    if (model.simpleHints.some(w => !w.get_visible())) fail('a hint is missing in Simple mode');
+    model.setMode('advanced', false);
+    if (model.advancedWidgets.some(w => !w.get_visible())) fail('an Advanced group is hidden in Advanced mode');
+    model.setMode('simple', false);
+    const d = homeData(model, []);
+    if (d.config.total !== CATALOG.filter(i => !i.managed).length) fail(`home counts ${d.config.total} settings`);
+    if (!d.look.accent || !d.dock.position) fail('home is missing the look or the dock');
+    print('controlUi: modes and home ok');
+}

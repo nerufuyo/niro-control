@@ -248,5 +248,5 @@ export function profilesPage(engine: ProfileEngine, ctx) {
     const later = () => { if (timer) GLib.source_remove(timer); timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 350, () => { timer = 0; refresh(); return GLib.SOURCE_REMOVE; }); };
     for (const s of Object.values(engine.stores.by)) s?.connect('changed', later);
     refresh();
-    return {widget: scroller, refresh};
+    return {widget: scroller, refresh, apply};
 }
