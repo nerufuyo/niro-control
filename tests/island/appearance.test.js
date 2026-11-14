@@ -69,3 +69,36 @@ test('matrix: nothing is called supported on a toolkit alone, every entry says w
     // only what was actually looked at is "tested"
     assert.deepEqual(FAMILIES.filter(f => f.evidence === 'tested').map(f => f.id), ['niro']);
 });
+
+import {exclusionsDropped, migrateLegacy, resolveScheme, rulesCount, validateRulesText} from '../../control/build/appearance.js';
+
+test('legacy fade migration: the old value is saved once, windows go to 255, and turning the old fade back on restores it', () => {
+    const a = migrateLegacy({appsOpacity: 204, saved: -1, legacyFade: false});
+    assert.deepEqual(a, {appsOpacity: 255, saved: 204, legacyFade: false});
+    assert.deepEqual(migrateLegacy(a), a);                                                         // idempotent
+    assert.deepEqual(migrateLegacy({...a, legacyFade: true}), {appsOpacity: 204, saved: 204, legacyFade: true});   // rollback
+    assert.deepEqual(migrateLegacy({appsOpacity: 255, saved: -1, legacyFade: false}), {appsOpacity: 255, saved: -1, legacyFade: false});  // nothing to save
+    assert.equal(migrateLegacy({appsOpacity: 255, saved: -1, legacyFade: true}).appsOpacity, 255); // no saved value: stays solid
+    assert.equal(migrateLegacy({appsOpacity: 100, saved: 204, legacyFade: false}).saved, 204);     // an earlier backup is never overwritten
+});
+
+test('scheme: Niro choice wins, system "default" counts as light', () => {
+    assert.equal(resolveScheme('system', 'prefer-dark'), 'dark');
+    assert.equal(resolveScheme('system', 'default'), 'light');
+    assert.equal(resolveScheme('system', 'prefer-light'), 'light');
+    assert.equal(resolveScheme('light', 'prefer-dark'), 'light');
+    assert.equal(resolveScheme('dark', 'default'), 'dark');
+});
+
+test('rules inside profiles: validated, counted, and a dropped exclusion is named', () => {
+    assert.equal(validateRulesText('{}'), null);
+    assert.equal(validateRulesText(JSON.stringify({a: {mode: 'exclude'}})), null);
+    assert.match(validateRulesText('nope'), /not valid JSON/);
+    assert.match(validateRulesText('[1]'), /JSON object/);
+    assert.match(validateRulesText(JSON.stringify({a: {mode: 'exclude'}, b: {mode: 'weird'}})), /1 of 2 rules are not valid/);
+    assert.match(validateRulesText(5), /must be text/);
+    assert.equal(rulesCount(JSON.stringify({a: {mode: 'exclude'}, b: {mode: 'weird'}})), 1);
+    const now = JSON.stringify({'org.gnome.Nautilus': {mode: 'exclude'}, chrome: {mode: 'fade', opacity: 80}});
+    assert.deepEqual(exclusionsDropped(now, '{}'), ['org.gnome.Nautilus']);
+    assert.deepEqual(exclusionsDropped(now, JSON.stringify({'org.gnome.Nautilus': {mode: 'exclude'}})), []);
+});

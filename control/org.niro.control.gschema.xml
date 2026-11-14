@@ -99,8 +99,29 @@
     </key>
     <key name="app-rules" type="s">
       <default>'{}'</default>
-      <summary>Per-application rules</summary>
-      <description>Internal: the per-application rules of the Compatibility page, as JSON keyed by application id.</description>
+      <summary>Per-application rules (JSON)</summary>
+      <description>The per-application rules of the Compatibility page, as JSON keyed by application id: mode inherit, exclude or fade. Part of profiles. Edit them on the Compatibility page rather than here.</description>
+    </key>
+    <key name="legacy-global-fade" type="b">
+      <default>false</default>
+      <summary>Old whole-window fade for every application</summary>
+      <description>Warning: this fades the whole window, so text, icons and controls lose opacity with the background. Off by default. Before Universal Appearance every window was faded this way (the value is kept in legacy-window-opacity), and this switch brings that behaviour back.</description>
+    </key>
+    <key name="legacy-window-opacity" type="i">
+      <range min="-1" max="255"/>
+      <default>-1</default>
+      <summary>Saved whole-window opacity</summary>
+      <description>Internal: the whole-window opacity (0 to 255) found when Universal Appearance first ran, kept so the old fade can be restored. -1 means none was found.</description>
+    </key>
+    <key name="shell-surfaces" type="b">
+      <default>false</default>
+      <summary>Blur the top bar, Overview, menus, notifications and quick settings</summary>
+      <description>Turns the blur extension's panel, Overview and popup blur on, in step with the shared look (strength, safe mode, performance mode). Your previous blur settings for those parts are kept and put back when this is turned off.</description>
+    </key>
+    <key name="shell-surfaces-backup" type="s">
+      <default>'{}'</default>
+      <summary>Saved shell blur settings</summary>
+      <description>Internal: the blur settings of the panel, Overview and popups before shell-surfaces was turned on.</description>
     </key>
     <key name="search-shortcut" type="as">
       <default>['&lt;Super&gt;space']</default>

@@ -1,5 +1,6 @@
 // Profiles, the pure part (no GLib/GTK, tested with node): the file format, validation of a value against the catalog,
 // resolving `extends`, and the difference between two sets of settings.
+import {exclusionsDropped, rulesCount, validateRulesText} from './appearance.js';
 import {dependencyMet} from './logic.js';
 import type {Item} from './types.js';
 
@@ -70,6 +71,7 @@ export function validateValue(item: Item, value: unknown): string | null {
         return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value) ? null : 'must be a colour like #RRGGBB';
     case 'text':
     case 'textarea':
+        if (item.id === 'niro.app-rules') return validateRulesText(value);
         return typeof value === 'string' ? null : 'must be text';
     case 'list':
     case 'shortcut':
@@ -147,7 +149,9 @@ export function describeValue(item: Item | undefined, v: Value | undefined): str
     case 'list': case 'shortcut': return (v as string[]).length ? (v as string[]).join(', ') : 'none';
     case 'shortcuts': return `${(v as string[][]).filter(x => x.length).length} of ${(v as string[][]).length} set`;
     case 'dict': return 'shadow numbers';
-    case 'textarea': return (v as string).length > 24 ? `${(v as string).slice(0, 24)}…` : (v as string) || 'empty';
+    case 'textarea':
+        if (item.id === 'niro.app-rules') { const n = rulesCount(v as string); return n ? `${n} rule${n === 1 ? '' : 's'}` : 'no rules'; }
+        return (v as string).length > 24 ? `${(v as string).slice(0, 24)}…` : (v as string) || 'empty';
     default: return String(v) || 'empty';
     }
 }
@@ -258,6 +262,13 @@ export interface Summary {
     undo: string;
 }
 
+/** A profile that changes the per-application rules must say which of your exclusions it would remove. */
+function droppedExclusions(changes: Change[]): string[] {
+    const c = changes.find(x => x.id === 'niro.app-rules');
+    const gone = c ? exclusionsDropped(String(c.from ?? '{}'), String(c.to ?? '{}')) : [];
+    return gone.length ? [`This profile removes your exclusion of ${gone.join(', ')} from appearance effects`] : [];
+}
+
 export function summarize(changes: Change[], after: Settings, catalog: Item[], stale: string[], undo = 'A backup is made first. Undo restores it.'): Summary {
     const by = new Map<string, Change[]>();
     for (const c of changes) by.set(c.menu, [...(by.get(c.menu) ?? []), c]);
@@ -267,7 +278,7 @@ export function summarize(changes: Change[], after: Settings, catalog: Item[], s
         total: changes.length,
         headline: changes.length ? `${changes.length} setting${changes.length === 1 ? '' : 's'} will change` : 'Nothing to change: the settings already match.',
         categories,
-        conflicts: inactiveNotes(changes, after, catalog).map(n => n.text),
+        conflicts: [...inactiveNotes(changes, after, catalog).map(n => n.text), ...droppedExclusions(changes)],
         login: pending.length ? `${pending.join(', ')} ${pending.length === 1 ? 'has' : 'have'} an update that loads at your next login: until then the new values may not show.` : null,
         undo,
     };

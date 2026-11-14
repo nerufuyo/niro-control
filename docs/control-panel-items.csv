@@ -15,6 +15,9 @@ Look,Universal Appearance,Apply to GNOME Shell parts,switch,,true,"The island, t
 Look,Universal Appearance,Apply to GTK applications,switch,,true,"Used by the GTK theme integration (installed from Compatibility, never without your consent) and by the control panel.",affect-gtk,niro.affect-gtk
 Look,Universal Appearance,Window-level effects for other applications,switch,,false,"Whole-window transparency for applications that cannot be styled from inside (browsers, Electron, Qt).",affect-thirdparty,niro.affect-thirdparty
 Look,Universal Appearance,Safe mode,switch,,false,"Solid surfaces and no compositor effects, whatever else is set.",safe-mode,niro.safe-mode
+Look,Universal Appearance,Per-application rules (JSON),textarea,,{},"The per-application rules of the Compatibility page, as JSON keyed by application id: mode inherit, exclude or fade.",app-rules,niro.app-rules
+Look,Universal Appearance,Old whole-window fade for every application,switch,,false,"Warning: this fades the whole window, so text, icons and controls lose opacity with the background.",legacy-global-fade,niro.legacy-global-fade
+Look,Universal Appearance,"Blur the top bar, Overview, menus, notifications and quick settings",switch,,false,"Turns the blur extension's panel, Overview and popup blur on, in step with the shared look (strength, safe mode, performance mode).",shell-surfaces,niro.shell-surfaces
 Search,Application Search,Search shortcut,shortcut,,['<Super>space'],Opens the application search.,search-shortcut,niro.search-shortcut
 Island,Appearance and Behavior,Top bar style,select,Glass / Black,glass,"“glass”: see-through, with no colour of its own, with the island as a black notch hanging from the top of the screen.",top-bar-style,island.top-bar-style
 Island,Appearance and Behavior,The island's look,select,Black / Glass,black,black: Island's own black island.,island-theme,island.island-theme

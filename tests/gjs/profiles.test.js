@@ -18,7 +18,7 @@ const value = id => engine.readItem(CATALOG.find(i => i.id === id));
 const captured = engine.capture();
 eq(Object.keys(captured).length, CATALOG.filter(i => !i.managed).length, 'captured settings');
 for (const m of CATALOG.filter(i => i.managed)) if (!(m.managed in captured)) fail(`${m.id} is not covered by ${m.managed}`);
-eq(CATALOG.length, 143, 'registered settings');
+eq(CATALOG.length, 146, 'registered settings');
 
 // built-in profiles are listed first, protected, and resolve through extends
 const names = engine.list().map(p => p.name);
@@ -182,3 +182,20 @@ try { engine.importFrom(`${tmp}/many.json`); fail('invalid values were imported'
 const noted = engine.applySettings({'island.hover-delay': 300, 'island.open-on': 'click'});
 if (!noted.notes.length || !/no effect/.test(noted.notes[0].text)) fail('an inactive setting should be noted');
 print('profiles reliability: ok');
+
+// per-application rules travel with profiles: applied, listed in the preview, and put back by Undo (a restore of the backup)
+{
+    const rulesItem = CATALOG.find(i => i.id === 'niro.app-rules');
+    const mine = JSON.stringify({'org.gnome.Nautilus': {mode: 'exclude'}});
+    engine.writeItem(rulesItem, mine);
+    const target = {...engine.capture(), 'niro.app-rules': '{}'};
+    const planned = engine.preview(target).find(c => c.id === 'niro.app-rules');
+    if (!planned) fail('the rules change is missing from the preview');
+    const r = engine.applySettings(target, 'rules test');
+    if (!r.ok) fail(`applying rules failed: ${JSON.stringify(r)}`);
+    eq(value('niro.app-rules'), '{}', 'rules applied');
+    const undo = engine.restore(engine.backups()[0].file);
+    if (!undo.ok) fail('undo failed');
+    eq(value('niro.app-rules'), mine, 'rules restored by Undo');
+    print('profiles: per-application rules ok');
+}

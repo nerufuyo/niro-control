@@ -186,3 +186,19 @@ test('change summary: counts, areas largest first, conflicts, pending login, und
     assert.equal(none.login, null);
     assert.equal(summarize([c('dock.icon-size', 'Dock')], {}, CATALOG, []).headline, '1 setting will change');
 });
+
+test('profiles carry per-application rules: validated on import, shown as a count, exclusions never dropped silently', async () => {
+    const {validateProfile, describeValue, summarize} = await import('../../control/build/profileLogic.js');
+    const item = CATALOG.find(i => i.id === 'niro.app-rules');
+    assert.ok(item, 'the rules are a registered setting');
+    const good = JSON.stringify({chrome: {mode: 'exclude'}});
+    assert.equal(validateProfile({format: 'niro-profile', version: 1, name: 'R', settings: {'niro.app-rules': good}}, CATALOG).ok, true);
+    const bad = validateProfile({format: 'niro-profile', version: 1, name: 'R', settings: {'niro.app-rules': '{"x":{"mode":"weird"}}'}}, CATALOG);
+    assert.equal(bad.ok, false);
+    assert.match(bad.errors.join(' '), /not valid/);
+    assert.equal(describeValue(item, good), '1 rule');
+    assert.equal(describeValue(item, '{}'), 'no rules');
+    const change = {id: 'niro.app-rules', title: item.title, menu: 'Look', group: 'g', from: good, to: '{}'};
+    assert.match(summarize([change], {}, CATALOG, []).conflicts.join(' '), /removes your exclusion of chrome/);
+    assert.equal(summarize([{...change, from: '{}', to: good}], {}, CATALOG, []).conflicts.length, 0);
+});

@@ -163,6 +163,36 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "niro.app-rules",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Per-application rules (JSON)",
+  "help": "The per-application rules of the Compatibility page, as JSON keyed by application id: mode inherit, exclude or fade.",
+  "key": "app-rules",
+  "kind": "textarea",
+  "managed": false
+ },
+ {
+  "id": "niro.legacy-global-fade",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Old whole-window fade for every application",
+  "help": "Warning: this fades the whole window, so text, icons and controls lose opacity with the background.",
+  "key": "legacy-global-fade",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.shell-surfaces",
+  "menu": "Look",
+  "group": "Universal Appearance",
+  "title": "Blur the top bar, Overview, menus, notifications and quick settings",
+  "help": "Turns the blur extension's panel, Overview and popup blur on, in step with the shared look (strength, safe mode, performance mode).",
+  "key": "shell-surfaces",
+  "kind": "switch",
+  "managed": false
+ },
+ {
   "id": "niro.search-shortcut",
   "menu": "Search",
   "group": "Application Search",

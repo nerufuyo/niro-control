@@ -108,3 +108,46 @@ export function classify(appId: string, execLine = ''): Family | null {
     const hay = `${appId} ${execLine}`;
     return FAMILIES.find(f => f.match.test(appId) || (f.id !== 'gtk4' && f.id !== 'gtk3' && f.id !== 'niro' && f.match.test(hay))) ?? null;
 }
+
+// ---- Legacy whole-window fade: migration, never destruction
+export interface LegacyState {
+    /** the blur extension's applications opacity, 0 to 255 */ appsOpacity: number;
+    /** the value kept from before, -1 for none */ saved: number;
+    /** the legacy-global-fade switch */ legacyFade: boolean;
+}
+/**
+ * What to write so that no window is faded by default and the old value is never lost: the first time a fade (< 255) is found it is
+ * saved; the extension setting goes to 255 unless the user turned the old fade back on, which writes the saved value back.
+ * Idempotent: running it again changes nothing.
+ */
+export function migrateLegacy(s: LegacyState): LegacyState {
+    let saved = s.saved;
+    if (saved < 0 && s.appsOpacity >= 0 && s.appsOpacity < 255) saved = s.appsOpacity;
+    const appsOpacity = s.legacyFade && saved >= 0 ? saved : 255;
+    return {appsOpacity, saved, legacyFade: s.legacyFade};
+}
+
+// ---- The colour scheme: Niro's own choice, else GNOME's
+export type SchemeChoice = 'system' | 'dark' | 'light';
+/** `system` is org.gnome.desktop.interface color-scheme: "prefer-dark", "prefer-light" or "default" (which GNOME treats as light). */
+export function resolveScheme(choice: string, system: string): 'dark' | 'light' {
+    if (choice === 'dark' || choice === 'light') return choice;
+    return system === 'prefer-dark' ? 'dark' : 'light';
+}
+
+// ---- Rules in profiles
+export function rulesCount(json: string): number { return Object.keys(parseRules(json)).length; }
+/** null when the text is a sound rules object with nothing dropped, else the reason. */
+export function validateRulesText(json: unknown): string | null {
+    if (typeof json !== 'string') return 'must be text';
+    let raw: unknown;
+    try { raw = JSON.parse(json || '{}'); } catch (_e) { return 'is not valid JSON'; }
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return 'must be a JSON object keyed by application id';
+    const kept = Object.keys(parseRules(json)).length, given = Object.keys(raw as object).length;
+    return kept === given ? null : `${given - kept} of ${given} rules are not valid (an id of letters, digits . _ - @ +, and a mode of inherit, exclude or fade)`;
+}
+/** Exclusions the user has now that applying `next` would remove: what a profile must not drop silently. */
+export function exclusionsDropped(current: string, next: string): string[] {
+    const now = parseRules(current), after = parseRules(next);
+    return Object.entries(now).filter(([id, r]) => r.mode === 'exclude' && after[id]?.mode !== 'exclude').map(([id]) => id).sort();
+}
