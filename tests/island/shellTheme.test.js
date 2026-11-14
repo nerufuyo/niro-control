@@ -76,3 +76,17 @@ test('dark text on the light surfaces reaches AA over every wallpaper at the flo
         }
     }
 });
+
+import {readFileSync} from 'node:fs';
+import {EDGE} from '../../control/build/appearanceTokens.js';
+test('one edge treatment: the Search palette and the shell surfaces share radius, border and shadow', () => {
+    const search = readFileSync(new URL('../../shell/search/stylesheet.css', import.meta.url), 'utf8');
+    const palette = search.match(/\.niro-search \{([^}]*)\}/)[1];
+    assert.match(palette, new RegExp(`border-radius: ${EDGE.radiusSheet}px`));
+    assert.ok(palette.includes(EDGE.borderDark), 'border');
+    assert.ok(palette.includes(EDGE.shadowDark), 'shadow');
+    const shell = shellStylesheet(look);
+    assert.match(shell, new RegExp(`\\.quick-settings[^}]*border-radius: ${EDGE.radiusSheet}px`));
+    assert.match(shell, new RegExp(`\\.popup-menu-content[^}]*border-radius: ${EDGE.radiusPopup}px`));
+    assert.ok(shell.includes(EDGE.shadowDark) && shell.includes(EDGE.borderDark));
+});

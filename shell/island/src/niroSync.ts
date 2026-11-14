@@ -132,6 +132,12 @@ export class NiroSync {
         this._shellFile = null; this._shellCss = null;
     }
 
+    /** A preset or profile writes several keys at once: the Shell stylesheet is built once, shortly after the last of them. */
+    _queueShell() {
+        if (this._shellTimer) return;
+        this._shellTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => { this._shellTimer = 0; this._shellStyle(); return GLib.SOURCE_REMOVE; });
+    }
+
     /** One rewrite at a time, shortly after the last change; refreshGtk skips files whose content would not change. */
     _queueGtk() {
         if (this._gtkTimer) return;
@@ -170,7 +176,7 @@ export class NiroSync {
     _apply() {
         this._migrate();
         this._surfaces();
-        this._shellStyle();
+        this._queueShell();
         this._queueGtk();
         // Universal Appearance: switched off (or off for the shell), the island, dock and search keep the values they have;
         // safe mode and performance mode make the glass solid and drop the blur (mirrors effective() in control/src/appearance.ts)
@@ -222,6 +228,8 @@ export class NiroSync {
         if (this._themeId) this._iface.disconnect(this._themeId);
         if (this._a11yId) this._a11y.disconnect(this._a11yId);
         this._ifaceId = this._themeId = this._a11yId = 0;
+        if (this._shellTimer) GLib.source_remove(this._shellTimer);
+        this._shellTimer = 0;
         if (this._gtkTimer) GLib.source_remove(this._gtkTimer);
         this._gtkTimer = 0;
     }

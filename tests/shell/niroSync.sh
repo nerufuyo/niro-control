@@ -71,6 +71,13 @@ ev "new imports.gi.Gio.Settings({schema_id: \"org.gnome.desktop.a11y.interface\"
 echo "GTK_HC_SOLID $(grep -c "window.background:not(.solid-csd) { background-color: rgba(28, 28, 30, 1)" $CSS)" >> '"$OUT"'
 ev "global.__N.set_boolean(\"universal-enabled\", false); 1" > /dev/null; sleep 1.5
 echo "GTK_OFF $(grep -c "switched off" $CSS)" >> '"$OUT"'
+ev "$HC.set_boolean(\"high-contrast\", false); global.__N.set_boolean(\"shell-surfaces\", true); 1" > /dev/null; sleep 1
+echo "UNIVERSAL_OFF_SHELL loaded=$(sheets | grep -c shell-appearance)" >> '"$OUT"'
+ev "global.__N.set_boolean(\"universal-enabled\", true); 1" > /dev/null; sleep 1.5
+echo "UNIVERSAL_ON_SHELL loaded=$(sheets | grep -c shell-appearance) gtk_back=$(grep -c "window.background" $CSS)" >> '"$OUT"'
+# a preset writes seven keys at once: both stylesheets end up solid, from one coherent state
+ev "for (const [k, v] of Object.entries({\"opacity\": 100, \"sidebar-opacity\": 100, \"content-opacity\": 100, \"elevated-opacity\": 100})) global.__N.set_int(k, v); global.__N.set_boolean(\"blur\", false); 1" > /dev/null; sleep 1.5
+echo "PRESET_SOLID shell=$(grep -c "#panel { background-color: rgba(28, 28, 30, 1)" $SHELLCSS) gtk=$(grep -c "window.background:not(.solid-csd) { background-color: rgba(28, 28, 30, 1)" $CSS)" >> '"$OUT"'
 kill $SP' > /dev/null 2>&1
 cat "$OUT"; grep -iE "JS ERROR|Island:" "$WORK/shell.log" | head -4
 has "legacy fade saved once and windows back to 255" "MIGRATE apps=255 saved=204"
@@ -93,4 +100,8 @@ has "GTK 3 follows its theme: a dark theme gives dark" "GTK3_DARKTHEME 1"
 has "and a light theme gives light" "GTK3_LIGHTTHEME 1"
 has "high contrast makes the glass solid" "GTK_HC_SOLID 1"
 has "the global switch neutralises the stylesheet" "GTK_OFF 1"
+has "the global switch also unloads the shell stylesheet" "UNIVERSAL_OFF_SHELL loaded=0"
+has "and switching it back on restores both" "UNIVERSAL_ON_SHELL loaded=1 gtk_back=1"
+has "a preset's keys, written together, leave both stylesheets solid and consistent" "PRESET_SOLID shell=1 gtk=1"
+if grep -qE "JS ERROR" "$WORK/shell.log"; then echo "FAIL no JS errors in the shell"; grep -E "JS ERROR" "$WORK/shell.log" | head -3; FAILS=$((FAILS+1)); else echo "ok   no JS errors in the shell"; fi
 [ $FAILS = 0 ] && echo "niroSync shell checks: all passed" || echo "niroSync shell checks: $FAILS failed"

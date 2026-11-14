@@ -119,3 +119,13 @@ window.niro-window:not(.maximized):not(.fullscreen):not(.tiled), window.niro-win
 .niro-window separator { background-color: @niro_divider; }
 `;
 }
+
+/**
+ * One treatment of edges for every Niro surface that floats (shell popups, Quick Settings, notifications, the Search palette):
+ * the radii, the border and the shadow. Island and Dock keep their own radius settings and are not forced into it.
+ */
+export const EDGE = {
+    radiusCard: 16, radiusPopup: 18, radiusSheet: 28,
+    borderDark: 'rgba(255, 255, 255, 0.10)', borderLight: 'rgba(0, 0, 0, 0.10)',
+    shadowDark: '0 8px 28px rgba(0, 0, 0, 0.45)', shadowLight: '0 8px 28px rgba(0, 0, 0, 0.25)',
+};
