@@ -19,6 +19,8 @@
 .niro-search-entry StLabel.hint-text { color: #8e8e93; }
 .niro-search-list { padding-top: 6px; spacing: 2px; }
 .niro-search-row { border-radius: 12px; padding: 8px 10px; }
+.niro-search-row:hover { background-color: rgba(255, 255, 255, 0.07); }
+.niro-search-row:focus { box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5); }
 .niro-search-icon { margin-right: 12px; }
 .niro-search-name { color: #f2f2f7; font-size: 14px; font-weight: 600; }
 .niro-search-description { color: #8e8e93; font-size: 11px; }
@@ -28,3 +30,4 @@
 .niro-search-icon-symbolic { color: #c7c7cc; }
 .niro-confirm-title { font-size: 16px; font-weight: 700; padding-bottom: 6px; }
 .niro-confirm-body { font-size: 13px; }
+.niro-search-hint { color: #8e8e93; font-size: 11px; padding: 8px 12px 2px 12px; border-top: 1px solid rgba(255, 255, 255, 0.06); }

@@ -15,6 +15,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import {buildRegistry, clipboardHistory, confirm, profiles, windows} from './actions.js';
 import {calculate} from './calc.js';
 import {searchItems} from './logic.js';
+import {hint, keyIntent, move, Once} from './nav.js';
 import {arrange, bestScore} from './rank.js';
 import {INDEX} from './settings-index.js';
 import {convert} from './units.js';
@@ -44,7 +45,7 @@ export default class NiroSearch extends Extension {
         this._results = [];
         this._rows = [];
         this._selected = 0;
-        this._busy = false;
+        this._once = new Once();
 
         this._box = new St.BoxLayout({style_class: 'niro-search', vertical: true, reactive: true, visible: false, width: WIDTH});
         this._entry = new St.Entry({style_class: 'niro-search-entry', hint_text: 'Search apps, settings, windows, or type a calculation…', can_focus: true, x_expand: true});
@@ -52,7 +53,8 @@ export default class NiroSearch extends Extension {
         this._list = new St.BoxLayout({style_class: 'niro-search-list', vertical: true});
         this._scroll.set_child(this._list);
         this._status = new St.Label({style_class: 'niro-search-status', visible: false});
-        this._box.add_child(this._entry); this._box.add_child(this._status); this._box.add_child(this._scroll);
+        this._hint = new St.Label({style_class: 'niro-search-hint', text: hint(undefined)});
+        this._box.add_child(this._entry); this._box.add_child(this._status); this._box.add_child(this._scroll); this._box.add_child(this._hint);
         Main.layoutManager.uiGroup.add_child(this._box);
 
         const text = this._entry.clutter_text;
@@ -69,7 +71,7 @@ export default class NiroSearch extends Extension {
         this._unexport();
         this._close();
         this._box?.destroy();
-        this._box = this._entry = this._list = this._scroll = this._status = null;
+        this._box = this._entry = this._list = this._scroll = this._status = this._hint = null;
         this._registry = this._look = null;
     }
 
@@ -175,11 +177,10 @@ export default class NiroSearch extends Extension {
     }
 
     async _activate(result) {
-        if (!result || this._busy) return;
-        this._busy = true;
+        if (!result || !this._once.begin()) return;
         this._close();
-        const outcome = await this._run(result.action, result.args, 'ui');
-        this._busy = false;
+        let outcome;
+        try { outcome = await this._run(result.action, result.args, 'ui'); } finally { this._once.end(); }
         if (outcome.ok) {
             if (result.recent !== false) this._remember(result);
             if (result.toast) Main.notify('Niro Search', outcome.message);
@@ -330,7 +331,6 @@ export default class NiroSearch extends Extension {
             content.add_child(labels);
             row.set_child(content);
             row.connect('clicked', () => this._activate(r));
-            row.connect('notify::hover', () => row.hover && this._select(i));
             this._list.add_child(row);
             this._rows.push(row);
         });
@@ -343,8 +343,11 @@ export default class NiroSearch extends Extension {
     }
 
     _select(index) {
+        this._hint.text = hint(undefined);
         if (!this._rows.length) return;
-        this._selected = (index + this._rows.length) % this._rows.length;
+        this._selected = index;
+        const sel = this._results[index];
+        this._hint.text = hint(sel && {title: sel.title, permission: this._registry.get(sel.action)?.permission});
         const [r, g, b] = this._accent ?? [232, 71, 43];
         this._rows.forEach((row, i) => row.set_style(i === this._selected ? `background-color: rgba(${r}, ${g}, ${b}, 0.28);` : ''));
         const adj = this._scroll.vadjustment ?? this._scroll.get_vscroll_bar?.().adjustment;
@@ -356,21 +359,14 @@ export default class NiroSearch extends Extension {
     }
 
     _onKey(event) {
-        const key = event.get_key_symbol();
-        const ctrl = (event.get_state() & Clutter.ModifierType.CONTROL_MASK) !== 0;
-        if (key === Clutter.KEY_Escape) {
-            if (this._entry.get_text()) this._entry.set_text(''); else this._close();
-        } else if (key === Clutter.KEY_Down || (ctrl && key === Clutter.KEY_n) || key === Clutter.KEY_Tab) {
-            this._select(this._selected + 1);
-        } else if (key === Clutter.KEY_Up || (ctrl && key === Clutter.KEY_p) || key === Clutter.KEY_ISO_Left_Tab) {
-            this._select(this._selected - 1);
-        } else if (key >= Clutter.KEY_1 && key <= Clutter.KEY_9 && ctrl) {
-            const r = this._results[key - Clutter.KEY_1];
-            if (r) this._activate(r);
-        } else if (key === Clutter.KEY_Return || key === Clutter.KEY_KP_Enter) {
-            this._activate(this._results[this._selected]);
-        } else {
-            return Clutter.EVENT_PROPAGATE;
+        const intent = keyIntent(event.get_key_symbol(), (event.get_state() & Clutter.ModifierType.CONTROL_MASK) !== 0);
+        if (!intent) return Clutter.EVENT_PROPAGATE;
+        switch (intent.type) {
+        case 'close': this._close(); break;
+        case 'next': this._select(move(this._selected, 1, this._rows.length)); break;
+        case 'previous': this._select(move(this._selected, -1, this._rows.length)); break;
+        case 'quick': this._activate(this._results[intent.index]); break;
+        case 'activate': this._activate(this._results[this._selected]); break;
         }
         return Clutter.EVENT_STOP;
     }
