@@ -13,6 +13,7 @@ import {searchItems} from './logic.js';
 import {aboutPage, dockPage, islandPage, lookPage, Model, resultsPage, searchPage, windowsPage} from './pages.js';
 import {detectPreset, effective, PRESET_KEYS, PRESETS} from './appearance.js';
 import {stylesheet} from './glass.js';
+import {compatPage} from './compatPage.js';
 import {homePage} from './homePage.js';
 import {profilesPage} from './profilesPage.js';
 
@@ -21,6 +22,7 @@ const MODULES = [
     ['look', 'Look', 'preferences-desktop-theme-symbolic', lookPage], ['island', 'Island', 'view-pin-symbolic', islandPage],
     ['dock', 'Dock', 'view-app-grid-symbolic', dockPage], ['windows', 'Windows', 'window-new-symbolic', windowsPage],
     ['search', 'Search', 'system-search-symbolic', searchPage],
+    ['compat', 'Compatibility', 'preferences-system-symbolic', (model, shared) => shared.compat.widget],
     ['profiles', 'Profiles', 'user-bookmarks-symbolic', (model, shared) => shared.profiles.widget], ['about', 'About', 'help-about-symbolic', aboutPage],
 ];
 
@@ -108,6 +110,7 @@ export function buildWindow(app) {
     const shared = {};
     shared.profiles = profilesPage(model.engine, ctx);
     shared.home = homePage(model, ctx, shared.profiles, stale);
+    shared.compat = compatPage(model, ctx);
 
     const content = new Gtk.Stack({hexpand: true, vexpand: true, transition_type: Gtk.StackTransitionType.CROSSFADE, transition_duration: 120});
     // reduced motion: GNOME's animations switch also stops the panel's crossfade
