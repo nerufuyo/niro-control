@@ -125,4 +125,9 @@ test('registry: the manifest an outside caller sees has no handlers', () => {
     const m = r.manifest();
     assert.equal(m.length, 4);
     assert.ok(m.every(a => !('run' in a) && a.id && a.permission));
+    const withEnv = r.manifest({profiles: false}).find(a => a.id === 'profile.apply');
+    assert.equal(withEnv.available, false);
+    assert.equal(withEnv.reason, 'Niro Control is not installed');
+    assert.equal(r.manifest({profiles: true}).find(a => a.id === 'profile.apply').available, true);
+    assert.equal(r.manifest({}).find(a => a.id === 'system.lock').available, true);
 });

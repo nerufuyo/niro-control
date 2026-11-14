@@ -19,6 +19,8 @@ import {INDEX} from './settings-index.js';
 import {convert} from './units.js';
 
 const WIDTH = 680;
+/** JSON with the keys in order, so the same arguments written in another order are the same request. */
+const canon = (v) => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x));
 const LIMITS = {Applications: 5, Windows: 4, Settings: 5, Profiles: 4, Actions: 4, Clipboard: 6};
 const RECENT_MAX = 8;
 const rgb = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
@@ -29,7 +31,9 @@ const ICON = {Calculator: 'accessories-calculator-symbolic', Conversion: 'edit-f
 
 const DBUS_XML = `<node><interface name="org.niro.Search">
   <method name="ListActions"><arg type="s" direction="out" name="json"/></method>
+  <method name="Availability"><arg type="s" direction="in" name="id"/><arg type="s" direction="out" name="json"/></method>
   <method name="RunAction"><arg type="s" direction="in" name="id"/><arg type="s" direction="in" name="args_json"/><arg type="s" direction="out" name="outcome_json"/></method>
+  <method name="History"><arg type="u" direction="in" name="limit"/><arg type="s" direction="out" name="json_lines"/></method>
 </interface></node>`;
 
 export default class NiroSearch extends Extension {
@@ -71,23 +75,67 @@ export default class NiroSearch extends Extension {
     // ---- D-Bus: the registry for shortcuts and the assistant. Anything that is not harmless is asked about on screen.
     _export() {
         const impl = {
-            ListActions: () => JSON.stringify(this._registry.manifest()),
+            ListActions: () => JSON.stringify(this._registry.manifest({})),
+            Availability: id => {
+                const a = this._registry.get(id);
+                const reason = a ? (a.available?.({}) ?? null) : 'no such action';
+                return JSON.stringify({id, available: Boolean(a) && reason === null, reason});
+            },
+            History: limit => this._history(Math.min(Math.max(limit, 1), 200)),
             RunActionAsync: (params, invocation) => {
                 const [id, argsJson] = params;
+                const reply = outcome => invocation.return_value(new GLib.Variant('(s)', [JSON.stringify(outcome)]));
                 let args = {};
                 try { args = argsJson ? JSON.parse(argsJson) : {}; } catch (_e) {
-                    invocation.return_value(new GLib.Variant('(s)', [JSON.stringify({ok: false, code: 'invalid', error: 'arguments are not JSON'})]));
+                    reply({ok: false, code: 'invalid', error: 'arguments are not JSON'});
                     return;
                 }
                 if (typeof args !== 'object' || Array.isArray(args) || args === null)
                     args = {__bad: true};
-                this._run(id, args, 'external').then(outcome =>
-                    invocation.return_value(new GLib.Variant('(s)', [JSON.stringify(outcome)])));
+                this._caller(invocation.get_sender()).then(caller => this._run(id, args, 'external', caller)).then(reply);
             },
         };
         this._dbus = Gio.DBusExportedObject.wrapJSObject(DBUS_XML, impl);
         this._dbus.export(Gio.DBus.session, '/org/niro/Search');
         this._owner = Gio.DBus.own_name(Gio.BusType.SESSION, 'org.niro.Search', Gio.BusNameOwnerFlags.NONE, null, null, null);
+    }
+
+    /** Which program is on the other end of a D-Bus call (its process name), for the audit. */
+    _caller(sender) {
+        return new Promise(resolve => {
+            try {
+                Gio.DBus.session.call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', 'GetConnectionUnixProcessID',
+                    new GLib.Variant('(s)', [sender]), null, Gio.DBusCallFlags.NONE, 1000, null, (conn, res) => {
+                        try {
+                            const [pid] = conn.call_finish(res).deepUnpack();
+                            const comm = new TextDecoder().decode(GLib.file_get_contents(`/proc/${pid}/comm`)[1]).trim();
+                            resolve(comm || String(pid));
+                        } catch (_e) { resolve('unknown'); }
+                    });
+            } catch (_e) { resolve('unknown'); }
+        });
+    }
+
+    // ---- The audit: one line per request that reached the registry, whoever asked
+    get _auditPath() { return `${GLib.get_user_data_dir()}/niro-control/audit.jsonl`; }
+
+    _audit(entry) {
+        try {
+            const path = this._auditPath;
+            GLib.mkdir_with_parents(GLib.path_get_dirname(path), 0o700);
+            const file = Gio.File.new_for_path(path);
+            try { if (file.query_info('standard::size', 0, null).get_size() > 512 * 1024) file.move(Gio.File.new_for_path(`${path}.old`), Gio.FileCopyFlags.OVERWRITE, null, null); } catch (_e) { /* not there yet */ }
+            const out = file.append_to(Gio.FileCreateFlags.PRIVATE, null);
+            out.write_all(new TextEncoder().encode(JSON.stringify(entry) + '\n'), null);
+            out.close(null);
+        } catch (_e) { /* the history is best effort: it never stops an action */ }
+    }
+
+    _history(limit) {
+        try {
+            const lines = new TextDecoder().decode(GLib.file_get_contents(this._auditPath)[1]).trim().split('\n').filter(Boolean);
+            return lines.slice(-limit).join('\n');
+        } catch (_e) { return ''; }
     }
 
     _unexport() {
@@ -96,13 +144,33 @@ export default class NiroSearch extends Extension {
         this._owner = 0; this._dbus = null;
     }
 
-    // ---- Running
-    async _run(id, args, source) {
-        const outcome = await this._registry.run(id, args, {}, source, (action) =>
-            confirm(action.title, action.confirm, action.title));
+    // ---- Running: the one gate. Search, a shortcut over D-Bus and the assistant all come through here.
+    async _run(id, args, source, caller = 'search') {
+        const started = GLib.get_monotonic_time();
+        const key = `${id}\u001f${canon(args)}`;
+        // The same request while it is still running or just finished is not run twice (a loop, a double press, a retry)
+        this._inflight ??= new Map();
+        const now = GLib.get_monotonic_time();
+        const last = this._inflight.get(key);
+        if (source === 'external' && last !== undefined && (last === 0 || now - last < 1500000)) {
+            const outcome = {ok: false, code: 'duplicate', error: 'the same request is already running or has just run'};
+            this._audit({at: new Date().toISOString(), source, caller, id, args: this._shorten(args), ok: false, code: 'duplicate', ms: 0});
+            return outcome;
+        }
+        if (source === 'external') this._inflight.set(key, 0);
+        const outcome = await this._registry.run(id, args, {}, source, (action) => confirm(action.title, action.confirm, action.title));
+        if (source === 'external') this._inflight.set(key, GLib.get_monotonic_time());
+        this._audit({at: new Date().toISOString(), source, caller, id, args: this._shorten(args), ok: outcome.ok, code: outcome.code ?? null,
+            ms: Math.round((GLib.get_monotonic_time() - started) / 1000)});
         if (!outcome.ok && outcome.code !== 'declined') Main.notify('Niro Search', outcome.error);
         else if (outcome.ok && source === 'external') Main.notify('Niro Search', outcome.message);
         return outcome;
+    }
+
+    _shorten(args) {
+        const out = {};
+        for (const [k, v] of Object.entries(args)) out[k] = typeof v === 'string' && v.length > 120 ? `${v.slice(0, 120)}…` : v;
+        return out;
     }
 
     async _activate(result) {

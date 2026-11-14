@@ -127,9 +127,12 @@ export class Registry<Env = unknown> {
         }
     }
 
-    /** What an outside caller may see of the registry: no handlers. */
-    manifest() {
-        return this.list().map(a => ({id: a.id, title: a.title, description: a.description, category: a.category, keywords: a.keywords,
-            params: a.params ?? [], permission: a.permission}));
+    /** What an outside caller may see of the registry: no handlers, and whether each action can run now (and why not). */
+    manifest(env?: Env) {
+        return this.list().map(a => {
+            const reason = env === undefined ? null : (a.available?.(env) ?? null);
+            return {id: a.id, title: a.title, description: a.description, category: a.category, keywords: a.keywords,
+                params: a.params ?? [], permission: a.permission, available: reason === null, reason};
+        });
     }
 }

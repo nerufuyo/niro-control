@@ -1,5 +1,5 @@
 # Niro Control: `make` builds and tests everything; `make deb` makes the package; `make install` installs it.
-.PHONY: all build test lint deb install clean catalog
+.PHONY: all build test test-shell lint deb install clean catalog
 
 all: test
 
@@ -10,6 +10,9 @@ build:
 test:
 	npm test
 	cargo test -p island-core -p island-daemon
+
+test-shell:           # needs the installed package and a built daemon; starts its own headless GNOME Shell
+	tests/shell/headless.sh
 
 lint:
 	npm run --silent lint

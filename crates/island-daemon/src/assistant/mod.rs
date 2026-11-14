@@ -22,6 +22,17 @@ mod grok;
 mod mic;
 mod models;
 mod music;
+mod niro;
+
+/// The assistant's registry gateway, for the command line (see `niro.rs`).
+pub fn niro_seen() -> niro::Seen {
+    niro::Seen::default()
+}
+
+/// Runs one registry request as the assistant would.
+pub async fn niro_execute(call: &serde_json::Value, seen: &mut niro::Seen) -> String {
+    niro::execute(call, seen).await
+}
 mod opencode;
 mod sign_in;
 mod system;
@@ -822,6 +833,11 @@ impl Session {
              - top_processes: the apps using the most CPU and memory right now; use it when the computer is \
              slow or hot, then offer to close the heavy ones\n\
              - chrome_profiles: Chrome's profiles, with each one's folder, name and account\n\
+             - niro {{action, args}}: Niro's own actions (profiles, settings, windows, Do Not Disturb, lock, and more), by id: \
+             {{\"type\": \"niro\", \"action\": \"list\"}} returns what exists with each one's arguments and whether it can run now; then \
+             {{\"type\": \"niro\", \"action\": \"profile.apply\", \"args\": {{\"id\": \"gaming\"}}}} runs one. Only ids from the list work. \
+             Some ask the user first; \"declined\" means they said no: do not ask again. Never repeat a request that came back \
+             done or declined\n\
              Search again with other terms or places when nothing fits; once found, act on it (reveal_file, \
              open_file, open_folder, chrome_profile) and say where it is. Never tell them to search themselves.\n\
              - check {{command}}: a command that only looks, run at once with its output returned to you; give \

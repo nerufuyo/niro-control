@@ -106,6 +106,7 @@ fn excuse(say: &str) -> bool {
 
 /// The actions island-daemon runs itself, for the AI, rather than the extension for the user.
 const TOOLS: &[&str] = &[
+    "niro",
     "find_files",
     "list_folder",
     "recent_files",
@@ -160,6 +161,11 @@ fn describe(call: &Value) -> String {
         Some("find_apps") => match strings(&call["terms"]).first() {
             Some(term) => format!("Looking for an app for “{term}”…"),
             None => "Looking through your apps…".into(),
+        },
+        Some("niro") => match call["action"].as_str() {
+            Some("list") => "Looking at what Niro can do…".into(),
+            Some(id) => format!("Asking Niro: {id}…"),
+            None => "Asking Niro…".into(),
         },
         Some("top_processes") => "Checking what’s using the computer…".into(),
         Some("check") => check_words(call["command"].as_str().unwrap_or_default()).into(),
@@ -216,7 +222,10 @@ fn strings(value: &Value) -> Vec<String> {
 }
 
 /// Runs one tool, off the async threads, and returns its result as text for the AI.
-async fn run(call: Value) -> String {
+async fn run(call: Value, niro: &mut super::niro::Seen) -> String {
+    if call["type"] == "niro" {
+        return super::niro::execute(&call, niro).await;
+    }
     if call["type"] == "check" {
         return check::run(call["command"].as_str().unwrap_or_default()).await;
     }
@@ -337,6 +346,7 @@ pub async fn think(
     let mut checks = Vec::new();
     let mut ran = Vec::new();
     let mut nudged = false;
+    let mut niro_seen = super::niro::Seen::default();
     for _ in 0..MAX_STEPS {
         let (calls, mut actions): (Vec<Value>, Vec<Value>) =
             answer.actions.iter().cloned().partition(is_tool);
@@ -370,7 +380,7 @@ pub async fn think(
             if call["type"] == "check" {
                 checks.push(call["command"].as_str().unwrap_or_default().to_owned());
             }
-            results.push(run(call).await);
+            results.push(run(call, &mut niro_seen).await);
         }
         // A command to run goes on its own, after the rest: asked, then followed to its end.
         let commands: Vec<Value> = actions

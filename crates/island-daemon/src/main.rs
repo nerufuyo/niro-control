@@ -56,10 +56,11 @@ const CACHED_SONGS: usize = 500;
 
 const HELP: &str = "island-daemon: the Island background service (started by systemd or D-Bus, not by hand)
 
-Usage: island-daemon [--version | --doctor | --report | --unhook-all | --help]
+Usage: island-daemon [--version | --doctor | --report | --niro-action ID [ARGS_JSON] | --unhook-all | --help]
   --version     print the version
   --doctor      check the service, speech recognition, each AI's install and sign-in, and its alerts
   --report      everything a bug report needs: versions, the doctor's check and recent logs
+  --niro-action run one of Niro's actions as the assistant would (the same checks, the same confirmations); prints the outcome
   --unhook-all  take Island's alert hooks out of Claude Code's and Codex's settings
   --help        print this
 
@@ -98,6 +99,18 @@ async fn run() -> anyhow::Result<()> {
         // Run by an AI's hook: says nothing and always succeeds.
         Some("--agent-hook") => {
             agents::hook::run(&args[2..]).await;
+            return Ok(());
+        }
+        // The assistant's way into Niro's action registry, by hand: for checks and scripts.
+        Some("--niro-action") => {
+            let Some(id) = args.get(2) else { bail!("--niro-action needs an action id (or \"list\")") };
+            let parsed = match args.get(3) {
+                Some(text) => serde_json::from_str(text).context("the arguments are not JSON")?,
+                None => serde_json::json!({}),
+            };
+            let call = serde_json::json!({"type": "niro", "action": id, "args": parsed});
+            let mut seen = assistant::niro_seen();
+            println!("{}", assistant::niro_execute(&call, &mut seen).await);
             return Ok(());
         }
         Some("--unhook-all") => {
