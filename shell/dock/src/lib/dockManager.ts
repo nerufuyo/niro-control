@@ -14,6 +14,17 @@ import { Magnification } from "./magnification.js";
 import { MediaManager } from "./mediaManager.js";
 import { SignalManager } from "./signalManager.js";
 import { WindowPreviewPopup } from "./windowPreview.js";
+import { box, setVertical } from "./compat.js";
+
+/** The applications button's pictures (setting `app-button-icon`). */
+const APP_BUTTON_ICONS: Record<string, string> = {
+  grid: "view-app-grid-symbolic",
+  list: "view-list-symbolic",
+  search: "system-search-symbolic",
+  menu: "open-menu-symbolic",
+  star: "starred-symbolic",
+  home: "user-home-symbolic",
+};
 
 const POSITIONS = { BOTTOM: 0, LEFT: 1, RIGHT: 2, TOP: 3 } as const;
 
@@ -22,6 +33,9 @@ export class DockManager {
   private _container: InstanceType<typeof St.BoxLayout> | null = null;
   private _intellihide: Intellihide | null = null;
   private _visibility: DockVisibility | null = null;
+  private _overviewHidden = false;
+  /** A full-screen app has the dock's display: it auto-hides there, and its edge brings it back (see `_syncFullscreen`). */
+  private _fsForced = false;
   private _iconManager: IconManager | null = null;
   private _magnification: Magnification | null = null;
   private _settings: Gio.Settings | null = null;
@@ -53,8 +67,20 @@ export class DockManager {
   private get _dockHeight(): number {
     const iconSize = this._settings?.get_int("icon-size") ?? 48;
     const iconActorHeight = iconSize + 8;
-    const verticalPadding = 8; // 4px top + 4px bottom from _applyDockStyle
-    return iconActorHeight + verticalPadding;
+    return iconActorHeight + 2 * this._verticalPadding();
+  }
+
+  /** The dock's side padding (Settings), and from it the room above and below the icons: 4px at the default 10. */
+  private _sidePadding(): number {
+    return this._settings?.get_int("dock-padding") ?? 10;
+  }
+
+  private _verticalPadding(): number {
+    return Math.max(2, Math.round(this._sidePadding() * 0.4));
+  }
+
+  private _iconSpacing(): number {
+    return this._settings?.get_int("icon-spacing") ?? 6;
   }
 
   enable(settings: Gio.Settings): void {
@@ -67,7 +93,7 @@ export class DockManager {
 
     this._container = new St.BoxLayout({
       style_class: "dock-container",
-      vertical: false,
+      ...box(false),
       reactive: true,
       x_align: Clutter.ActorAlign.CENTER,
       y_align: Clutter.ActorAlign.END,
@@ -106,6 +132,12 @@ export class DockManager {
     this._signals.connect(global.window_manager, "unminimize", (_wm: unknown, actor: unknown) =>
       this._genie(actor as Clutter.Actor, true),
     );
+    // Thumbnails follow the windows that are minimized: a closed one, or one restored some other way, goes.
+    this._signals.connect(global.window_manager, "destroy", () => GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+      this._iconManager?.syncMinimized();
+      return GLib.SOURCE_REMOVE;
+    }));
+    this._signals.connect(global.window_manager, "switch-workspace", () => this._iconManager?.syncMinimized());
     this._signals.connect(global.display, "window-created", () =>
       GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
         this._syncAllIconGeometry();
@@ -123,6 +155,12 @@ export class DockManager {
     iconManager.setShowRunningApps(settings.get_boolean("show-running-apps"));
     iconManager.setAppButtonPosition(settings.get_int("show-applications-button-position"));
     iconManager.setWorkspaceMode(settings.get_int("dock-workspace-mode"));
+    iconManager.setIconSpacing(this._iconSpacing());
+    iconManager.setAppButtonIcon(APP_BUTTON_ICONS[settings.get_string("app-button-icon")] ?? APP_BUTTON_ICONS.grid);
+    iconManager.setIconStyle(settings.get_string("icon-style"));
+    iconManager.setIconColor(settings.get_string("icon-color"));
+    iconManager.setIconTheme(settings.get_string("icon-theme"));
+    iconManager.setMinimizedInDock(settings.get_boolean("minimized-in-dock"));
     iconManager.setMediaIndicatorEnabled(settings.get_boolean("media-indicator"));
     iconManager.setMediaControlsEnabled(settings.get_boolean("media-controls"));
     iconManager.setDragReorderEnabled(settings.get_boolean("drag-reorder"));
@@ -187,13 +225,39 @@ export class DockManager {
       iconManager.setIconSize(settings.get_int("icon-size"));
       this._updatePosition();
     });
+    // Size of the dock: the space between icons and around them.
+    for (const key of ["icon-spacing", "dock-padding"]) {
+      this._signals.connect(settings, `changed::${key}`, () => {
+        iconManager.setIconSpacing(this._iconSpacing());
+        this._applyDockStyle();
+        if (this._visibility) this._startAutoHide();
+        this._updatePosition();
+      });
+    }
+    // Look of the icons: theme, tile, colours, and the applications button's picture.
+    this._signals.connect(settings, "changed::icon-theme", () => {
+      iconManager.setIconTheme(settings.get_string("icon-theme"));
+      this._updatePosition();
+    });
+    this._signals.connect(settings, "changed::icon-style", () => {
+      iconManager.setIconStyle(settings.get_string("icon-style"));
+      this._updatePosition();
+    });
+    this._signals.connect(settings, "changed::icon-color", () => iconManager.setIconColor(settings.get_string("icon-color")));
+    this._signals.connect(settings, "changed::app-button-icon", () =>
+      iconManager.setAppButtonIcon(APP_BUTTON_ICONS[settings.get_string("app-button-icon")] ?? APP_BUTTON_ICONS.grid),
+    );
     this._signals.connect(settings, "changed::auto-hide", () => {
       if (settings.get_boolean("auto-hide")) {
         this._startAutoHide();
-      } else {
+      } else if (!this._fsForced) {
         this._stopAutoHide();
       }
     });
+    this._signals.connect(settings, "changed::fullscreen-reveal", () => this._syncFullscreen());
+    this._signals.connect(global.display, "in-fullscreen-changed", () => this._syncFullscreen());
+    // The windows are hidden while the Overview is up, which is no full screen: looked at again as it goes.
+    this._signals.connect(Main.overview, "hidden", () => this._syncFullscreen());
     this._signals.connect(settings, "changed::magnification-enabled", () => {
       magnification.setEnabled(settings.get_boolean("magnification-enabled"));
     });
@@ -257,6 +321,10 @@ export class DockManager {
     this._signals.connect(settings, "changed::show-running-apps", () => {
       iconManager.setShowRunningApps(settings.get_boolean("show-running-apps"));
     });
+    this._signals.connect(settings, "changed::minimized-in-dock", () => {
+      iconManager.setMinimizedInDock(settings.get_boolean("minimized-in-dock"));
+      this._updatePosition();
+    });
     this._signals.connect(settings, "changed::dock-workspace-mode", () => {
       iconManager.setWorkspaceMode(settings.get_int("dock-workspace-mode"));
     });
@@ -277,6 +345,74 @@ export class DockManager {
 
     if (settings.get_boolean("auto-hide")) {
       this._startAutoHide();
+    }
+
+    // Super: the Overview has the screen, so the dock slides away with it and comes back as it closes.
+    this._signals.connect(Main.overview, "showing", () => this._setOverviewHidden(true));
+    this._signals.connect(Main.overview, "hiding", () => this._setOverviewHidden(false));
+    if (Main.overview.visibleTarget ?? Main.overview.visible) this._setOverviewHidden(true);
+    this._syncFullscreen();
+  }
+
+  /**
+   * Over a full-screen app the dock goes away whatever the auto-hide setting, and the screen edge it sits on brings it back while the
+   * pointer is there. GNOME hides chrome under a full-screen window and gives it no way back, so the dock leaves that rule while
+   * it lasts (its edge strip has always been outside it) and takes the auto-hide animation.
+   */
+  private _syncFullscreen(): void {
+    const settings = this._settings;
+    if (!settings || !this._container) return;
+    const monitor = Main.layoutManager.primaryMonitor;
+    const wanted = settings.get_boolean("fullscreen-reveal") && Boolean(monitor?.inFullscreen) && global.window_group.visible;
+    if (wanted === this._fsForced) return;
+    this._fsForced = wanted;
+    for (const actor of [this._container, this._bg]) {
+      if (!actor) continue;
+      Main.layoutManager.untrackChrome(actor);
+      Main.layoutManager.trackChrome(actor, { affectsStruts: false, trackFullscreen: !wanted });
+    }
+    if (wanted) {
+      if (!this._visibility) this._startAutoHide();
+    } else if (!settings.get_boolean("auto-hide")) {
+      this._stopAutoHide();
+    }
+  }
+
+  /** The dock's own slide for the Overview when it is not auto-hiding (DockVisibility does it when it is). */
+  private _setOverviewHidden(hidden: boolean): void {
+    if (hidden === this._overviewHidden) return;
+    this._overviewHidden = hidden;
+    if (this._visibility) {
+      this._visibility.setOverviewHidden(hidden);
+      return;
+    }
+    const container = this._container;
+    if (!container) return;
+    const duration = this._settings?.get_int("animation-duration") ?? 200;
+    if (hidden) {
+      const vertical = this._dockPosition === POSITIONS.LEFT || this._dockPosition === POSITIONS.RIGHT;
+      const away = Math.ceil((vertical ? container.width : container.height) * 1.2) + 24;
+      const sign = this._dockPosition === POSITIONS.TOP || this._dockPosition === POSITIONS.LEFT ? -1 : 1;
+      const params: Record<string, unknown> = {
+        translation_x: vertical ? sign * away : 0,
+        translation_y: vertical ? 0 : sign * away,
+        opacity: 0,
+        duration,
+        mode: Clutter.AnimationMode.EASE_IN_QUAD,
+        onStopped: (finished: boolean) => {
+          if (finished && this._overviewHidden) container.visible = false;
+        },
+      };
+      (container as unknown as { ease(p: Record<string, unknown>): void }).ease(params);
+    } else {
+      container.visible = true;
+      (container as unknown as { ease(p: Record<string, unknown>): void }).ease({
+        translation_x: 0,
+        translation_y: 0,
+        opacity: 255,
+        duration,
+        mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
+      });
     }
   }
 
@@ -366,6 +502,7 @@ export class DockManager {
     // Must set dock rect AFTER creating intellihide so it can detect overlap.
     this._updatePosition();
     this._visibility.start();
+    if (this._overviewHidden) this._visibility.setOverviewHidden(true);
   }
 
   private _stopAutoHide(): void {
@@ -381,6 +518,11 @@ export class DockManager {
       this._container.visible = true;
       this._container.opacity = 255;
       this._updatePosition();
+      // Still in the Overview: the dock goes out again by its own slide.
+      if (this._overviewHidden) {
+        this._overviewHidden = false;
+        this._setOverviewHidden(true);
+      }
     }
   }
 
@@ -406,8 +548,27 @@ export class DockManager {
   private _genie(actor: Clutter.Actor, reverse: boolean): void {
     const win = (actor as unknown as { meta_window?: Meta.Window }).meta_window;
     const app = win ? Shell.WindowTracker.get_default().get_window_app(win) : null;
-    const rect = app ? this._iconRect(app) : null;
+    const manager = this._iconManager;
+    let rect: { x: number; y: number; width: number; height: number } | null = null;
+    // A minimized window goes to its own thumbnail at the dock's end (macOS-style), and comes back from it.
+    if (win && manager?.isMinimizedInDock() && manager.isMinimizable(win)) {
+      if (reverse) {
+        rect = manager.minimizedRect(win);
+        manager.removeMinimized(win);
+      } else {
+        rect = manager.addMinimized(win);
+      }
+    }
+    rect ??= app ? this._iconRect(app) : null;
     if (rect) genie(actor, rect, { reverse });
+    // An app that is not pinned has no thumbnail at the end: its icon becomes the overview once the window has arrived (and goes back
+    // as it leaves).
+    if (win && manager?.isMinimizedInDock() && !manager.isMinimizable(win)) {
+      GLib.timeout_add(GLib.PRIORITY_DEFAULT, reverse ? 30 : 470, () => {
+        this._iconManager?.syncMinimized();
+        return GLib.SOURCE_REMOVE;
+      });
+    }
   }
 
   // A window opened by a dock click scales up out of the app's icon, macOS style.
@@ -565,8 +726,8 @@ export class DockManager {
     const hasSeparator = iconManager.hasSeparator();
     const hasAppButton = iconManager.hasAppButton();
     const iconPadded = (this._settings?.get_int("icon-size") ?? 48) + 12;
-    const spacing = 6;
-    const padding = 20;
+    const spacing = this._iconSpacing();
+    const padding = 2 * this._sidePadding();
     const separatorWidth = 9; // 1px width + 4px margin each side
     const contentSize =
       iconCount > 0
@@ -577,7 +738,8 @@ export class DockManager {
         : hasAppButton
           ? iconPadded
           : 0;
-    const dockAxisSize = Math.max(contentSize + padding, DockManager.MIN_DOCK_WIDTH);
+    const minimizedExtent = iconManager.getMinimizedExtent();
+    const dockAxisSize = Math.max(contentSize + minimizedExtent + padding, DockManager.MIN_DOCK_WIDTH);
 
     let x = 0;
     let y = 0;
@@ -643,8 +805,11 @@ export class DockManager {
     const [w, h] = c.get_size();
     const [gx, gy] = c.get_transformed_position();
     const [ew, eh] = this._bgExtra;
-    bg.set_position(Math.round(gx - ew / 2), Math.round(gy - eh));
-    bg.set_size(Math.round(w + ew), Math.round(h + eh));
+    // A hidden dock has no position to follow (it reads as NaN, which Clutter refuses to allocate).
+    if (c.visible && Number.isFinite(gx) && Number.isFinite(gy)) {
+      bg.set_position(Math.round(gx - ew / 2), Math.round(gy - eh));
+      bg.set_size(Math.round(w + ew), Math.round(h + eh));
+    }
     bg.opacity = c.opacity;
     bg.visible = c.visible;
   }
@@ -664,8 +829,8 @@ export class DockManager {
     const alpha = opacity / 100;
 
     this._container.style = `
-      padding: 4px 10px;
-      spacing: 6px;
+      padding: ${this._verticalPadding()}px ${this._sidePadding()}px;
+      spacing: ${this._iconSpacing()}px;
     `;
     this._bg.style = `
       background-color: rgba(${r}, ${g}, ${b}, ${alpha});
@@ -770,7 +935,7 @@ export class DockManager {
 
     const isVertical =
       this._dockPosition === POSITIONS.LEFT || this._dockPosition === POSITIONS.RIGHT;
-    this._container.vertical = isVertical;
+    setVertical(this._container, isVertical);
 
     // Update magnification pivot point based on position
     if (this._magnification) {

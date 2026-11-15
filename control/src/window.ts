@@ -19,7 +19,7 @@ import {profilesPage} from './profilesPage.js';
 
 const MODULES = [
     ['home', 'Home', 'go-home-symbolic', (model, shared) => shared.home.widget],
-    ['look', 'Look', 'preferences-desktop-theme-symbolic', lookPage], ['island', 'Island', 'view-pin-symbolic', islandPage],
+    ['look', 'Look', 'preferences-desktop-appearance-symbolic', lookPage], ['island', 'Island', 'view-pin-symbolic', islandPage],
     ['dock', 'Dock', 'view-app-grid-symbolic', dockPage], ['windows', 'Windows', 'window-new-symbolic', windowsPage],
     ['search', 'Search', 'system-search-symbolic', searchPage],
     ['compat', 'Compatibility', 'preferences-system-symbolic', (model, shared) => shared.compat.widget],

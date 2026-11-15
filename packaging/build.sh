@@ -4,10 +4,13 @@
 # the island), control/ (the control panel), data/ (units, D-Bus services, fonts, defaults), packaging/debian/.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"; cd "$ROOT"
+# NIRO_STAGE_ONLY=<dir>: only lay the files out under <dir> (packaging/build-rpm.sh), no .deb. Fedora keeps fonts in /usr/share/fonts.
 OUT="$ROOT/out"; W="$(mktemp -d)"; trap 'rm -rf "$W"' EXIT
 VER="$(cat VERSION)+git$(git rev-list --count HEAD 2>/dev/null || echo 0)"; P="$W/niro-control"
+STAGE_ONLY="${NIRO_STAGE_ONLY:-}"; FONTDIR=truetype/island
+if [ -n "$STAGE_ONLY" ]; then P="$STAGE_ONLY"; FONTDIR=island; fi
 EXTDIR="$P/usr/share/gnome-shell/extensions"
-mkdir -p "$OUT" "$P/DEBIAN"
+mkdir -p "$OUT" "$P"
 
 # --- TypeScript: the extensions and the control panel
 [ -d node_modules ] || npm ci >/dev/null
@@ -50,8 +53,8 @@ for u in org.niro.island.Daemon.service org.niro.island.ShelfWindow.service; do
 done
 sed -e 's|@BINDIR@|/usr/bin|' -e 's|file://%h/.local/share/doc/island|file:///usr/share/doc/niro-control|' data/island-daemon.service \
   | install -D -m 644 /dev/stdin "$P/usr/lib/systemd/user/island-daemon.service"
-install -D -m 644 data/fonts/InterVariable.ttf "$P/usr/share/fonts/truetype/island/InterVariable.ttf"
-install -D -m 644 data/fonts/Inter-LICENSE.txt "$P/usr/share/fonts/truetype/island/Inter-LICENSE.txt"
+install -D -m 644 data/fonts/InterVariable.ttf "$P/usr/share/fonts/$FONTDIR/InterVariable.ttf"
+install -D -m 644 data/fonts/Inter-LICENSE.txt "$P/usr/share/fonts/$FONTDIR/Inter-LICENSE.txt"
 install -D -m 644 README.md "$P/usr/share/doc/niro-control/README.md"
 
 # --- The control panel, the shared schema, the defaults
@@ -63,11 +66,14 @@ install -D -m 755 control/niro-control "$P/usr/bin/niro-control"
 install -D -m 644 control/org.niro.Control.desktop "$P/usr/share/applications/org.niro.Control.desktop"
 install -D -m 644 control/org.niro.control.gschema.xml "$P/usr/share/glib-2.0/schemas/org.niro.control.gschema.xml"
 install -D -m 644 data/dconf/00-niro "$P/etc/dconf/db/local.d/00-niro"
-install -D -m 644 data/dconf/profile-user "$P/etc/dconf/profile/user"
+# Fedora's dconf package already owns /etc/dconf/profile/user (with system-db:local), so the rpm leaves it alone.
+[ -n "$STAGE_ONLY" ] || install -D -m 644 data/dconf/profile-user "$P/etc/dconf/profile/user"
 
 # --- Package
 chmod -R u=rwX,go=rX "$P/usr" "$P/etc" # copied files keep their source's modes: make them readable
 find "$P/usr/bin" -type f -exec chmod 755 {} +
+[ -n "$STAGE_ONLY" ] && exit 0
+mkdir -p "$P/DEBIAN"
 sed "s/@VERSION@/$VER/" packaging/debian/control.in > "$P/DEBIAN/control"
 for s in preinst prerm postrm postinst; do install -m 755 "packaging/debian/$s" "$P/DEBIAN/$s"; done
 dpkg-deb --root-owner-group -Zxz -b "$P" "$OUT/niro-control_${VER}_amd64.deb" >/dev/null

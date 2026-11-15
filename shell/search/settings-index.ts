@@ -373,6 +373,16 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "island.fullscreen-reveal",
+  "menu": "Island",
+  "group": "Pages and Features",
+  "title": "Show the island at the top edge over full-screen apps",
+  "help": "Over a full-screen app (a video, a game) the island stays away, and the top edge of the screen brings it back while the pointer is on it.",
+  "key": "fullscreen-reveal",
+  "kind": "switch",
+  "managed": false
+ },
+ {
   "id": "island.island-monitor",
   "menu": "Island",
   "group": "Appearance and Behavior",
@@ -979,7 +989,7 @@ export const INDEX = [
   "title": "Icon size",
   "help": "Size of dock icons in pixels (16-96)",
   "key": "icon-size",
-  "kind": "stepper",
+  "kind": "slider",
   "managed": false
  },
  {
@@ -989,6 +999,26 @@ export const INDEX = [
   "title": "Auto-hide",
   "help": "Whether to auto-hide the dock when the pointer moves away",
   "key": "auto-hide",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "dock.minimized-in-dock",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Minimized windows at the end of the dock",
+  "help": "A minimized window of a pinned app goes to a thumbnail at the dock's right end, after a separator, as on macOS; a click brings it back.",
+  "key": "minimized-in-dock",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "dock.fullscreen-reveal",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Hide over full-screen apps, show at the edge",
+  "help": "Over a full-screen app (a video, a game) the dock stays away, and the screen edge it sits on brings it back while the pointer is there.",
+  "key": "fullscreen-reveal",
   "kind": "switch",
   "managed": false
  },
@@ -1070,6 +1100,66 @@ export const INDEX = [
   "help": "Target framerate for magnification animation in Hz (30, 60, or 120)",
   "key": "magnification-framerate",
   "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "dock.icon-spacing",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Space between icons",
+  "help": "The gap between two icons in the dock, in pixels (0-24)",
+  "key": "icon-spacing",
+  "kind": "slider",
+  "managed": false
+ },
+ {
+  "id": "dock.dock-padding",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Dock padding",
+  "help": "The room between the dock's edge and its first and last icon, in pixels (2-40)",
+  "key": "dock-padding",
+  "kind": "slider",
+  "managed": false
+ },
+ {
+  "id": "dock.icon-theme",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Icon theme",
+  "help": "The icon theme the dock's icons come from.",
+  "key": "icon-theme",
+  "kind": "select",
+  "managed": false
+ },
+ {
+  "id": "dock.icon-style",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Icon shape",
+  "help": "A tile behind each icon: none, a rounded square, a circle or a glass tile",
+  "key": "icon-style",
+  "kind": "select",
+  "managed": false
+ },
+ {
+  "id": "dock.icon-color",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Icon colours",
+  "help": "The icons' own colours, half faded, or in grey",
+  "key": "icon-color",
+  "kind": "select",
+  "managed": false
+ },
+ {
+  "id": "dock.app-button-icon",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Applications button icon",
+  "help": "The picture on the button that opens all applications",
+  "key": "app-button-icon",
+  "kind": "select",
   "managed": false
  },
  {

@@ -17,6 +17,7 @@ export interface Item {
     unit: string;
     path?: string[];         // a field inside a dictionary setting
     options?: {value: string | number; label: string}[];
+    dynamic?: 'icon-themes';   // select: the choices are read from the computer when the panel opens (options holds the fixed first one)
     min?: number;
     max?: number;
     step?: number;

@@ -41,10 +41,15 @@ export class DockVisibility {
   private _dragActive = false;
 
   private _shown = false;
+  /** The Overview is open: the dock stays out of it, whatever the pointer or a window does. */
+  private _overviewHidden = false;
+  /** What intellihide last said, to come back right when the Overview closes. */
+  private _overlap: OverlapStatus = true;
   private _restingTranslationX = 0;
   private _restingTranslationY = 0;
 
   private _hideSourceId: number | null = null;
+  private _pollSourceId: number | null = null;
   private _animationSourceId: number | null = null;
   private _animationStartTime = 0;
   private _animationFromX = 0;
@@ -104,6 +109,22 @@ export class DockVisibility {
     this._monitor = Main.layoutManager.primaryMonitor;
     this._dockBounds = { x, y, width, height };
     this._updateEdgeActivatorBounds();
+  }
+
+  /** Slides the dock off its edge (and back) with the Overview: it is not shown by the edge zone or the pointer meanwhile. */
+  setOverviewHidden(hidden: boolean): void {
+    if (hidden === this._overviewHidden) return;
+    this._overviewHidden = hidden;
+    this._cancelHide();
+    if (hidden) {
+      this._shown = false;
+      this._stopPointerPoll();
+      this._animateVisibility(false, this._overviewDistance());
+    } else if (!this._overlap) {
+      this._show();
+    } else {
+      this._updatePointerState();
+    }
   }
 
   isShown(): boolean {
@@ -216,6 +237,7 @@ export class DockVisibility {
 
   stop(): void {
     this._cancelHide();
+    this._stopPointerPoll();
     this._signals.disconnectAll();
 
     if (this._edgeActivator) {
@@ -234,7 +256,7 @@ export class DockVisibility {
   }
 
   private _updatePointerState(): void {
-    if (!this._monitor) return;
+    if (!this._monitor || this._overviewHidden) return;
 
     // The dock stays up for the whole duration of a drag-reorder; hiding it
     // mid-drag would pull the drop target out from under the pointer.
@@ -443,24 +465,51 @@ export class DockVisibility {
 
   private _show(): void {
     this._cancelHide();
-    if (this._shown) return;
+    if (this._shown || this._overviewHidden) return;
 
     this._shown = true;
     this._animateVisibility(true);
+    this._startPointerPoll();
+  }
+
+  /**
+   * While the dock is up, the pointer is read now and then: over a full-screen app's window no motion event reaches the stage, so the dock
+   * would never see the pointer leave.
+   */
+  private _startPointerPoll(): void {
+    if (this._pollSourceId !== null) return;
+    this._pollSourceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 250, () => {
+      if (!this._shown) {
+        this._pollSourceId = null;
+        return GLib.SOURCE_REMOVE;
+      }
+      const [x, y] = global.get_pointer();
+      this._pointerX = x;
+      this._pointerY = y;
+      this._updatePointerState();
+      return GLib.SOURCE_CONTINUE;
+    });
+  }
+
+  private _stopPointerPoll(): void {
+    if (this._pollSourceId === null) return;
+    GLib.Source.remove(this._pollSourceId);
+    this._pollSourceId = null;
   }
 
   private _hide(): void {
     if (!this._shown) return;
 
     this._shown = false;
+    this._stopPointerPoll();
     this._animateVisibility(false);
   }
 
-  private _animateVisibility(show: boolean): void {
+  private _animateVisibility(show: boolean, distance?: number): void {
     this._cancelAnimation();
     this._container.visible = true;
 
-    const [offsetX, offsetY] = this._getSlideOffset();
+    const [offsetX, offsetY] = this._getSlideOffset(distance);
     this._animationFromX = this._container.translation_x;
     this._animationFromY = this._container.translation_y;
     this._animationFromOpacity = this._container.opacity;
@@ -510,8 +559,13 @@ export class DockVisibility {
     this._animationSourceId = null;
   }
 
-  private _getSlideOffset(): [number, number] {
-    const slideDistance = 20;
+  /** How far the dock goes to be fully off its edge: its own thickness and a little more. */
+  private _overviewDistance(): number {
+    const along = this._edge === 1 || this._edge === 2 ? this._container.width : this._container.height;
+    return Math.max(60, Math.ceil(along * this._magnificationScale) + 24);
+  }
+
+  private _getSlideOffset(slideDistance = 20): [number, number] {
     switch (this._edge) {
       case 0:
         return [0, slideDistance];
@@ -526,7 +580,8 @@ export class DockVisibility {
   }
 
   private _onIntellihideChanged(overlap: OverlapStatus): void {
-    if (this._dragActive) return;
+    this._overlap = overlap;
+    if (this._dragActive || this._overviewHidden) return;
 
     if (!overlap) {
       this._show();

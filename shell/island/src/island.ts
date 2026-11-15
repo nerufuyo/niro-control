@@ -479,6 +479,19 @@ export const Island = GObject.registerClass({
         this._showView(view, growing);
     }
 
+    /** Away in the top edge at once, without the motion of `setAutoHidden(true)`: for coming in from there next (the reveal over a
+     * full-screen app starts from nothing on screen). */
+    tuck() {
+        this._autoHidden = true;
+        this._tucked = true;
+        this.remove_transition('opacity');
+        this._liftTimeline?.stop();
+        this._liftTimeline = null;
+        this._setLift(-Math.ceil(this.height));
+        this.opacity = 0;
+        this._view?.hide();
+    }
+
     /** Draws the closed island up into the top edge for auto-hide (its view hidden then, so nothing ticks unseen),
      * or back down. Its layers move, not the island: hidden, its top `band` px still take the pointer where it was
      * (see `vfunc_pick`). */

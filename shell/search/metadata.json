@@ -2,6 +2,6 @@
   "uuid": "search@niro.local",
   "name": "Search",
   "description": "Search the applications you have installed from the keyboard (Super+Space), in the desktop's own tone.",
-  "shell-version": ["46", "47", "48"],
+  "shell-version": ["46", "47", "48", "49", "50", "51"],
   "version": 9001
 }

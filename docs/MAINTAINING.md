@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 146 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 155 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -17,8 +17,8 @@
 
 `shell/blur`, `shell/corners` and `shell/emoji` are copies of third-party GPL extensions (renamed `blur@`, `corners@`,
 `emoji@niro.local`; their schemas keep the original ids so settings carry over). `shell/corners` has two small fixes
-(a closing window no longer breaks its refresh). Ubuntu's own `user-theme`, `tiling-assistant` and `appindicator`
-extensions are package dependencies, not copies. Vitals and system-monitor are gone: the island's System page shows
+(a closing window no longer breaks its refresh). `user-theme` and `appindicator` (and Ubuntu's `tiling-assistant`)
+are package dependencies, not copies. Vitals and system-monitor are gone: the island's System page shows
 CPU, memory, temperature and network.
 
 ## Changing things
@@ -29,7 +29,7 @@ CPU, memory, temperature and network.
 | add an island or dock setting | its own schema (`shell/island/schemas`, `shell/dock/schemas`): the panel picks it up |
 | change a shortcut default | the schema key's default (`search-shortcut`, `shortcut-*`) |
 | change which extensions are on, the dock's favourites | `data/dconf/00-niro` |
-| change what the package installs or runs | `packaging/build.sh`, `packaging/debian/*` |
+| change what the package installs or runs | `packaging/build.sh` (stages the files for both), `packaging/debian/*`, `packaging/rpm/niro-control.spec` |
 
 ## Types and tests
 
@@ -39,13 +39,13 @@ old JavaScript. Remove the comment from one file at a time and fix what the comp
 
 ## Releasing
 
-Bump `VERSION`, `make deb`, `make install`. The package version is `VERSION+git<commit count>`. Extensions and the
+Bump `VERSION`, `make rpm` or `make deb`, `make install`. The package version is `VERSION+git<commit count>`. Extensions and the
 panel load after logging out and in. The island's update check against the original project is off by default.
 
 ## Rust notes
 
-`island-whisper` needs cmake, a C++ compiler, libclang and, for the GPU, `libvulkan-dev` and `glslc`;
-`island-shelf` needs `libgtk-4-dev`. The first build compiles whisper.cpp and takes several minutes.
+`island-whisper` needs cmake, a C++ compiler, libclang and, for the GPU, the Vulkan headers and `glslc`;
+`island-shelf` needs the GTK 4 development files. `make deps` installs them for Fedora and Debian/Ubuntu. The first build compiles whisper.cpp and takes several minutes.
 
 ## The control panel
 
@@ -125,3 +125,29 @@ A dependency rule in `scripts/control-panel-items.py` (`DEPENDS`) greys a row ou
 The shell's blur extension used to fade whole windows by the Look opacity; the panel (`org.niro.Control`) is now exempt (it still gets the blur behind it) because it paints its own glass. That change is in `shell/blur/components/applications/index.js` and loads at the next login.
 
 `scripts/glass-matrix.sh` takes screenshots over four wallpapers, several opacities and both schemes in a private headless shell (it loads the repository's blur extension, not the installed one). `tests/island/glass.test.js` checks that no token but the glass follows the opacity and that primary and secondary text reach WCAG AA over black, white and mid wallpapers at every opacity.
+
+## GNOME Shell 46 to 51
+
+Shell APIs change between versions; the places that differ are kept in one file each: `shell/island/src/compat.ts`,
+`shell/dock/src/lib/compat.ts`, `shell/corners/effect/glsl_effect.js`. Known differences: `St.BoxLayout` takes
+`orientation` instead of `vertical` (48 added it, 51 dropped the old one); `Shell.GLSLEffect` is gone in 51 (a
+`Clutter.ShaderEffect` takes its place; effects define `buildPipeline()`, not a vfunc); `Meta.Window.maximize()` lost its
+flags in 49. Test a new shell with a headless GNOME Shell and the extensions copied to a throwaway `XDG_DATA_HOME`, then
+read the shell's log for `CRITICAL` lines: a missing property only shows when the extension is enabled.
+`blur` and `corners` are the least tested on 51 (they load and enable; their drawing needs a real session).
+
+## Overview (Super)
+
+The dock and the closed island step out of the Overview: the dock slides off its edge and fades (`DockManager._setOverviewHidden`, or `DockVisibility.setOverviewHidden` while auto-hide is on), the island uses its auto-hide (`overview` in `visibilityRules.autoHide`, hidden at once, no edge brings it back). Both come back as the Overview starts to close (`hiding`, not `hidden`). Alerts and the open island stay.
+
+## Full-screen apps
+
+GNOME hides chrome under a full-screen window and gives it no way back; both parts leave that rule on their own terms (setting `fullscreen-reveal`, on by default, in the island's and the dock's schemas). The dock auto-hides there whatever its setting and its bottom (or side) edge brings it back (`DockManager._syncFullscreen`; `DockVisibility` polls the pointer while it is up, as no motion event reaches the stage over a full-screen window). The island stays hidden, its alerts waiting as before, and a strip at the display's top edge (`Controller._syncFullscreenReveal`) brings it in for as long as the pointer is on it or it is open (`_revealOverFullscreen`, `_scheduleRevealEnd`). While revealed it counts as visible, so the queued alerts show.
+
+## Minimized windows in the dock
+
+As on macOS, a minimized window goes to a thumbnail at the dock's right end, after a separator (setting `minimized-in-dock`, on by default; off gives GNOME's own: into the app's icon). `IconManager` owns the thumbnails (`syncMinimized`, `addMinimized`, `removeMinimized`; a `Clutter.Clone` of the window's actor, with the app's icon in the corner), `DockManager._genie` sends the genie to the thumbnail's slot (worked out before it exists: the dock grows around its centre) and back from it on restore, and the dock's size counts them (`getMinimizedExtent`). Only pinned apps get thumbnails at the end; an app that is not pinned has none: its own icon becomes the overview (a window's thumbnail, `_syncOverviewIcons`) while all its windows are minimized, and goes back when one is restored.
+
+## Dock size and icon look
+
+Size: `icon-size` (slider, 16-128), `icon-spacing` and `dock-padding`; the dock's own size is worked out from them in `DockManager._updatePosition` and `_dockHeight`. Icons: `icon-theme` (any installed theme; `iconTheme.ts` looks icons up by the freedesktop rules in that theme and the ones it inherits, and the desktop's own icon is kept where the theme has none), `icon-style` (a tile behind each icon: plain, rounded, circle, glass; the icon is 74% of its slot on a tile), `icon-color` (original, muted, monochrome: a `Clutter.DesaturateEffect`) and `app-button-icon` (six pictures for the applications button). The panel's icon-theme list is read from the computer when it opens (`installedIconThemes`, an item with `dynamic: 'icon-themes'`).

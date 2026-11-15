@@ -3,7 +3,7 @@
 # extension code is identical to the freshly built code. Exit 1 on any mismatch.
 set -u
 fail=0
-dpkg -V niro-control || fail=1
+if command -v rpm >/dev/null 2>&1 && rpm -q niro-control >/dev/null 2>&1; then rpm -V niro-control || fail=1; else dpkg -V niro-control || fail=1; fi
 root=$(cd "$(dirname "$0")/.." && pwd)
 for ext in search island dock; do
   b="$root/shell/$ext/build"; [ -d "$b" ] || continue

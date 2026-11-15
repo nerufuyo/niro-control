@@ -3,6 +3,7 @@
 // SettingsSelect, ShortcutRecorder, ColorPicker, AdvancedDisclosure, SettingsSearch, PreviewPanel, ResetControl.
 import Adw from 'gi://Adw?version=1';
 import Gdk from 'gi://Gdk?version=4.0';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
@@ -88,7 +89,36 @@ export function settingsStepper(item: Item, binding: Binding, ctx: Context) {
     return {widget: box, focus: spin};
 }
 
+/** The icon themes installed on this computer: the folders under the icon directories that hold an index.theme with icons in it. */
+export function installedIconThemes(): {value: string; label: string}[] {
+    const roots = [GLib.build_filenamev([GLib.get_home_dir(), '.icons']), GLib.build_filenamev([GLib.get_user_data_dir(), 'icons']),
+        ...GLib.get_system_data_dirs().map(d => GLib.build_filenamev([d, 'icons']))];
+    const found = new Map<string, string>();
+    for (const root of roots) {
+        let dir;
+        try { dir = Gio.File.new_for_path(root).enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null); } catch (_e) { continue; }
+        for (let info = dir.next_file(null); info; info = dir.next_file(null)) {
+            const name = info.get_name();
+            if (found.has(name)) continue;
+            const key = new GLib.KeyFile();
+            try { key.load_from_file(GLib.build_filenamev([root, name, 'index.theme']), GLib.KeyFileFlags.NONE); } catch (_e) { continue; }
+            try { if (key.get_boolean('Icon Theme', 'Hidden')) continue; } catch (_e) { /* not hidden */ }
+            let directories = '';
+            try { directories = key.get_string('Icon Theme', 'Directories'); } catch (_e) { /* a cursor theme */ }
+            if (!directories || /^cursors?$/.test(directories)) continue;
+            let label = name;
+            try { label = key.get_locale_string('Icon Theme', 'Name', null); } catch (_e) { /* its folder's name */ }
+            found.set(name, label === name ? name : `${label} (${name})`);
+        }
+    }
+    return [...found].sort((a, b) => a[1].localeCompare(b[1])).map(([value, label]) => ({value, label}));
+}
+
 export function settingsSelect(item: Item, binding: Binding, ctx: Context) {
+    if (item.dynamic === 'icon-themes') {
+        const live = installedIconThemes();
+        item = {...item, options: [...(item.options ?? []), ...live]};
+    }
     const labels = item.options.map(o => o.label);
     const drop = Gtk.DropDown.new_from_strings(labels);
     drop.set_valign(Gtk.Align.CENTER);

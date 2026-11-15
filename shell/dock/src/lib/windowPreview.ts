@@ -5,6 +5,7 @@ import Shell from "gi://Shell";
 import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { SignalManager } from "./signalManager.js";
+import { box } from "./compat.js";
 
 type IconActor = InstanceType<typeof St.BoxLayout>;
 
@@ -105,7 +106,7 @@ export class WindowPreviewPopup {
     this._currentApp = app;
     const grid = new St.BoxLayout({
       style_class: "dock-preview-grid",
-      vertical: false,
+      ...box(false),
       reactive: true,
     });
 
@@ -156,7 +157,7 @@ export class WindowPreviewPopup {
     for (const rowData of rows) {
       const rowBox = new St.BoxLayout({
         style_class: "dock-preview-row",
-        vertical: false,
+        ...box(false),
       });
       rowBox.set_style(`spacing: ${thumbSpacing}px;`);
       for (const thumbData of rowData) {
@@ -168,7 +169,7 @@ export class WindowPreviewPopup {
     // Create outer popup container
     this._popup = new St.BoxLayout({
       style_class: "dock-preview-popup",
-      vertical: true,
+      ...box(true),
       reactive: true,
     });
     this._popup.add_child(grid);
@@ -198,7 +199,7 @@ export class WindowPreviewPopup {
   private _createThumb(app: Shell.App, metaWin: Meta.Window, thumbHeight: number): ThumbData {
     const thumbBox = new St.BoxLayout({
       style_class: "dock-preview-thumb",
-      vertical: true,
+      ...box(true),
       reactive: true,
       x_align: Clutter.ActorAlign.CENTER,
     });
@@ -253,7 +254,7 @@ export class WindowPreviewPopup {
     });
     this._signals.connect(closeBtn, "button-press-event", () => Clutter.EVENT_STOP);
     // Title and close button share one header row, so nothing falls outside the popup.
-    const header = new St.BoxLayout({ vertical: false, x_expand: true });
+    const header = new St.BoxLayout({ ...box(false), x_expand: true });
     titleLabel.set_x_expand(true);
     titleLabel.clutter_text.set_ellipsize(3); // Pango.EllipsizeMode.END
     header.add_child(titleLabel);
