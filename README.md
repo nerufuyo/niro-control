@@ -1,5 +1,7 @@
 # Niro Control
 
+<p align="center"><img src="data/icons/hicolor/scalable/apps/org.niro.Control.svg" width="96" alt="Niro Control icon"></p>
+
 **One look for the whole GNOME desktop.** A top-bar island, a macOS-style dock, an application search, window blur and
 rounded corners, and a control panel that sets them all from one place. One repository, one `.deb`.
 

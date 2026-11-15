@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3A3A40"/>
+      <stop offset="1" stop-color="#1C1C1E"/>
+    </linearGradient>
+    <linearGradient id="sheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#bg)"/>
+  <rect x="4" y="4" width="120" height="60" rx="28" fill="url(#sheen)"/>
+  <rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.14"/>
+  <!-- the island: a black pill at the top edge -->
+  <rect x="42" y="12" width="44" height="12" rx="6" fill="#000000"/>
+  <circle cx="78" cy="18" r="2.4" fill="#E8472B"/>
+  <!-- N -->
+  <path fill="#FFFFFF" d="M28 94V44h12l26 34V44h12v50H66L40 60v34z"/>
+  <!-- the full stop of NIRO. -->
+  <circle cx="93" cy="88" r="7" fill="#E8472B"/>
+</svg>
