@@ -3,6 +3,7 @@
 import Clutter from "gi://Clutter";
 import Cogl from "gi://Cogl";
 import GObject from "gi://GObject";
+import Meta from "gi://Meta";
 import Shell from "gi://Shell";
 import { PACKAGE_VERSION } from "resource:///org/gnome/shell/misc/config.js";
 
@@ -68,4 +69,28 @@ export function glslEffectBase(): typeof GObject.Object {
 export function fragmentHook(): Hook {
   return ((Shell as unknown as { SnippetHook?: { FRAGMENT: number } }).SnippetHook?.FRAGMENT ??
     Cogl.SnippetHook.FRAGMENT) as number;
+}
+
+/** Whether the shell runs on Wayland (GNOME 50 dropped X11 and the check). */
+export function isWayland(): boolean {
+  return (Meta as unknown as { is_wayland_compositor?: () => boolean }).is_wayland_compositor?.() ?? true;
+}
+
+/**
+ * Keeps a window that covers a whole display from going straight to the screen (X11's unredirection), past what is drawn over
+ * it, as the dock and the island are over a full-screen app. Counted: keep the calls paired. GNOME 48 moved it.
+ */
+export function inhibitScanout(inhibit: boolean): void {
+  if (SHELL_MAJOR >= 48) {
+    const compositor = (global as unknown as { compositor: { disable_unredirect(): void; enable_unredirect(): void } }).compositor;
+    if (inhibit) compositor.disable_unredirect();
+    else compositor.enable_unredirect();
+    return;
+  }
+  const meta = Meta as unknown as {
+    disable_unredirect_for_display(display: unknown): void;
+    enable_unredirect_for_display(display: unknown): void;
+  };
+  if (inhibit) meta.disable_unredirect_for_display(global.display);
+  else meta.enable_unredirect_for_display(global.display);
 }

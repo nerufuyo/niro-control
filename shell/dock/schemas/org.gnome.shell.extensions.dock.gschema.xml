@@ -17,6 +17,11 @@
       <summary>Minimized windows at the end of the dock</summary>
       <description>A minimized window of a pinned app goes to a thumbnail at the dock's right end, after a separator, as on macOS; a click brings it back. An app that is not pinned shows the overview (a window's thumbnail) as its icon while all its windows are minimized. Off, minimized windows go into their app's icon as GNOME has it.</description>
     </key>
+    <key name="hide-system-dock" type="b">
+      <default>true</default>
+      <summary>Turn off the system's own dock</summary>
+      <description>While this dock is on, the docks the system brings (Ubuntu Dock, Dash to Dock) are turned off, and turned on again when this one is. GNOME's own dash in the Overview is always hidden.</description>
+    </key>
     <key name="fullscreen-reveal" type="b">
       <default>true</default>
       <summary>Hide over full-screen apps, show at the edge</summary>

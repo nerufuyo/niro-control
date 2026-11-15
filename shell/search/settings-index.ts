@@ -566,8 +566,8 @@ export const INDEX = [
   "id": "island.gnome-banners",
   "menu": "Island",
   "group": "Alerts",
-  "title": "Leave notifications to GNOME's own banners",
-  "help": "The island then shows no notification alerts; its Notifications page still lists them.",
+  "title": "Show GNOME's own notification banners instead of the island's",
+  "help": "Off (the default): GNOME's own notification banners are hidden and the island shows the notifications.",
   "key": "gnome-banners",
   "kind": "switch",
   "managed": false
@@ -1009,6 +1009,16 @@ export const INDEX = [
   "title": "Minimized windows at the end of the dock",
   "help": "A minimized window of a pinned app goes to a thumbnail at the dock's right end, after a separator, as on macOS; a click brings it back.",
   "key": "minimized-in-dock",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "dock.hide-system-dock",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Turn off the system's own dock",
+  "help": "While this dock is on, the docks the system brings (Ubuntu Dock, Dash to Dock) are turned off, and turned on again when this one is.",
+  "key": "hide-system-dock",
   "kind": "switch",
   "managed": false
  },
