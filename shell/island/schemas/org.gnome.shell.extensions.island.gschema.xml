@@ -246,8 +246,8 @@
     </key>
     <key name="gnome-banners" type="b">
       <default>false</default>
-      <summary>Leave notifications to GNOME's own banners</summary>
-      <description>The island then shows no notification alerts; its Notifications page still lists them.</description>
+      <summary>Show GNOME's own notification banners instead of the island's</summary>
+      <description>Off (the default): GNOME's own notification banners are hidden and the island shows the notifications. On: GNOME shows its banners and the island shows no notification alerts. Its Notifications page lists them either way.</description>
     </key>
     <key name="super-v" type="s">
       <choices>

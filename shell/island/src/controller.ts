@@ -203,6 +203,8 @@ export class Controller {
         this._revealed = false;
         this._fsLeaving = false;
         this._strip = null;
+        /** On X11 a full-screen window goes straight to the screen, past the top edge: held back while the reveal is wanted. */
+        this._fsScanout = false;
         /** Whether `_warmUp` shows the open island's view out of sight. */
         this._warmShown = false;
         /** A warm-up the island opened in the middle of, and whether it was of all (see `_warmUp`); else null. */
@@ -985,6 +987,11 @@ export class Controller {
     _syncFullscreenReveal() {
         const wanted = !this._destroying && this._settings.get_boolean('fullscreen-reveal') &&
             !this._settings.get_boolean('alerts-over-fullscreen') && global.window_group.visible && Boolean(this._monitor?.inFullscreen);
+        const holdScanout = wanted && !isWayland();
+        if (holdScanout !== this._fsScanout) {
+            this._fsScanout = holdScanout;
+            inhibitScanout(holdScanout);
+        }
         if (!wanted) {
             this._strip?.hide();
             if (this._revealed) {
@@ -3294,6 +3301,10 @@ export class Controller {
             return;
         }
         this._stopRevealWait();
+        if (this._fsScanout) {
+            this._fsScanout = false;
+            inhibitScanout(false);
+        }
         if (this._strip) {
             Main.layoutManager.removeChrome(this._strip);
             this._strip.destroy();

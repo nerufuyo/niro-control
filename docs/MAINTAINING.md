@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 155 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 156 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -151,3 +151,9 @@ As on macOS, a minimized window goes to a thumbnail at the dock's right end, aft
 ## Dock size and icon look
 
 Size: `icon-size` (slider, 16-128), `icon-spacing` and `dock-padding`; the dock's own size is worked out from them in `DockManager._updatePosition` and `_dockHeight`. Icons: `icon-theme` (any installed theme; `iconTheme.ts` looks icons up by the freedesktop rules in that theme and the ones it inherits, and the desktop's own icon is kept where the theme has none), `icon-style` (a tile behind each icon: plain, rounded, circle, glass; the icon is 74% of its slot on a tile), `icon-color` (original, muted, monochrome: a `Clutter.DesaturateEffect`) and `app-button-icon` (six pictures for the applications button). The panel's icon-theme list is read from the computer when it opens (`installedIconThemes`, an item with `dynamic: 'icon-themes'`).
+
+## System notifications, system docks, X11
+
+- **GNOME's own notification banners** are hidden while the island is on (island setting `gnome-banners` off, the default; `notifications.ts` keeps the tray's `bannerBlocked` set); the island shows the notification instead. `gnome-banners` on hands the banners back to GNOME.
+- **System docks:** with `hide-system-dock` on (default) the dock turns off Ubuntu Dock and Dash to Dock while it runs and turns them on again when it goes or the setting is off (`DockManager._syncSystemDocks`, deferred: the extension manager must not rewrite its list inside `enable()`). GNOME's own dash in the Overview is always hidden.
+- **X11** (GNOME 48 and older, Ubuntu's Xorg session): the island has its own paths (`isWayland()`: input region, screen sharing). A full-screen window on X11 goes straight to the screen, past the edge reveal, so both the island and the dock hold back unredirection (`inhibitScanout`) while a full-screen reveal is wanted. GNOME 49 and later have no X11 session, so none of this has been run on a real Xorg session: it follows Dash to Dock's approach and the island's earlier X11 code. Check it on Ubuntu 24.04 with `docs/UAT.md` under Xorg.

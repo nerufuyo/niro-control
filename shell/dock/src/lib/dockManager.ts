@@ -14,7 +14,7 @@ import { Magnification } from "./magnification.js";
 import { MediaManager } from "./mediaManager.js";
 import { SignalManager } from "./signalManager.js";
 import { WindowPreviewPopup } from "./windowPreview.js";
-import { box, setVertical } from "./compat.js";
+import { box, inhibitScanout, isWayland, setVertical } from "./compat.js";
 
 /** The applications button's pictures (setting `app-button-icon`). */
 const APP_BUTTON_ICONS: Record<string, string> = {
@@ -26,6 +26,9 @@ const APP_BUTTON_ICONS: Record<string, string> = {
   home: "user-home-symbolic",
 };
 
+/** Docks other extensions put on the screen: Ubuntu's own, and Dash to Dock (its base). Turned off while this dock is on (setting `hide-system-dock`). */
+const SYSTEM_DOCKS = ["ubuntu-dock@ubuntu.com", "dash-to-dock@micxgx.gmail.com"];
+
 const POSITIONS = { BOTTOM: 0, LEFT: 1, RIGHT: 2, TOP: 3 } as const;
 
 export class DockManager {
@@ -36,6 +39,11 @@ export class DockManager {
   private _overviewHidden = false;
   /** A full-screen app has the dock's display: it auto-hides there, and its edge brings it back (see `_syncFullscreen`). */
   private _fsForced = false;
+  /** Whether this dock holds back X11's unredirection of a full-screen window, so its edge can show over it. */
+  private _scanoutInhibited = false;
+  /** The system docks this one turned off, to turn on again when it goes (see `_syncSystemDocks`). */
+  private _disabledDocks: string[] = [];
+  private _systemDocksSourceId: number | null = null;
   private _iconManager: IconManager | null = null;
   private _magnification: Magnification | null = null;
   private _settings: Gio.Settings | null = null;
@@ -352,6 +360,53 @@ export class DockManager {
     this._signals.connect(Main.overview, "hiding", () => this._setOverviewHidden(false));
     if (Main.overview.visibleTarget ?? Main.overview.visible) this._setOverviewHidden(true);
     this._syncFullscreen();
+
+    // The docks of the system (Ubuntu's, Dash to Dock) would stand beside this one: they go while it is on.
+    // Not from inside this call (nor the manager's): it rewrites the list of extensions, which must not happen while one is being turned on.
+    this._signals.connect(settings, "changed::hide-system-dock", () => this._scheduleSystemDocks());
+    this._signals.connect(Main.extensionManager, "extension-state-changed", (_manager: unknown, extension: unknown) => {
+      if (SYSTEM_DOCKS.includes((extension as { uuid: string }).uuid)) this._scheduleSystemDocks();
+    });
+    this._scheduleSystemDocks();
+  }
+
+  private _scheduleSystemDocks(): void {
+    if (this._systemDocksSourceId !== null) return;
+    this._systemDocksSourceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => {
+      this._systemDocksSourceId = null;
+      this._syncSystemDocks();
+      return GLib.SOURCE_REMOVE;
+    });
+  }
+
+  /** Turns the system docks off (and back on, once this dock's setting is off or it is gone), as `hide-system-dock` says. */
+  private _syncSystemDocks(): void {
+    const settings = this._settings;
+    if (!settings) return;
+    const manager = Main.extensionManager;
+    const ACTIVE = 1; // ExtensionState.ACTIVE
+    if (settings.get_boolean("hide-system-dock")) {
+      for (const uuid of SYSTEM_DOCKS) {
+        const extension = manager.lookup(uuid);
+        if (!extension || extension.state !== ACTIVE) continue;
+        manager.disableExtension(uuid);
+        if (!this._disabledDocks.includes(uuid)) this._disabledDocks.push(uuid);
+      }
+    } else {
+      this._restoreSystemDocks();
+    }
+  }
+
+  private _restoreSystemDocks(): void {
+    for (const uuid of this._disabledDocks.splice(0)) Main.extensionManager.enableExtension(uuid);
+  }
+
+  /** On X11 a full-screen window goes straight to the screen, past the dock's edge: while one has the display, it is held back. */
+  private _syncScanout(): void {
+    const want = this._fsForced && !isWayland();
+    if (want === this._scanoutInhibited) return;
+    this._scanoutInhibited = want;
+    inhibitScanout(want);
   }
 
   /**
@@ -366,6 +421,7 @@ export class DockManager {
     const wanted = settings.get_boolean("fullscreen-reveal") && Boolean(monitor?.inFullscreen) && global.window_group.visible;
     if (wanted === this._fsForced) return;
     this._fsForced = wanted;
+    this._syncScanout();
     for (const actor of [this._container, this._bg]) {
       if (!actor) continue;
       Main.layoutManager.untrackChrome(actor);
@@ -417,6 +473,15 @@ export class DockManager {
   }
 
   disable(): void {
+    // The system docks come back, unless the screen only locked (this dock is then off for a moment, not removed).
+    if (this._systemDocksSourceId !== null) {
+      GLib.Source.remove(this._systemDocksSourceId);
+      this._systemDocksSourceId = null;
+    }
+    if (!Main.sessionMode.isLocked) this._restoreSystemDocks();
+    this._fsForced = false;
+    this._syncScanout();
+
     if (this._visibility) {
       this._visibility.stop();
       this._visibility = null;

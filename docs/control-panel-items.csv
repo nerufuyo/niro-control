@@ -55,7 +55,7 @@ Island,Pages and Features,"The Apps page, timing the application in front",switc
 Island,Pages and Features,The Devices page,switch,,false,Shows the Devices page: each connected Bluetooth device with its battery.,devices-page,island.devices-page
 Island,AI Agents,Answer Claude Code from the island,switch,,true,"When on, Island adds a hook to Claude Code's settings so it hears when Claude needs you or is done; off removes it.",agent-alerts-claude,island.agent-alerts-claude
 Island,AI Agents,Answer Codex from the island,switch,,true,"When on, Island adds hooks to Codex's hooks.json so it hears when Codex needs you or is done; off removes them.",agent-alerts-codex,island.agent-alerts-codex
-Island,Alerts,Leave notifications to GNOME's own banners,switch,,false,The island then shows no notification alerts; its Notifications page still lists them.,gnome-banners,island.gnome-banners
+Island,Alerts,Show GNOME's own notification banners instead of the island's,switch,,false,Off (the default): GNOME's own notification banners are hidden and the island shows the notifications.,gnome-banners,island.gnome-banners
 Island,Shortcuts,What Super+V (GNOME's calendar shortcut) opens,select,Island / Calendar / None / Gnome,calendar,"""island"": the island's clipboard history.",super-v,island.super-v
 Island,Music,Briefly show the new song when the track changes,switch,,false,,track-peek,island.track-peek
 Island,Alerts,"Show when the camera, microphone or screen sharing is in use",switch,,true,,privacy-indicators,island.privacy-indicators
@@ -100,6 +100,7 @@ Island,Alerts,"Play a sound when a focus session or break ends, and for reminder
 Dock,Appearance,Icon size,slider,16–128,48,Size of dock icons in pixels (16-96),icon-size,dock.icon-size
 Dock,Applications and Indicators,Auto-hide,switch,,true,Whether to auto-hide the dock when the pointer moves away,auto-hide,dock.auto-hide
 Dock,Applications and Indicators,Minimized windows at the end of the dock,switch,,true,"A minimized window of a pinned app goes to a thumbnail at the dock's right end, after a separator, as on macOS; a click brings it back.",minimized-in-dock,dock.minimized-in-dock
+Dock,Applications and Indicators,Turn off the system's own dock,switch,,true,"While this dock is on, the docks the system brings (Ubuntu Dock, Dash to Dock) are turned off, and turned on again when this one is.",hide-system-dock,dock.hide-system-dock
 Dock,Applications and Indicators,"Hide over full-screen apps, show at the edge",switch,,true,"Over a full-screen app (a video, a game) the dock stays away, and the screen edge it sits on brings it back while the pointer is there.",fullscreen-reveal,dock.fullscreen-reveal
 Dock,Motion,Enable magnification,switch,,true,Whether icons grow when the pointer hovers near the dock,magnification-enabled,dock.magnification-enabled
 Dock,Motion,Magnification max scale,stepper,1–3,1.4,Maximum scale applied to the icon directly under the cursor (1.0 = no magnification),magnification-scale,dock.magnification-scale
