@@ -64,6 +64,8 @@ for f in control/profiles/*.json; do install -D -m 644 "$f" "$P/usr/share/niro-c
 install -D -m 644 control/gtk3-probe.js "$P/usr/share/niro-control/gtk3-probe.js"
 install -D -m 755 control/niro-control "$P/usr/bin/niro-control"
 install -D -m 644 control/org.niro.Control.desktop "$P/usr/share/applications/org.niro.Control.desktop"
+install -D -m 644 data/icons/hicolor/scalable/apps/org.niro.Control.svg "$P/usr/share/icons/hicolor/scalable/apps/org.niro.Control.svg"
+install -D -m 644 data/icons/hicolor/symbolic/apps/org.niro.Control-symbolic.svg "$P/usr/share/icons/hicolor/symbolic/apps/org.niro.Control-symbolic.svg"
 install -D -m 644 control/org.niro.control.gschema.xml "$P/usr/share/glib-2.0/schemas/org.niro.control.gschema.xml"
 install -D -m 644 data/dconf/00-niro "$P/etc/dconf/db/local.d/00-niro"
 # Fedora's dconf package already owns /etc/dconf/profile/user (with system-db:local), so the rpm leaves it alone.

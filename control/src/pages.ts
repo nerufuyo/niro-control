@@ -407,7 +407,9 @@ export function aboutPage(model: Model) {
     logout.add_suffix(new Gtk.Image({icon_name: 'system-log-out-symbolic'}));
     logout.connect('activated', () => { try { Gio.Subprocess.new(['gnome-session-quit', '--logout'], Gio.SubprocessFlags.NONE); } catch (e) { model.ctx.toast(`Couldn't log out: ${e.message}`); } });
     actions.add(logout);
-    return page(group, parts_group, actions);
+    const logo = new Gtk.Image({icon_name: 'org.niro.Control', pixel_size: 96, halign: Gtk.Align.CENTER, margin_top: 8, margin_bottom: 4});
+    logo.update_property([Gtk.AccessibleProperty.LABEL], ['Niro Control']);
+    return page(logo, group, parts_group, actions);
 }
 
 // ---- Search results: the same rows, found by what they say

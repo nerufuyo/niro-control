@@ -38,10 +38,12 @@ cp -a %{_stagedir}/. %{buildroot}/
 glib-compile-schemas %{_datadir}/glib-2.0/schemas >/dev/null 2>&1 || :
 fc-cache %{_datadir}/fonts/island >/dev/null 2>&1 || :
 dconf update >/dev/null 2>&1 || :
+gtk-update-icon-cache -q -t -f %{_datadir}/icons/hicolor >/dev/null 2>&1 || :
 systemctl --global enable island-daemon.service >/dev/null 2>&1 || :
 
 %postun
 glib-compile-schemas %{_datadir}/glib-2.0/schemas >/dev/null 2>&1 || :
+gtk-update-icon-cache -q -t -f %{_datadir}/icons/hicolor >/dev/null 2>&1 || :
 if [ $1 -eq 0 ]; then
   systemctl --global disable island-daemon.service >/dev/null 2>&1 || :
   dconf update >/dev/null 2>&1 || :
@@ -52,6 +54,8 @@ fi
 %{_datadir}/gnome-shell/extensions/*@niro.local
 %{_datadir}/niro-control
 %{_datadir}/applications/org.niro.Control.desktop
+%{_datadir}/icons/hicolor/scalable/apps/org.niro.Control.svg
+%{_datadir}/icons/hicolor/symbolic/apps/org.niro.Control-symbolic.svg
 %{_datadir}/glib-2.0/schemas/org.niro.control.gschema.xml
 %{_datadir}/dbus-1/services/org.niro.island.*.service
 %{_datadir}/fonts/island
