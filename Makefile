@@ -1,5 +1,5 @@
 # Niro Control: `make` builds and tests everything; `make rpm` (Fedora) or `make deb` (Ubuntu/Debian) makes the package; `make install` installs it.
-.PHONY: all build test test-shell test-installed test-dbus lint deb rpm install clean catalog deps
+.PHONY: all build test test-shell test-installed test-dbus lint deb rpm install activate clean catalog deps
 
 # Which package format this machine uses: rpm on Fedora and friends, deb on Debian and Ubuntu.
 PKG := $(shell command -v dpkg-deb >/dev/null 2>&1 && echo deb || echo rpm)
@@ -47,6 +47,9 @@ ifeq ($(PKG),rpm)
 else
 	sudo dpkg -i $$(ls -t out/niro-control_*.deb | head -1)
 endif
+
+activate:             # check Niro in this session; if the shell has not loaded it yet, log out and verify after the login
+	./scripts/niro-doctor --relogin
 
 clean:
 	rm -rf out target shell/*/build shell/dock/dist control/build

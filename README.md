@@ -53,8 +53,10 @@ make deps           # build tools and libraries from your distribution (asks for
 make install        # builds the package for this system (.rpm on Fedora, .deb on Ubuntu/Debian) and installs it
 ```
 
-Log out and in to load the extensions, then open **Niro Control** from the applications menu (or run `niro-control`).
+Log out and in to load the extensions (or run `make activate`: it logs you out for you after a countdown and, once you are back, checks by itself and tells you in a notification), then open **Niro Control** from the applications menu (or run `niro-control`).
 `make rpm` or `make deb` only builds the package, into `out/`.
+
+`niro-doctor` (installed with the package) reports whether the seven parts are active in this session, the daemon, the icon and the dock's pin; `niro-doctor --relogin` logs you out when the shell has not loaded Niro yet, `niro-doctor --pin` pins it to the dock.
 
 What `make deps` installs, if you prefer to do it by hand:
 

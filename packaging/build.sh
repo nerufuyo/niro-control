@@ -48,6 +48,7 @@ cargo build --release -p island-whisper "${FEATURES[@]}" >&2
 for b in island-daemon island-shelf island-whisper; do install -D -m 755 "target/release/$b" "$P/usr/bin/$b"; done
 install -D -m 755 scripts/island-charge-limit "$P/usr/bin/island-charge-limit"
 install -D -m 755 scripts/island-setup-voice.sh "$P/usr/bin/island-setup-voice"
+install -D -m 755 scripts/niro-doctor "$P/usr/bin/niro-doctor"
 for u in org.niro.island.Daemon.service org.niro.island.ShelfWindow.service; do
   sed 's|@BINDIR@|/usr/bin|' "data/$u" | install -D -m 644 /dev/stdin "$P/usr/share/dbus-1/services/$u"
 done
