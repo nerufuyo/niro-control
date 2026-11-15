@@ -12,6 +12,16 @@
       <summary>Auto-hide</summary>
       <description>Whether to auto-hide the dock when the pointer moves away</description>
     </key>
+    <key name="minimized-in-dock" type="b">
+      <default>true</default>
+      <summary>Minimized windows at the end of the dock</summary>
+      <description>A minimized window of a pinned app goes to a thumbnail at the dock's right end, after a separator, as on macOS; a click brings it back. An app that is not pinned shows the overview (a window's thumbnail) as its icon while all its windows are minimized. Off, minimized windows go into their app's icon as GNOME has it.</description>
+    </key>
+    <key name="fullscreen-reveal" type="b">
+      <default>true</default>
+      <summary>Hide over full-screen apps, show at the edge</summary>
+      <description>Over a full-screen app (a video, a game) the dock stays away, and the screen edge it sits on brings it back while the pointer is there.</description>
+    </key>
     <key name="magnification-enabled" type="b">
       <default>true</default>
       <summary>Enable magnification</summary>
@@ -51,6 +61,57 @@
       <default>60</default>
       <summary>Magnification framerate</summary>
       <description>Target framerate for magnification animation in Hz (30, 60, or 120)</description>
+    </key>
+    <key name="icon-spacing" type="i">
+      <default>6</default>
+      <range min="0" max="24"/>
+      <summary>Space between icons</summary>
+      <description>The gap between two icons in the dock, in pixels (0-24)</description>
+    </key>
+    <key name="dock-padding" type="i">
+      <default>10</default>
+      <range min="2" max="40"/>
+      <summary>Dock padding</summary>
+      <description>The room between the dock's edge and its first and last icon, in pixels (2-40)</description>
+    </key>
+    <key name="icon-theme" type="s">
+      <default>''</default>
+      <summary>Icon theme</summary>
+      <description>The icon theme the dock's icons come from. Empty: the desktop's own theme. Any theme installed on the computer.</description>
+    </key>
+    <key name="icon-style" type="s">
+      <choices>
+        <choice value="plain"/>
+        <choice value="rounded"/>
+        <choice value="circle"/>
+        <choice value="glass"/>
+      </choices>
+      <default>'plain'</default>
+      <summary>Icon shape</summary>
+      <description>A tile behind each icon: none, a rounded square, a circle or a glass tile</description>
+    </key>
+    <key name="icon-color" type="s">
+      <choices>
+        <choice value="original"/>
+        <choice value="muted"/>
+        <choice value="monochrome"/>
+      </choices>
+      <default>'original'</default>
+      <summary>Icon colours</summary>
+      <description>The icons' own colours, half faded, or in grey</description>
+    </key>
+    <key name="app-button-icon" type="s">
+      <choices>
+        <choice value="grid"/>
+        <choice value="list"/>
+        <choice value="search"/>
+        <choice value="menu"/>
+        <choice value="star"/>
+        <choice value="home"/>
+      </choices>
+      <default>'grid'</default>
+      <summary>Applications button icon</summary>
+      <description>The picture on the button that opens all applications</description>
     </key>
     <key name="icon-quality" type="i">
       <default>2</default>

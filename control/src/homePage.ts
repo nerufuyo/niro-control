@@ -131,7 +131,7 @@ export function homePage(model, ctx, profilesApi, staleParts: string[]) {
 
         // settings health: one row per thing that can go wrong, with the way to fix it
         const hg = new Adw.PreferencesGroup({title: 'Settings health', description: summary(d.health)});
-        const ICON = {healthy: 'emblem-ok-symbolic', attention: 'dialog-warning-symbolic', recovery: 'dialog-error-symbolic', unavailable: 'dialog-question-symbolic'};
+        const ICON = {healthy: 'object-select-symbolic', attention: 'dialog-warning-symbolic', recovery: 'dialog-error-symbolic', unavailable: 'dialog-question-symbolic'};
         const CLASS = {healthy: 'success', attention: 'warning', recovery: 'error', unavailable: 'dim-label'};
         for (const h of d.health) {
             const r = new Adw.ActionRow({title: GLib.markup_escape_text(h.title, -1), subtitle: GLib.markup_escape_text(h.detail, -1), subtitle_lines: 2});

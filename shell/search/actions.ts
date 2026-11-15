@@ -15,7 +15,7 @@ import {Registry} from './registry.js';
 export const PAGES = ['look', 'island', 'dock', 'windows', 'search', 'profiles', 'about'];
 const NIRO = () => GLib.find_program_in_path('niro-control');
 const CONFIG = `${GLib.get_user_config_dir()}/niro-control`;
-const BUILTIN = '/usr/share/niro-control/profiles';
+const BUILTIN = GLib.getenv('NIRO_BUILTIN_DIR') ?? '/usr/share/niro-control/profiles';
 
 const decoder = new TextDecoder();
 export const readJson = (path: string) => JSON.parse(decoder.decode(GLib.file_get_contents(path)[1]));

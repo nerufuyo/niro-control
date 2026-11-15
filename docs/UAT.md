@@ -1,6 +1,6 @@
 # Real-session acceptance checklist
 
-Run in a normal GNOME Wayland session after logging in with the current package (`dpkg -s niro-control` shows the version; the Home page's "Log out needed" row must say No). Automated tests and the headless shell cover the logic; only this list covers a real keyboard, real windows and a real compositor. Tick each line and note anything odd.
+Run in a normal GNOME Wayland session after logging in with the current package (`rpm -q niro-control` on Fedora or `dpkg -s niro-control` on Ubuntu shows the version; the Home page's "Log out needed" row must say No). Automated tests and the headless shell cover the logic; only this list covers a real keyboard, real windows and a real compositor. Tick each line and note anything odd.
 
 | # | Check | How | Expect |
 |---|---|---|---|

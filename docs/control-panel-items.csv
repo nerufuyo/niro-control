@@ -36,6 +36,7 @@ Island,Appearance and Behavior,"How long the pointer rests before the island ope
 Island,Appearance and Behavior,Auto-hide the closed island,select,Off / Always / Top bar / Windows,off,off: always shown.,auto-hide,island.auto-hide
 Island,Appearance and Behavior,"How long the closed island waits before hiding, in seconds",stepper,1–60,3,,auto-hide-delay,island.auto-hide-delay
 Island,Alerts,Alerts over full-screen apps,switch,,false,"When on, alerts (notifications, calls, timers…) show over a full-screen app (a video, a game), the island hidden again between them.",alerts-over-fullscreen,island.alerts-over-fullscreen
+Island,Pages and Features,Show the island at the top edge over full-screen apps,switch,,true,"Over a full-screen app (a video, a game) the island stays away, and the top edge of the screen brings it back while the pointer is on it.",fullscreen-reveal,island.fullscreen-reveal
 Island,Appearance and Behavior,Display the island is on,select,Primary / Active / All,primary,"""primary"": the main display, in its top bar.",island-monitor,island.island-monitor
 Island,Appearance and Behavior,Island height,stepper,24–40,30,"How far the closed island hangs below the top bar, in pixels, when it is not inside the top bar.",notch-depth,island.notch-depth
 Island,Appearance and Behavior,Space below the island,switch,,true,"With the closed island inside the top bar: the top bar is a little taller than the island, so the island stops just short of the windows below.",notch-gap,island.notch-gap
@@ -96,8 +97,10 @@ Island,AI Usage,Show Grok's usage,switch,,true,,usage-grok,island.usage-grok
 Island,AI Usage,Warn at this share of a limit (%),slider,50–99,80,,usage-warn,island.usage-warn
 Island,AI Usage,Warn again at this share of a limit (%),slider,50–100,95,,usage-critical,island.usage-critical
 Island,Alerts,"Play a sound when a focus session or break ends, and for reminders",switch,,true,,chimes,island.chimes
-Dock,Appearance,Icon size,stepper,16–128,48,Size of dock icons in pixels (16-96),icon-size,dock.icon-size
+Dock,Appearance,Icon size,slider,16–128,48,Size of dock icons in pixels (16-96),icon-size,dock.icon-size
 Dock,Applications and Indicators,Auto-hide,switch,,true,Whether to auto-hide the dock when the pointer moves away,auto-hide,dock.auto-hide
+Dock,Applications and Indicators,Minimized windows at the end of the dock,switch,,true,"A minimized window of a pinned app goes to a thumbnail at the dock's right end, after a separator, as on macOS; a click brings it back.",minimized-in-dock,dock.minimized-in-dock
+Dock,Applications and Indicators,"Hide over full-screen apps, show at the edge",switch,,true,"Over a full-screen app (a video, a game) the dock stays away, and the screen edge it sits on brings it back while the pointer is there.",fullscreen-reveal,dock.fullscreen-reveal
 Dock,Motion,Enable magnification,switch,,true,Whether icons grow when the pointer hovers near the dock,magnification-enabled,dock.magnification-enabled
 Dock,Motion,Magnification max scale,stepper,1–3,1.4,Maximum scale applied to the icon directly under the cursor (1.0 = no magnification),magnification-scale,dock.magnification-scale
 Dock,Motion,Magnification falloff distance,stepper,40–300,100,How far (in pixels) the magnification wave reaches from the cursor,magnification-falloff,dock.magnification-falloff
@@ -106,6 +109,12 @@ Dock,Applications and Indicators,Running indicator style,select,"Dots, one per w
 Dock,Motion,Bounce on launch,switch,,true,Play a bounce animation on the dock icon when a new app is launched,bounce-on-launch,dock.bounce-on-launch
 Dock,Motion,Animation duration,stepper,0–1000,200,"Duration of the show/hide animation in milliseconds (0 = instant, max 1000)",animation-duration,dock.animation-duration
 Dock,Motion,Magnification framerate,stepper,15–144,60,"Target framerate for magnification animation in Hz (30, 60, or 120)",magnification-framerate,dock.magnification-framerate
+Dock,Appearance,Space between icons,slider,0–24,6,"The gap between two icons in the dock, in pixels (0-24)",icon-spacing,dock.icon-spacing
+Dock,Appearance,Dock padding,slider,2–40,10,"The room between the dock's edge and its first and last icon, in pixels (2-40)",dock-padding,dock.dock-padding
+Dock,Appearance,Icon theme,select,System default,,The icon theme the dock's icons come from.,icon-theme,dock.icon-theme
+Dock,Appearance,Icon shape,select,Plain / Rounded / Circle / Glass,plain,"A tile behind each icon: none, a rounded square, a circle or a glass tile",icon-style,dock.icon-style
+Dock,Appearance,Icon colours,select,Original / Muted / Monochrome,original,"The icons' own colours, half faded, or in grey",icon-color,dock.icon-color
+Dock,Appearance,Applications button icon,select,Grid / List / Search / Menu / Star / Home,grid,The picture on the button that opens all applications,app-button-icon,dock.app-button-icon
 Dock,Motion,Icon quality multiplier,stepper,0–4,2,"Render icons at a minimum of N times native resolution; HiDPI and magnification may increase it automatically (1, 2, or 4)",icon-quality,dock.icon-quality
 Dock,Motion,Show threshold,stepper,0–200,25,Distance in pixels from screen edge to trigger dock show,show-threshold,dock.show-threshold
 Dock,Appearance,Dock opacity,slider,0–100,60,Dock background opacity percentage (0-100),dock-opacity,dock.dock-opacity

@@ -15,6 +15,7 @@ has() { if [[ "$2" == *"$3"* ]]; then echo "ok   $1"; else echo "FAIL $1: [$2] l
 timeout 150 dbus-run-session -- bash -c '
 gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-test --virtual-monitor 1280x720 > '"$LOG"' 2>&1 & SP=$!
 sleep 22
+[ -n "${NIRO_EXT_ROOT:-}" ] && { for e in island dock search blur corners emoji emulator; do gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "Main.extensionManager.enableExtension(\"$e@niro.local\")" >/dev/null 2>&1; done; sleep 10; }
 export DAEMON='"$DAEMON"'
 eval_js() { gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "$1" 2>&1; }
 call() { gdbus call --session --dest org.niro.Search --object-path /org/niro/Search --method org.niro.Search."$@" 2>&1; }
@@ -30,6 +31,7 @@ echo "EXTRA $(call RunAction system.lock "{\"evil\":1}" | grep -o "invalid")"
 echo "AI_UNKNOWN $($DAEMON --niro-action "system.format-disk" "{}" | grep -o "code\":\"[a-z]*")"
 echo "AI_SHELLID $($DAEMON --niro-action "system.lock;rm -rf" "{}" | grep -o "code\":\"[a-z]*")"
 echo "AI_ARGS $($DAEMON --niro-action profile.apply "{\"id\":5}" | grep -o "code\":\"[a-z]*")"
+echo "MODAL_BASE $(eval_js "Main.modalCount" | grep -oE "[0-9]+.\)$" | grep -oE "^[0-9]+")"
 ( $DAEMON --niro-action system.restart "{}" > /tmp/niro_restart.txt 2>&1 & ); sleep 2
 echo "MODAL $(eval_js "Main.modalCount" | grep -oE "[0-9]+.\)$" | grep -oE "^[0-9]+")"
 echo "DUP $($DAEMON --niro-action system.restart "{}" | grep -o "code\":\"[a-z]*")"
@@ -53,10 +55,10 @@ eval_js "$O._open(); \"x\"" >/dev/null; sleep 1; eval_js "$O._close(); \"x\"" >/
 echo "FOCUS_AFTER $(eval_js "global.display.focus_window ? global.display.focus_window.title : \"none\"" | grep -o "focus-probe\|none")"
 kill $(cat /tmp/niro_probe.pid) 2>/dev/null
 echo "HISTORY $(call History 50 | grep -o "\"caller\":\"[a-z-]*\"" | sort -u | tr "\n" " ")"
-} 2>&1 | grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)"
+} 2>&1 | grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)"
 kill $SP; wait $SP 2>/dev/null' > /tmp/niro_headless.out 2>&1
 
-OUT=$(grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)" /tmp/niro_headless.out)
+OUT=$(grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)" /tmp/niro_headless.out)
 has "all seven extensions active" "$OUT" "island=State:ACTIVE dock=State:ACTIVE search=State:ACTIVE blur=State:ACTIVE corners=State:ACTIVE emoji=State:ACTIVE emulator=State:ACTIVE"
 has "twelve actions listed" "$OUT" "ACTIONS 12"
 has "no handlers exposed" "$OUT" "NOHANDLER 0"
@@ -67,7 +69,9 @@ has "extra argument refused" "$OUT" "EXTRA invalid"
 has "assistant: invented id refused" "$OUT" 'AI_UNKNOWN code":"unknown'
 has "assistant: shell-shaped id refused" "$OUT" 'AI_SHELLID code":"unknown'
 has "assistant: bad arguments refused" "$OUT" 'AI_ARGS code":"invalid'
-has "restart waits for confirmation (a modal dialog opens)" "$OUT" "MODAL 2"
+# the confirmation dialog takes one more modal grab than the shell holds already (that base differs between versions)
+BASE=$(echo "$OUT" | grep -oP "^MODAL_BASE \K[0-9]+" | head -1)
+has "restart waits for confirmation (a modal dialog opens)" "$OUT" "MODAL $((BASE + 1))"
 has "the same request twice is refused" "$OUT" 'DUP code":"duplicate'
 has "declining returns declined, nothing ran" "$OUT" 'DECLINED code":"declined'
 has "palette: calculator first" "$OUT" "Calculator:6.283185307"

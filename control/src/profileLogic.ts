@@ -65,6 +65,7 @@ export function validateValue(item: Item, value: unknown): string | null {
         return null;
     }
     case 'select':
+        if (item.dynamic) return typeof value === 'string' ? null : 'must be text';
         return (item.options ?? []).some(o => String(o.value) === String(value)) ? null
             : `must be one of ${(item.options ?? []).map(o => o.value).join(', ')}`;
     case 'color':

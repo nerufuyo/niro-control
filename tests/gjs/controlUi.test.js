@@ -17,7 +17,7 @@ const other = (item, v) => {
     switch (item.kind) {
     case 'switch': return !v;
     case 'slider': case 'stepper': return v === item.min ? item.min + (item.step || 1) : item.min;
-    case 'select': return item.options.find(o => String(o.value) !== String(v)).value;
+    case 'select': return (item.options.find(o => String(o.value) !== String(v)) ?? {value: 'Adwaita'}).value;   // a dynamic select (icon themes) has its choices only on the computer
     case 'color': return v === '#112233' ? '#223344' : '#112233';
     case 'list': return ['a', 'b'];
     case 'shortcut': return ['<Super><Alt>z'];
@@ -46,7 +46,7 @@ for (const item of CATALOG) {
     });
     bound++;
 }
-if (bound !== 146) fail(`bound ${bound} items, expected 146`);
+if (bound !== 155) fail(`bound ${bound} items, expected 155`);
 
 // dictionary fields keep their siblings: changing the radius leaves the rest of the setting as it was
 const radius = bindingFor(CATALOG.find(i => i.id === 'corners.global-rounded-corner-settings.borderRadius'), stores);
@@ -147,7 +147,7 @@ if (Gtk.init_check()) {
     model.setMode('advanced', false);
     const advanced = rowsNow();
     model.setMode('simple', false);
-    if (simple.names.size !== 146 || advanced.names.size !== 146) fail(`rows: simple ${simple.names.size}, advanced ${advanced.names.size}`);
+    if (simple.names.size !== 155 || advanced.names.size !== 155) fail(`rows: simple ${simple.names.size}, advanced ${advanced.names.size}`);
     if (JSON.stringify(engine.capture()) !== values) fail('switching mode changed a value');
     if (model.advancedWidgets.length < 5) fail('the Advanced groups were not found');
     // in Simple mode the advanced groups are hidden and a hint says how many are; in Advanced the reverse

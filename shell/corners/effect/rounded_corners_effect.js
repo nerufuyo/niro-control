@@ -1,8 +1,7 @@
 /** @file Binds the actual corner rounding shader to the windows. */
 var _a;
-import Cogl from 'gi://Cogl';
 import GObject from 'gi://GObject';
-import Shell from 'gi://Shell';
+import { GLSLEffect, FRAGMENT } from './glsl_effect.js';
 import { readShader } from '../utils/file.js';
 import { getPref } from '../utils/settings.js';
 const [declarations, code] = readShader(import.meta.url, 'shader/rounded_corners.frag');
@@ -16,7 +15,7 @@ class Uniforms {
     exponent = 0;
     pixelStep = 0;
 }
-export const RoundedCornersEffect = GObject.registerClass({}, class Effect extends Shell.GLSLEffect {
+export const RoundedCornersEffect = GObject.registerClass({}, class Effect extends GLSLEffect {
     /**
      * To store a uniform value, we need to know its location in the shader,
      * which is done by calling `this.get_uniform_location()`. This is
@@ -31,8 +30,8 @@ export const RoundedCornersEffect = GObject.registerClass({}, class Effect exten
                 this.get_uniform_location(k);
         }
     }
-    vfunc_build_pipeline() {
-        this.add_glsl_snippet(Cogl.SnippetHook.FRAGMENT, declarations, code, false);
+    buildPipeline() {
+        this.add_glsl_snippet(FRAGMENT, declarations, code, false);
     }
     /**
      * Update uniforms of the shader.

@@ -2,6 +2,6 @@
   "uuid": "emulator@niro.local",
   "name": "Emulator",
   "description": "Keep the Android Emulator window above others and hide its side toolbar.",
-  "shell-version": ["46"],
+  "shell-version": ["46", "47", "48", "49", "50", "51"],
   "url": "https://github.com/nerufuyo/niro-control"
 }

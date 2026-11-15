@@ -10,6 +10,7 @@ import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import {PACKAGE_VERSION} from 'resource:///org/gnome/shell/misc/config.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {buildRegistry, clipboardHistory, confirm, profiles, windows} from './actions.js';
@@ -27,6 +28,9 @@ const LIMITS = {Applications: 5, Windows: 4, Settings: 5, Profiles: 4, Actions: 
 const RECENT_MAX = 8;
 const rgb = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '');
+// St.BoxLayout: `vertical` up to GNOME 50, `orientation` from 48 (GNOME 51 dropped `vertical`).
+const VERTICAL = parseInt(PACKAGE_VERSION, 10) >= 48 ? {orientation: Clutter.Orientation.VERTICAL} : {vertical: true};
+
 const PAGE_OF = {Look: 'look', Island: 'island', Dock: 'dock', Windows: 'windows', Search: 'search'};
 const ICON = {Calculator: 'accessories-calculator-symbolic', Conversion: 'edit-find-replace-symbolic', Settings: 'preferences-system-symbolic',
     Profiles: 'user-bookmarks-symbolic', Actions: 'system-run-symbolic', Clipboard: 'edit-paste-symbolic', Windows: 'focus-windows-symbolic'};
@@ -47,10 +51,10 @@ export default class NiroSearch extends Extension {
         this._selected = 0;
         this._once = new Once();
 
-        this._box = new St.BoxLayout({style_class: 'niro-search', vertical: true, reactive: true, visible: false, width: WIDTH});
+        this._box = new St.BoxLayout({style_class: 'niro-search', ...VERTICAL, reactive: true, visible: false, width: WIDTH});
         this._entry = new St.Entry({style_class: 'niro-search-entry', hint_text: 'Search apps, settings, windows, or type a calculation…', can_focus: true, x_expand: true});
         this._scroll = new St.ScrollView({style_class: 'niro-search-scroll', hscrollbar_policy: St.PolicyType.NEVER, overlay_scrollbars: true});
-        this._list = new St.BoxLayout({style_class: 'niro-search-list', vertical: true});
+        this._list = new St.BoxLayout({style_class: 'niro-search-list', ...VERTICAL});
         this._scroll.set_child(this._list);
         this._status = new St.Label({style_class: 'niro-search-status', visible: false});
         this._hint = new St.Label({style_class: 'niro-search-hint', text: hint(undefined)});
@@ -325,7 +329,7 @@ export default class NiroSearch extends Extension {
             const icon = r.icon ? new St.Icon({gicon: r.icon, icon_size: 28, style_class: 'niro-search-icon'})
                 : new St.Icon({icon_name: r.iconName ?? 'application-x-executable-symbolic', icon_size: 24, style_class: 'niro-search-icon niro-search-icon-symbolic'});
             content.add_child(icon);
-            const labels = new St.BoxLayout({vertical: true, y_align: Clutter.ActorAlign.CENTER, x_expand: true});
+            const labels = new St.BoxLayout({...VERTICAL, y_align: Clutter.ActorAlign.CENTER, x_expand: true});
             labels.add_child(new St.Label({text: r.title, style_class: 'niro-search-name'}));
             if (r.subtitle) labels.add_child(new St.Label({text: r.subtitle, style_class: 'niro-search-description'}));
             content.add_child(labels);

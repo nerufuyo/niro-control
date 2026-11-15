@@ -69,6 +69,14 @@
   margin: 0 4px;
 }
 
+/* Minimized windows at the dock's end */
+.dock-minimized-thumb {
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  background-color: rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+}
+
 /* Applications Button */
 .dock-app-button {
   background: transparent;

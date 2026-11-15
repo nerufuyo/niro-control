@@ -198,6 +198,11 @@ export class Controller {
         this._presentation = 'compact';
         /** Whether auto-hide has faded the closed island away (see `_syncAutoHide`). */
         this._autoHidden = false;
+        /** Over a full-screen app (alerts waiting): the top edge has brought the island back for a moment (see `_revealOverFullscreen`),
+         * it is on its way out, and the strip of screen edge that does it. */
+        this._revealed = false;
+        this._fsLeaving = false;
+        this._strip = null;
         /** Whether `_warmUp` shows the open island's view out of sight. */
         this._warmShown = false;
         /** A warm-up the island opened in the middle of, and whether it was of all (see `_warmUp`); else null. */
@@ -349,7 +354,11 @@ export class Controller {
             this._syncMonitor();
         });
         // Drawn into the edge by auto-hide: GNOME may send a window covering the display straight to the screen again.
-        this._island.connect('auto-hide-settled', () => this._syncScanout());
+        this._island.connect('auto-hide-settled', () => {
+            if (this._fsLeaving)
+                this._finishReveal();
+            this._syncScanout();
+        });
         // Hidden by a fullscreen window meanwhile: what waited shows now.
         this._island.connect('notify::visible', () => {
             this._syncScanout();
@@ -374,15 +383,17 @@ export class Controller {
         const sync = () => {
             this._syncScanout();
             this._syncAutoHide();
+            this._syncFullscreenReveal();
             this._later('scanout', SCANOUT_SETTLE_MS, () => {
                 this._syncScanout();
                 this._syncAutoHide();
+                this._syncFullscreenReveal();
             });
         };
         this._scanoutWatches = [
             [global.display, ['restacked', 'workareas-changed', 'in-fullscreen-changed', 'window-entered-monitor',
                 'window-left-monitor', 'grab-op-end']],
-            [Main.overview, ['showing', 'hidden']],
+            [Main.overview, ['showing', 'hiding', 'hidden']],
             [global.window_manager, ['size-changed', 'minimize', 'unminimize', 'map', 'destroy']],
             [global.workspace_manager, ['active-workspace-changed']],
             [Main.layoutManager.panelBox, ['notify::mapped', 'notify::y', 'notify::translation-y']],
@@ -546,6 +557,10 @@ export class Controller {
         this._settingsChanged.push(this._settings.connect('changed::island-shape', () => this._updateGeometry()));
         for (const key of ['auto-hide', 'auto-hide-delay'])
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncAutoHide(true)));
+        this._settingsChanged.push(this._settings.connect('changed::fullscreen-reveal', () => {
+            this._syncFullscreenReveal();
+            this._syncAutoHide(true);
+        }));
         this._settingsChanged.push(this._settings.connect('changed::alerts-over-fullscreen', () => {
             this._trackIsland();
             this._syncFullscreen();
@@ -567,7 +582,10 @@ export class Controller {
         // On the display in use, it follows the window in front, once closed.
         this._focusMonitorChanged = global.display.connect('window-entered-monitor', () => this._syncMonitor());
         // On every display, it leaves one a fullscreen window takes (see `_wantedMonitor`).
-        this._fullscreenChanged = global.display.connect('in-fullscreen-changed', () => this._syncMonitor());
+        this._fullscreenChanged = global.display.connect('in-fullscreen-changed', () => {
+            this._syncMonitor();
+            this._syncFullscreenReveal();
+        });
         this._settingsChanged.push(this._settings.connect('changed::voice-assistant', () => {
             this._syncVoiceEnabled();
             this._syncUsage();
@@ -955,8 +973,82 @@ export class Controller {
     // GNOME hides the island under a fullscreen window only when fullscreen changes, not when it moves
     // to another display: its rule (layout.js `_updateActorVisibility`), here.
     _syncFullscreen() {
-        this._island.visible = this._settings.get_boolean('alerts-over-fullscreen') ||
+        this._island.visible = this._settings.get_boolean('alerts-over-fullscreen') || this._revealed ||
             !(global.window_group.visible && this._monitor?.inFullscreen);
+        this._syncFullscreenReveal();
+    }
+
+    // Full-screen reveal: with alerts waiting (their setting off) the island is away under a full-screen app, as GNOME's own bar is.
+    // The top edge brings it back for as long as the pointer is on it, as the dock's bottom edge does.
+
+    /** Puts the strip at the display's top edge while it is wanted (full screen, Settings allow it), or ends a reveal that is not. */
+    _syncFullscreenReveal() {
+        const wanted = !this._destroying && this._settings.get_boolean('fullscreen-reveal') &&
+            !this._settings.get_boolean('alerts-over-fullscreen') && global.window_group.visible && Boolean(this._monitor?.inFullscreen);
+        if (!wanted) {
+            this._strip?.hide();
+            if (this._revealed) {
+                this._revealed = false;
+                this._fsLeaving = false;
+                this._cancel('fs-reveal-end');
+                this._trackIsland();
+                this._syncFullscreen();
+                this._syncAutoHide(true);
+            }
+            return;
+        }
+        if (!this._strip) {
+            this._strip = new St.Widget({name: 'island-fullscreen-edge', reactive: true, track_hover: true, opacity: 0});
+            Main.layoutManager.addChrome(this._strip, {affectsStruts: false, trackFullscreen: false});
+            this._strip.connect('enter-event', () => {
+                this._revealOverFullscreen();
+                return Clutter.EVENT_PROPAGATE;
+            });
+        }
+        const monitor = this._monitor;
+        const width = Math.min(monitor.width, px(640));
+        this._strip.set_position(monitor.x + Math.round((monitor.width - width) / 2), monitor.y);
+        this._strip.set_size(width, px(REVEAL_EDGE_PX + 2));
+        this._strip.visible = !this._revealed;
+    }
+
+    /** The pointer at the top edge over a full-screen app: the island slides in, and what waited for it shows. */
+    _revealOverFullscreen() {
+        if (this._revealed || this._destroying || !this._island)
+            return;
+        this._revealed = true;
+        this._fsLeaving = false;
+        this._strip?.hide();
+        this._trackIsland();
+        this._island.tuck();
+        this._autoHidden = true;
+        this._syncFullscreen();
+        this._syncAutoHide(true);
+        this._syncScanout();
+        this._scheduleRevealEnd();
+    }
+
+    /** Goes back once the pointer is away and the island is closed again, whatever it was doing meanwhile. */
+    _scheduleRevealEnd() {
+        this._later('fs-reveal-end', 500, () => {
+            if (!this._revealed)
+                return;
+            if (this._island.hovered || this._presentation !== 'compact' || this._expandWanted || this._voiceOpen || this._alert) {
+                this._scheduleRevealEnd();
+                return;
+            }
+            this._fsLeaving = true;
+            this._syncAutoHide(true);
+        });
+    }
+
+    /** The island has slid out again (see 'auto-hide-settled'): hidden under the full-screen app, its strip back. */
+    _finishReveal() {
+        this._fsLeaving = false;
+        this._revealed = false;
+        this._cancel('fs-reveal-end');
+        this._trackIsland();
+        this._syncFullscreen();
     }
 
     // Auto-hide
@@ -972,10 +1064,18 @@ export class Controller {
             Boolean(monitor?.inFullscreen);
     }
 
+    /** Whether the Overview is open or opening: false as soon as it starts to close, so the island comes back with it. */
+    _inOverview() {
+        return Main.overview.visibleTarget ?? Main.overview.visible;
+    }
+
     /** Whether the island, or a copy of it (`mirror`), hides now ('now'), after Settings' wait ('later'), or shows
      * (false); and, hidden, how much of its top still brings it back. Each on its own display, by the same rules.
      * See visibilityRules.js. */
     _autoHideState(mirror = null) {
+        // Brought back by the top edge over a full-screen app: it stays until `_scheduleRevealEnd` sends it away.
+        if (!mirror && this._revealed)
+            return {when: this._fsLeaving ? 'now' : false, band: 0};
         const island = mirror?.island ?? this._island;
         const monitor = mirror?.monitor ?? this._monitor;
         const mode = this._settings.get_string('auto-hide');
@@ -988,10 +1088,13 @@ export class Controller {
             hovered: island.hovered,
             barHidden: mode === 'top-bar' && this._barHidden(monitor),
             windowAtTop: mode === 'windows' && this._windowAtTop(monitor, island),
+            overview: this._inOverview(),
+            fullscreenReveal: this._settings.get_boolean('fullscreen-reveal'),
         });
         // A bar another extension hid is not there to point at.
         const barHeight = this._isOnBar(monitor) && !this._barHidden(monitor) ? this._topBar.height : 0;
-        const band = revealBand({mode, fullscreen, barHeight, edge: px(REVEAL_EDGE_PX)});
+        const band = revealBand({mode, fullscreen, barHeight, edge: px(REVEAL_EDGE_PX), overview: this._inOverview(),
+            fullscreenReveal: this._settings.get_boolean('fullscreen-reveal')});
         return {when, band};
     }
 
@@ -1050,7 +1153,7 @@ export class Controller {
     /** As chrome: over a full-screen app only for alerts (Settings). On X11 (GNOME 49 and older) hidden in the bar,
      * out of the input region, so clicks below reach the windows; the band stays in the bar's own. */
     _chromeParams() {
-        const params = {trackFullscreen: !this._settings.get_boolean('alerts-over-fullscreen')};
+        const params = {trackFullscreen: !(this._settings.get_boolean('alerts-over-fullscreen') || this._revealed)};
         if (!isWayland())
             params.affectsInputRegion = !this._autoHidden || !this._onBar;
         return params;
@@ -3191,6 +3294,11 @@ export class Controller {
             return;
         }
         this._stopRevealWait();
+        if (this._strip) {
+            Main.layoutManager.removeChrome(this._strip);
+            this._strip.destroy();
+            this._strip = null;
+        }
         // Turned off (the screen locks too): agents waiting on an answer here ask in their terminals at once,
         // and so do those that ask until Island is back.
         this._passAgentAsks();

@@ -2,13 +2,16 @@
 // shader pinches the window into a funnel (narrower toward the bottom), the way macOS's genie does.
 import Clutter from "gi://Clutter";
 import GObject from "gi://GObject";
-import Shell from "gi://Shell";
+import { fragmentHook, glslEffectBase } from "./compat.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 
-class GenieEffectBase extends Shell.GLSLEffect {
+// biome-ignore lint/suspicious/noExplicitAny: Shell.GLSLEffect or the Clutter fallback, typed alike
+const GLSLBase = glslEffectBase() as any;
+
+class GenieEffectBase extends GLSLBase {
     _progress = 0;
-    _loc: number | null = null;
-    vfunc_build_pipeline() {
+    _loc: unknown = null;
+    buildPipeline() {
         const declarations = "uniform float progress;\n";
         const code = `
             vec2 uv = cogl_tex_coord_in[0].st;
@@ -20,7 +23,7 @@ class GenieEffectBase extends Shell.GLSLEffect {
             else
                 cogl_color_out = texture2D(cogl_sampler0, vec2(sx, uv.y)) * cogl_color_in;
         `;
-        this.add_glsl_snippet((Shell as unknown as { SnippetHook: { FRAGMENT: number } }).SnippetHook.FRAGMENT, declarations, code, true);
+        this.add_glsl_snippet(fragmentHook(), declarations, code, true);
     }
 
     setProgress(value: number) {
@@ -31,7 +34,7 @@ class GenieEffectBase extends Shell.GLSLEffect {
     vfunc_paint_target(node: unknown, paintContext: unknown) {
         this._loc ??= this.get_uniform_location("progress");
         this.set_uniform_float(this._loc, 1, [this._progress ?? 0]);
-        // biome-ignore lint/suspicious/noExplicitAny: Shell.GLSLEffect.vfunc_paint_target has no usable typing
+        // biome-ignore lint/suspicious/noExplicitAny: vfunc_paint_target has no usable typing
         (super.vfunc_paint_target as any)(node, paintContext);
     }
 }
@@ -60,7 +63,7 @@ export function genie(actor: Clutter.Actor, rect: Rect | null, { reverse = false
         const dy = rect.y + rect.height / 2 - (y + h / 2);
         const small = Math.max(0.06, Math.min(0.12, rect.width / w));
         const effect = new GenieEffect() as InstanceType<typeof GenieEffectBase>;
-        clone.add_effect_with_name("dock-genie", effect);
+        clone.add_effect_with_name("dock-genie", effect as unknown as Clutter.Effect);
         const hidden = actor.opacity;
         actor.opacity = 0;
         const finish = () => {

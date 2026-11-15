@@ -109,7 +109,12 @@ export class NiroSync {
             if (!on) { this._unloadShellStyle(); return; }
             const values = Object.fromEntries(PRESET_KEYS.map(k => [k, typeof this._shared.get_value(k).unpack() === 'boolean' ? this._shared.get_boolean(k) : this._shared.get_int(k)]));
             const e = effective(values, {safeMode: this._flag('safe-mode', false), highContrast: false});
-            const css = shellStylesheet({accent: this._shared.get_string('accent'), tint: this._shared.get_string('tint'), sidebar: e.sidebar, content: e.content, elevated: e.elevated, ...this._shellMeasured()});
+            // A theme that draws its own glass is left alone, unless solid surfaces were asked for (safe mode, the Solid preset): then the
+            // surfaces are ours whatever the theme does (Fedora's top bar is see-through by default).
+            const measured = this._shellMeasured();
+            const solid = this._flag('safe-mode', false) || (e.sidebar >= 100 && e.content >= 100 && e.elevated >= 100);
+            const own = solid ? {panel: false, popup: false, quick: false, overview: false} : measured.own;
+            const css = shellStylesheet({accent: this._shared.get_string('accent'), tint: this._shared.get_string('tint'), sidebar: e.sidebar, content: e.content, elevated: e.elevated, ...measured, own});
             if (css === this._shellCss && this._shellFile) return;
             const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'niro']);
             GLib.mkdir_with_parents(dir, 0o755);

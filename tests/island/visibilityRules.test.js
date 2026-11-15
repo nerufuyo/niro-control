@@ -49,3 +49,24 @@ test('the hidden island takes the pointer only where it can come back from', () 
     assert.equal(revealBand({mode: 'always', fullscreen: true, barHeight: 32, edge: 2}), 0);
     assert.equal(revealBand({mode: 'top-bar', fullscreen: false, barHeight: 32, edge: 2}), 0);
 });
+
+test('the Overview takes the top: the closed island hides at once, whatever the mode or the pointer, and no edge brings it back', () => {
+    for (const mode of ['off', 'always', 'top-bar', 'windows'])
+        assert.equal(autoHide({...closed, mode, overview: true}), 'now');
+    assert.equal(autoHide({...closed, hovered: true, overview: true}), 'now');
+    assert.equal(autoHide({...closed, overview: false, mode: 'off'}), false);
+    // alerts and the open island stay
+    assert.equal(autoHide({...closed, presentation: 'peek', overview: true}), false);
+    assert.equal(revealBand({mode: 'always', fullscreen: false, barHeight: 32, edge: 2, overview: true}), 0);
+    assert.equal(revealBand({mode: 'always', fullscreen: false, barHeight: 32, edge: 2}), 32);
+});
+
+test('over a full-screen app it stays away, and with the reveal on the pointer at the top brings it back for as long as it is on it', () => {
+    assert.equal(autoHide({...closed, fullscreen: true}), 'now');
+    assert.equal(autoHide({...closed, fullscreen: true, hovered: true}), 'now');
+    assert.equal(autoHide({...closed, fullscreen: true, fullscreenReveal: true}), 'now');
+    assert.equal(autoHide({...closed, fullscreen: true, fullscreenReveal: true, hovered: true}), false);
+    assert.equal(autoHide({...closed, mode: 'off', fullscreen: true, fullscreenReveal: true}), 'now');
+    assert.equal(revealBand({mode: 'always', fullscreen: true, barHeight: 32, edge: 2}), 0);
+    assert.equal(revealBand({mode: 'always', fullscreen: true, barHeight: 32, edge: 2, fullscreenReveal: true}), 2);
+});

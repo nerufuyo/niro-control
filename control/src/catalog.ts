@@ -691,6 +691,20 @@ export const CATALOG: Item[] = [
   "kind": "switch"
  },
  {
+  "id": "island.fullscreen-reveal",
+  "menu": "Island",
+  "group": "Pages and Features",
+  "title": "Show the island at the top edge over full-screen apps",
+  "help": "Over a full-screen app (a video, a game) the island stays away, and the top edge of the screen brings it back while the pointer is on it.",
+  "detail": "Over a full-screen app (a video, a game) the island stays away, and the top edge of the screen brings it back while the pointer is on it. Alerts still wait for the app to leave full screen unless \"Alerts over full-screen apps\" is on.",
+  "source": "island",
+  "key": "fullscreen-reveal",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
   "id": "island.island-monitor",
   "menu": "Island",
   "group": "Appearance and Behavior",
@@ -1676,7 +1690,7 @@ export const CATALOG: Item[] = [
   "type": "i",
   "default": "48",
   "unit": "px",
-  "kind": "stepper",
+  "kind": "slider",
   "digits": 0,
   "step": 1,
   "min": 16,
@@ -1691,6 +1705,34 @@ export const CATALOG: Item[] = [
   "detail": "Whether to auto-hide the dock when the pointer moves away",
   "source": "dock",
   "key": "auto-hide",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "dock.minimized-in-dock",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Minimized windows at the end of the dock",
+  "help": "A minimized window of a pinned app goes to a thumbnail at the dock's right end, after a separator, as on macOS; a click brings it back.",
+  "detail": "A minimized window of a pinned app goes to a thumbnail at the dock's right end, after a separator, as on macOS; a click brings it back. An app that is not pinned shows the overview (a window's thumbnail) as its icon while all its windows are minimized. Off, minimized windows go into their app's icon as GNOME has it.",
+  "source": "dock",
+  "key": "minimized-in-dock",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "dock.fullscreen-reveal",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Hide over full-screen apps, show at the edge",
+  "help": "Over a full-screen app (a video, a game) the dock stays away, and the screen edge it sits on brings it back while the pointer is there.",
+  "detail": "Over a full-screen app (a video, a game) the dock stays away, and the screen edge it sits on brings it back while the pointer is there.",
+  "source": "dock",
+  "key": "fullscreen-reveal",
   "type": "b",
   "default": "true",
   "unit": "",
@@ -1847,6 +1889,163 @@ export const CATALOG: Item[] = [
   "min": 15,
   "max": 144,
   "advanced": true
+ },
+ {
+  "id": "dock.icon-spacing",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Space between icons",
+  "help": "The gap between two icons in the dock, in pixels (0-24)",
+  "detail": "The gap between two icons in the dock, in pixels (0-24)",
+  "source": "dock",
+  "key": "icon-spacing",
+  "type": "i",
+  "default": "6",
+  "unit": "px",
+  "kind": "slider",
+  "digits": 0,
+  "step": 1,
+  "min": 0.0,
+  "max": 24.0
+ },
+ {
+  "id": "dock.dock-padding",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Dock padding",
+  "help": "The room between the dock's edge and its first and last icon, in pixels (2-40)",
+  "detail": "The room between the dock's edge and its first and last icon, in pixels (2-40)",
+  "source": "dock",
+  "key": "dock-padding",
+  "type": "i",
+  "default": "10",
+  "unit": "px",
+  "kind": "slider",
+  "digits": 0,
+  "step": 1,
+  "min": 2.0,
+  "max": 40.0
+ },
+ {
+  "id": "dock.icon-theme",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Icon theme",
+  "help": "The icon theme the dock's icons come from.",
+  "detail": "The icon theme the dock's icons come from. Empty: the desktop's own theme. Any theme installed on the computer.",
+  "source": "dock",
+  "key": "icon-theme",
+  "type": "s",
+  "default": "",
+  "unit": "",
+  "kind": "select",
+  "options": [
+   {
+    "value": "",
+    "label": "System default"
+   }
+  ],
+  "dynamic": "icon-themes"
+ },
+ {
+  "id": "dock.icon-style",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Icon shape",
+  "help": "A tile behind each icon: none, a rounded square, a circle or a glass tile",
+  "detail": "A tile behind each icon: none, a rounded square, a circle or a glass tile",
+  "source": "dock",
+  "key": "icon-style",
+  "type": "s",
+  "default": "plain",
+  "unit": "",
+  "kind": "select",
+  "options": [
+   {
+    "value": "plain",
+    "label": "Plain"
+   },
+   {
+    "value": "rounded",
+    "label": "Rounded"
+   },
+   {
+    "value": "circle",
+    "label": "Circle"
+   },
+   {
+    "value": "glass",
+    "label": "Glass"
+   }
+  ]
+ },
+ {
+  "id": "dock.icon-color",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Icon colours",
+  "help": "The icons' own colours, half faded, or in grey",
+  "detail": "The icons' own colours, half faded, or in grey",
+  "source": "dock",
+  "key": "icon-color",
+  "type": "s",
+  "default": "original",
+  "unit": "",
+  "kind": "select",
+  "options": [
+   {
+    "value": "original",
+    "label": "Original"
+   },
+   {
+    "value": "muted",
+    "label": "Muted"
+   },
+   {
+    "value": "monochrome",
+    "label": "Monochrome"
+   }
+  ]
+ },
+ {
+  "id": "dock.app-button-icon",
+  "menu": "Dock",
+  "group": "Appearance",
+  "title": "Applications button icon",
+  "help": "The picture on the button that opens all applications",
+  "detail": "The picture on the button that opens all applications",
+  "source": "dock",
+  "key": "app-button-icon",
+  "type": "s",
+  "default": "grid",
+  "unit": "",
+  "kind": "select",
+  "options": [
+   {
+    "value": "grid",
+    "label": "Grid"
+   },
+   {
+    "value": "list",
+    "label": "List"
+   },
+   {
+    "value": "search",
+    "label": "Search"
+   },
+   {
+    "value": "menu",
+    "label": "Menu"
+   },
+   {
+    "value": "star",
+    "label": "Star"
+   },
+   {
+    "value": "home",
+    "label": "Home"
+   }
+  ]
  },
  {
   "id": "dock.icon-quality",

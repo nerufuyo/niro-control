@@ -133,6 +133,11 @@
       <summary>Alerts over full-screen apps</summary>
       <description>When on, alerts (notifications, calls, timers…) show over a full-screen app (a video, a game), the island hidden again between them. Off, they wait until the app leaves full screen, as GNOME's own.</description>
     </key>
+    <key name="fullscreen-reveal" type="b">
+      <default>true</default>
+      <summary>Show the island at the top edge over full-screen apps</summary>
+      <description>Over a full-screen app (a video, a game) the island stays away, and the top edge of the screen brings it back while the pointer is on it. Alerts still wait for the app to leave full screen unless "Alerts over full-screen apps" is on.</description>
+    </key>
     <key name="island-monitor" type="s">
       <choices>
         <choice value="primary"/>

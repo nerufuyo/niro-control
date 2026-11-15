@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../.."
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 EXTS="$WORK/share/gnome-shell/extensions"; mkdir -p "$EXTS" "$WORK/config"
 for e in "$HOME"/.local/share/*; do [ "$(basename "$e")" = gnome-shell ] || ln -s "$e" "$WORK/share/$(basename "$e")"; done
-for u in island blur; do cp -r /usr/share/gnome-shell/extensions/$u@niro.local "$EXTS/"; chmod -R u+w "$EXTS/$u@niro.local"; done
+for u in island blur; do cp -r ${NIRO_EXT_ROOT:-/usr/share/gnome-shell/extensions}/$u@niro.local "$EXTS/"; chmod -R u+w "$EXTS/$u@niro.local"; done
 cp shell/island/build/src/{niroSync,appearance,appearanceTokens,gtkAdapter,shellTheme}.js "$EXTS/island@niro.local/src/"
 cp shell/blur/components/applications/index.js "$EXTS/blur@niro.local/components/applications/index.js"
 SCHEMAS="$WORK/schemas"; mkdir "$SCHEMAS"; cp control/org.niro.control.gschema.xml "$SCHEMAS/"; glib-compile-schemas "$SCHEMAS"
@@ -91,7 +91,8 @@ has "legacy fade saved once and windows back to 255" "MIGRATE apps=255 saved=204
 has "the old fade switch restores the saved value" "LEGACY_ON apps=204"
 has "and switching it off returns to 255, keeping the saved value" "LEGACY_OFF apps=255 saved=204"
 has "shell surfaces: blur on for top bar, Overview, popups" "SURF_ON panel=true overview=true popup=true"
-has "shell stylesheet is loaded with the panel surface and the accent" "SHELL_ON loaded=1 panel=1 accent=2"
+# Ubuntu's top bar is opaque (Niro paints it); Fedora's is see-through, which Niro leaves to the theme: either way the accent must be there
+has "shell stylesheet is loaded with the accent (and the panel surface when the theme's own bar is opaque)" "SHELL_ON loaded=1 panel=[01] accent=2"
 has "an accent change reaches the shell stylesheet" "SHELL_ACCENT 2"
 has "safe mode makes the shell surfaces solid" "SHELL_SAFE solid=1"
 has "high contrast unloads it (GNOME's own high-contrast look is left alone)" "SHELL_HC loaded=0"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds the control panel's catalog from the schemas: docs/control-panel-items.{md,csv} and control/src/catalog.ts.
 
-Every setting the panel shows is one item here (146 in all). The schemas are the source of truth for keys, types, ranges and
+Every setting the panel shows is one item here (155 in all). The schemas are the source of truth for keys, types, ranges and
 defaults; this script adds what a person sees (title, help, group), the control to use, and a few UI-only hints
 (advanced, managed by Look, depends on). Run it again after a schema changes (`make catalog`)."""
 import csv, json, re, xml.etree.ElementTree as ET
@@ -19,16 +19,16 @@ SCHEMAS = {
 INTERNAL = {'update-shown', 'prefs-page', 'focus-dnd-owned', 'focus-dnd-declined', 'agents-announced', 'app-usage-clear',
             'event-calendar', 'clipboard-ignored-apps', 'check-updates'}
 UNITS = {'icon-size': 'px', 'dock-border-radius': 'px', 'preview-scale': 'px', 'animation-duration': 'ms', 'hover-delay': 'ms',
-         'notch-depth': 'px', 'auto-hide-delay': 's', 'event-alert-minutes': 'min', 'show-threshold': 'px',
+         'notch-depth': 'px', 'auto-hide-delay': 's', 'event-alert-minutes': 'min', 'show-threshold': 'px', 'icon-spacing': 'px', 'dock-padding': 'px',
          'magnification-falloff': 'px', 'usage-warn': '%', 'usage-critical': '%', 'dock-opacity': '%', 'glass-tint': '%',
          'top-bar-opacity': '%', 'border-width': 'px', 'opacity': '%', 'blur-strength': '%', 'magnification-framerate': 'fps'}
 # Whole numbers that are really choices (the schema gives the meaning in its help text).
 ENUMS = {'dock-position': ['Bottom', 'Left', 'Right', 'Top'], 'dock-workspace-mode': ['All workspaces', 'Current workspace only'],
          'running-indicator-style': ['Dots, one per window', 'Bar'], 'show-applications-button-position': ['Start', 'End']}
-RANGES = {'icon-size': (16, 128), 'dock-border-radius': (0, 40), 'animation-duration': (0, 1000), 'magnification-falloff': (40, 300),
+RANGES = {'icon-size': (16, 128), 'icon-spacing': (0, 24), 'dock-padding': (2, 40), 'dock-border-radius': (0, 40), 'animation-duration': (0, 1000), 'magnification-falloff': (40, 300),
           'magnification-framerate': (15, 144), 'icon-quality': (0, 4), 'show-threshold': (0, 200), 'preview-scale': (100, 400),
           'magnification-scale': (1.0, 3.0), 'dock-opacity': (0, 100)}
-SLIDERS = {'opacity', 'blur-strength', 'dock-opacity', 'glass-tint', 'top-bar-opacity', 'usage-warn', 'usage-critical'}
+SLIDERS = {'icon-size', 'icon-spacing', 'dock-padding', 'opacity', 'blur-strength', 'dock-opacity', 'glass-tint', 'top-bar-opacity', 'usage-warn', 'usage-critical'}
 ADVANCED = {'app-rules', 'legacy-global-fade', 'custom-css', 'dock-background-color', 'icon-quality', 'show-threshold', 'magnification-framerate', 'animation-duration',
             'voice-claude-model', 'voice-codex-model', 'voice-grok-model', 'voice-opencode-model', 'voice-agy-model',
             'voice-speech-model', 'voice-language', 'bot-glow', 'border-width', 'skip-libhandy-app', 'whitelist', 'blacklist',
@@ -89,7 +89,7 @@ def island_group(k):
 
 def dock_group(k):
     if re.match(r'(magnification|animation|bounce|icon-quality|show-threshold)', k): return 'Motion'
-    if re.match(r'(dock-|icon-size|custom-css)', k): return 'Appearance'
+    if re.match(r'(dock-|icon-size|icon-spacing|icon-theme|icon-style|icon-color|app-button-icon|custom-css)', k): return 'Appearance'
     if re.match(r'(toggle-dock|focus-app|enable-keyboard)', k): return 'Shortcuts'
     if re.match(r'(window-previews|preview-scale|media-)', k): return 'Windows and Media'
     return 'Applications and Indicators'
@@ -125,6 +125,8 @@ def build(source, menu, name, group, k):
             'textarea' if name in ('custom-css', 'app-rules') else 'text'
     else:
         it['kind'] = 'text'
+    if name == 'icon-theme' and source == 'dock':
+        it.update(kind='select', options=[dict(value='', label='System default')], dynamic='icon-themes')
     if name in ADVANCED: it['advanced'] = True
     if (source, name) in MANAGED:
         it['managed'] = MANAGED[(source, name)]
@@ -219,7 +221,7 @@ items.append(sh)
 ids = [i['id'] for i in items]
 assert len(ids) == len(set(ids)), 'duplicate ids'
 from collections import Counter; print(dict(Counter(i['menu'] for i in items)), dict(Counter((i['menu'],i['group']) for i in items if i['menu']=='Dock')))
-assert len(items) == 146, f'expected 146 items, got {len(items)}'
+assert len(items) == 155, f'expected 155 items, got {len(items)}'
 for i in items:
     assert '&' not in re.sub(r'&\s', '', i['title'] + i['help']) or '&apos;' not in i['title'], i
 
@@ -242,7 +244,7 @@ with open(ROOT / 'docs/control-panel-items.csv', 'w', newline='') as f:
         w.writerow([i['menu'], i['group'], i['title'], i['kind'], opts, i['default'], i['help'], i['key'], i['id']])
 
 order = ['Look', 'Island', 'Dock', 'Windows', 'Search']
-md = ['# Control panel: every item\n', 'Generated by `scripts/control-panel-items.py`: one row per setting (146). The panel builds itself from',
+md = ['# Control panel: every item\n', 'Generated by `scripts/control-panel-items.py`: one row per setting (155). The panel builds itself from',
       '`control/src/catalog.ts`, which the same script writes, so this list and the UI cannot drift apart.\n']
 for m in order:
     md.append(f'\n## {m}\n')

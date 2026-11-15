@@ -1,6 +1,7 @@
 import Clutter from "gi://Clutter";
 import Gio from "gi://Gio";
 import GLib from "gi://GLib";
+import type Meta from "gi://Meta";
 import Shell from "gi://Shell";
 import St from "gi://St";
 import * as BoxPointer from "resource:///org/gnome/shell/ui/boxpointer.js";
@@ -9,6 +10,8 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import { SignalManager } from "./signalManager.js";
 import type { WindowPreviewPopup } from "./windowPreview.js";
+import { box } from "./compat.js";
+import { ThemeResolver } from "./iconTheme.js";
 
 export type DockIconClicked = (app: Shell.App) => void;
 export type IconsChanged = () => void;
@@ -25,9 +28,19 @@ interface AppData {
   indicatorBox: InstanceType<typeof St.BoxLayout>;
   dots: InstanceType<typeof St.Widget>[];
   mediaIndicator: InstanceType<typeof St.Widget> | null;
+  /** An unpinned app with only minimized windows shows one of them in its icon's place. */
+  overview: { win: Meta.Window; widget: InstanceType<typeof St.Widget> } | null;
   draggable: Draggable | null;
   dragSignalIds: number[];
 }
+
+interface MinItem {
+  win: Meta.Window;
+  actor: IconActor;
+  width: number;
+}
+
+export type Rect = { x: number; y: number; width: number; height: number };
 
 type ContextMenu = InstanceType<typeof PopupMenu.PopupMenu>;
 type MenuManager = InstanceType<typeof PopupMenu.PopupMenuManager>;
@@ -121,10 +134,18 @@ export class IconManager {
   private _dropTarget: DropTarget | null = null;
   private _favoriteSettings: Gio.Settings | null = null;
   private _pendingReload: boolean = false;
+  /** Minimized windows sit at the end of the dock as thumbnails (macOS-style), not in their app's icon. */
+  private _minimizedEnabled: boolean = true;
+  private _minSeparator: InstanceType<typeof St.Widget> | null = null;
+  private _minItems: Map<number, MinItem> = new Map();
   private _pendingReloadSourceId: number | null = null;
 
   /** Gap between icons, mirrors the `spacing` declared in _applyDockStyle. */
-  private static readonly ICON_SPACING = 6;
+  private _spacing = 6;
+  private _iconStyle = "plain";
+  private _iconColor = "original";
+  private _themeResolver: ThemeResolver | null = null;
+  private _appButtonIconName = "view-app-grid-symbolic";
   private static readonly DROP_INDICATOR_THICKNESS = 3;
   private static readonly DROP_INDICATOR_LENGTH = 32;
   private static readonly DROP_ZONE_PADDING = 8;
@@ -181,6 +202,14 @@ export class IconManager {
   }
 
   setIconSize(size: number): void {
+    for (const actor of this._icons.values()) {
+      const data = this._getStored(actor);
+      if (data?.overview) {
+        data.overview.widget.destroy();
+        data.overview = null;
+        data.icon.show();
+      }
+    }
     this._iconSize = size;
     for (const actor of this._icons.values()) {
       this._applyIconSize(actor);
@@ -190,6 +219,7 @@ export class IconManager {
       const padded = this._iconSize + 12;
       this._appButton.set_size(padded, padded - 4);
     }
+    this._syncOverviewIcons();
   }
 
   setQuality(quality: number): void {
@@ -227,8 +257,12 @@ export class IconManager {
    * and scale before returning the texture, just like the stock GNOME dash.
    */
   private _createIconTexture(app: Shell.App): InstanceType<typeof St.Icon> {
-    const icon = app.create_icon_texture(this._getTextureSize()) as InstanceType<typeof St.Icon>;
-    icon.set_size(this._iconSize, this._iconSize);
+    const inner = this._innerSize();
+    const themed = this._themedGicon(app);
+    const icon = (themed
+      ? new St.Icon({ gicon: themed, icon_size: Math.ceil(inner * this._getTextureMultiplier()) })
+      : app.create_icon_texture(this._getTextureSize())) as InstanceType<typeof St.Icon>;
+    icon.set_size(inner, inner);
     icon.add_style_class_name("dock-icon-gicon");
     icon.x_align = Clutter.ActorAlign.CENTER;
     icon.y_align = Clutter.ActorAlign.CENTER;
@@ -267,6 +301,17 @@ export class IconManager {
   setShowRunningApps(enabled: boolean): void {
     this._showRunningApps = enabled;
     this._reload();
+  }
+
+  /** Minimized windows as thumbnails at the dock's end (true), or only in their app's icon as GNOME has it. */
+  setMinimizedInDock(enabled: boolean): void {
+    if (enabled === this._minimizedEnabled) return;
+    this._minimizedEnabled = enabled;
+    this._reload();
+  }
+
+  isMinimizedInDock(): boolean {
+    return this._minimizedEnabled;
   }
 
   setWorkspaceMode(mode: number): void {
@@ -383,6 +428,8 @@ export class IconManager {
     this._separator = null;
     this._appButton = null;
     this._appButtonIcon = null;
+    this._minSeparator = null;
+    this._minItems.clear();
   }
 
   /**
@@ -441,6 +488,8 @@ export class IconManager {
     this._apps.clear();
     this._separator = null;
     this._appButton = null;
+    this._minSeparator = null;
+    this._minItems.clear();
 
     this._favorites = this._readFavorites();
 
@@ -471,6 +520,7 @@ export class IconManager {
     // Add applications button at the end
     this._updateAppButton();
     this._positionAppButton();
+    this.syncMinimized(false);
   }
 
   private _onWindowChange(): void {
@@ -558,6 +608,7 @@ export class IconManager {
 
     // Update separator visibility
     this._updateSeparator();
+    this._syncOverviewIcons();
 
     this._refreshAllIndicators();
 
@@ -601,7 +652,7 @@ export class IconManager {
       style_class: "dock-icon",
       reactive: true,
       track_hover: true,
-      vertical: true,
+      ...box(true),
       x_align: Clutter.ActorAlign.CENTER,
       y_align: Clutter.ActorAlign.FILL,
     }) as IconActor;
@@ -638,10 +689,12 @@ export class IconManager {
       indicatorBox,
       dots: [],
       mediaIndicator: null,
+      overview: null,
       draggable: null,
       dragSignalIds: [],
     };
     (actor as unknown as Record<string, unknown>)._appData = appData;
+    this._decorateIcon(appData);
 
     this._signals.connect(actor, "button-press-event", (_actor, event) => {
       const button = (event as { get_button: () => number }).get_button();
@@ -700,7 +753,8 @@ export class IconManager {
       return Clutter.EVENT_PROPAGATE;
     });
 
-    this._container.add_child(actor);
+    // Before the minimized windows, which stay at the end.
+    this._container.insert_child_at_index(actor, this._container.get_n_children() - this._minChildCount());
     this._icons.set(appId, actor);
     this._apps.set(appId, app);
     this._positionAppButton();
@@ -745,6 +799,7 @@ export class IconManager {
         oldIcon.destroy();
         data.iconWrapper.add_child(icon);
         data.icon = icon;
+        this._decorateIcon(data);
       } else {
         data.icon.set_size(this._iconSize, this._iconSize);
       }
@@ -881,7 +936,7 @@ export class IconManager {
     for (const wa of windows) {
       const metaWin = wa.get_meta_window();
       if (!metaWin) continue;
-      if (!metaWin.showing_on_its_workspace()) continue;
+      if (!metaWin.showing_on_its_workspace() && !(this._minimizedEnabled && metaWin.minimized)) continue;
       if (this._workspaceMode === 1 && metaWin.get_workspace() !== activeWorkspace) continue;
       const app = tracker.get_window_app(metaWin);
       if (!app) continue;
@@ -1168,7 +1223,7 @@ export class IconManager {
 
   private _showDropIndicator(index: number): void {
     const vertical = this._isVerticalLayout();
-    const halfGap = IconManager.ICON_SPACING / 2;
+    const halfGap = this._spacing / 2;
 
     const favs = this._favoriteActors();
     let cross: number;
@@ -1479,7 +1534,7 @@ export class IconManager {
       style_class: "dock-app-button",
       reactive: true,
       track_hover: true,
-      vertical: true,
+      ...box(true),
       x_align: Clutter.ActorAlign.CENTER,
       y_align: Clutter.ActorAlign.FILL,
       width: padded,
@@ -1488,7 +1543,7 @@ export class IconManager {
     this._appButton = appButton;
 
     this._appButtonIcon = new St.Icon({
-      icon_name: "view-app-grid-symbolic",
+      icon_name: this._appButtonIconName,
       icon_size: this._iconSize,
       style_class: "dock-app-button-icon",
     });
@@ -1534,9 +1589,361 @@ export class IconManager {
     if (!this._appButton) return;
 
     const childCount = this._container.get_n_children();
-    const targetIndex = this._appButtonPosition === 0 ? 0 : childCount - 1;
+    const targetIndex = this._appButtonPosition === 0 ? 0 : childCount - 1 - this._minChildCount();
     if (this._container.get_child_at_index(targetIndex) === this._appButton) return;
 
     this._container.set_child_at_index(this._appButton, targetIndex);
   }
+
+  // ---- Look of the icons: size, theme, tile, colour
+
+  /** The icon's own size: all of the slot, or the tile's inside when the icons stand on tiles. */
+  private _innerSize(): number {
+    return this._iconStyle === "plain" ? this._iconSize : Math.round(this._iconSize * 0.74);
+  }
+
+  /** The app's icon from the chosen theme, or null for the desktop's own (no theme chosen, not found there, or a picture of its own). */
+  private _themedGicon(app: Shell.App): Gio.Icon | null {
+    const resolver = this._themeResolver;
+    if (!resolver) return null;
+    const icon = app.get_app_info()?.get_icon();
+    if (!icon || !(icon as unknown as { get_names?: () => string[] }).get_names) return null;
+    const names = (icon as unknown as { get_names(): string[] }).get_names();
+    return resolver.lookup(names, Math.ceil(this._innerSize() * this._getTextureMultiplier()));
+  }
+
+  setIconTheme(name: string): void {
+    const resolver = name ? new ThemeResolver(name) : null;
+    this._themeResolver = resolver?.usable ? resolver : null;
+    this._refreshIconResolution();
+  }
+
+  setIconStyle(style: string): void {
+    if (style === this._iconStyle) return;
+    this._iconStyle = style;
+    this._refreshIconResolution();
+  }
+
+  setIconColor(color: string): void {
+    this._iconColor = color;
+    for (const actor of this._icons.values()) {
+      const data = this._getStored(actor);
+      if (data) this._decorateIcon(data);
+    }
+  }
+
+  setIconSpacing(spacing: number): void {
+    this._spacing = Math.max(0, spacing);
+  }
+
+  setAppButtonIcon(name: string): void {
+    this._appButtonIconName = name;
+    this._appButtonIcon?.set_icon_name(name);
+  }
+
+  /** The tile behind the icon and its colour effect, as the settings say. */
+  private _decorateIcon(data: AppData): void {
+    const size = this._iconSize;
+    const inner = this._innerSize();
+    const wrapper = data.iconWrapper;
+    switch (this._iconStyle) {
+      case "rounded":
+        wrapper.style = `border-radius: ${Math.round(size * 0.24)}px; background-color: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.14);`;
+        break;
+      case "circle":
+        wrapper.style = `border-radius: ${Math.ceil(size / 2)}px; background-color: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.14);`;
+        break;
+      case "glass":
+        wrapper.style = `border-radius: ${Math.round(size * 0.24)}px; background-color: rgba(255, 255, 255, 0.24); border: 1px solid rgba(255, 255, 255, 0.35); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.4);`;
+        break;
+      default:
+        wrapper.style = "";
+    }
+    const offset = Math.round((size - inner) / 2);
+    data.icon.set_position(offset, offset);
+    for (const widget of [data.icon]) {
+      widget.remove_effect_by_name("dock-tone");
+      const factor = this._iconColor === "monochrome" ? 1 : this._iconColor === "muted" ? 0.5 : 0;
+      if (factor > 0) widget.add_effect_with_name("dock-tone", new Clutter.DesaturateEffect({ factor }));
+    }
+  }
+
+  // ---- Minimized windows, at the dock's end
+
+  /** The window an unpinned `app` shows in its icon's place: one of its windows, when all of them are minimized; else none. */
+  private _overviewWindow(app: Shell.App): Meta.Window | null {
+    const windows = app.get_windows().filter((win) => !win.skip_taskbar);
+    if (windows.length === 0 || !windows.every((win) => win.minimized)) return null;
+    return windows[windows.length - 1] ?? null;
+  }
+
+  /** Unpinned apps whose windows are all minimized show the overview (a window's thumbnail) as their icon. */
+  private _syncOverviewIcons(): void {
+    for (const [id, actor] of this._icons) {
+      const data = this._getStored(actor);
+      const app = this._apps.get(id);
+      if (!data || !app) continue;
+      const win = this._minimizedEnabled && !this._favorites.includes(id) ? this._overviewWindow(app) : null;
+      if ((data.overview?.win ?? null) === win) continue;
+      if (data.overview) {
+        data.overview.widget.destroy();
+        data.overview = null;
+        data.icon.show();
+      }
+      if (!win) continue;
+      const windowActor = win.get_compositor_private() as Clutter.Actor | null;
+      if (!windowActor) continue;
+      const size = this._iconSize;
+      const widget = new St.Widget({
+        style_class: "dock-minimized-thumb",
+        layout_manager: new Clutter.FixedLayout(),
+        width: size,
+        height: size,
+        clip_to_allocation: true,
+      });
+      const [aw, ah] = windowActor.get_size();
+      if (aw > 0 && ah > 0) {
+        const clone = new Clutter.Clone({ source: windowActor, reactive: false });
+        const scale = Math.min(size / aw, size / ah);
+        clone.set_scale(scale, scale);
+        clone.set_position(Math.round((size - aw * scale) / 2), Math.round((size - ah * scale) / 2));
+        widget.add_child(clone);
+      }
+      const badgeSize = Math.round(size * 0.4);
+      const badge = app.create_icon_texture(badgeSize);
+      badge.set_position(size - badgeSize + 2, size - badgeSize + 2);
+      widget.add_child(badge);
+      widget.set_position(0, 0);
+      data.iconWrapper.add_child(widget);
+      data.icon.hide();
+      data.overview = { win, widget };
+    }
+  }
+
+  /** How many container children the minimized section has (its separator and one thumbnail each). */
+  private _minChildCount(): number {
+    return (this._minSeparator ? 1 : 0) + this._minItems.size;
+  }
+
+  /** Whether `win` is one the dock shows as a thumbnail when minimized (a normal window the shell would list). */
+  isMinimizable(win: Meta.Window): boolean {
+    if (!this._minimizedEnabled || !this._isPinnedWindow(win)) return false;
+    return !win.skip_taskbar && (win.window_type === 0 /* NORMAL */ || win.window_type === 3 /* DIALOG */ || win.window_type === 4 /* MODAL_DIALOG */);
+  }
+
+  /** Whether `win` belongs to an app pinned to the dock: only those get a thumbnail at the end. */
+  private _isPinnedWindow(win: Meta.Window): boolean {
+    const app = Shell.WindowTracker.get_default().get_window_app(win);
+    return app !== null && this._favorites.includes(app.get_id());
+  }
+
+  private _wantedMinimized(): Meta.Window[] {
+    if (!this._minimizedEnabled) return [];
+    const tracker = Shell.WindowTracker.get_default();
+    const active = global.workspace_manager.get_active_workspace();
+    const result: Meta.Window[] = [];
+    for (const actor of global.get_window_actors()) {
+      const win = actor.get_meta_window();
+      if (!win || !win.minimized || !this.isMinimizable(win)) continue;
+      if (this._workspaceMode === 1 && win.get_workspace() !== active) continue;
+      if (!tracker.get_window_app(win)) continue;
+      result.push(win);
+    }
+    return result;
+  }
+
+  /** Thumbnails for the minimized windows there are, and none for the ones that are not any more. */
+  syncMinimized(animate = true): void {
+    this._syncOverviewIcons();
+    if (!this._minimizedEnabled && this._minItems.size === 0) return;
+    const wanted = this._wantedMinimized();
+    const ids = new Set(wanted.map((win) => win.get_id()));
+    for (const [id, item] of [...this._minItems]) {
+      if (!ids.has(id)) this._removeMinItem(id, item, animate);
+    }
+    for (const win of wanted) {
+      if (!this._minItems.has(win.get_id())) this._addMinItem(win, animate ? 0 : -1);
+    }
+    this._updateMinSeparator();
+    this._refreshAllIndicators();
+    if (this._onIconsChanged) this._onIconsChanged();
+  }
+
+  /**
+   * A window is being minimized: its thumbnail is made now (shown once the genie has arrived) and where it will be is returned, so the
+   * window flies there. The dock grows around its centre, so the slot is the end of the row less half of what it adds.
+   */
+  addMinimized(win: Meta.Window): Rect | null {
+    if (!this.isMinimizable(win)) return null;
+    const existing = this._minItems.get(win.get_id());
+    if (existing) return this._minRect(existing.actor);
+    const last = this._container.get_last_child();
+    const slot = this._thumbSize(win).width + 12;
+    const spacing = this._spacing;
+    const addsSeparator = this._minSeparator === null;
+    const added = (addsSeparator ? 9 + spacing : 0) + slot + spacing;
+    const vertical = this._isVerticalLayout();
+    let rect: Rect | null = null;
+    if (last) {
+      const [lx, ly] = last.get_transformed_position();
+      const [lw, lh] = last.get_transformed_size();
+      const start = (vertical ? ly + lh : lx + lw) + (addsSeparator ? 9 + spacing : 0) + spacing - added / 2;
+      rect = vertical
+        ? { x: lx, y: Math.round(start), width: Math.round(lw), height: slot }
+        : { x: Math.round(start), y: ly, width: slot, height: Math.round(lh) };
+    }
+    this._addMinItem(win, 380);
+    this._updateMinSeparator();
+    if (this._onIconsChanged) this._onIconsChanged();
+    return rect;
+  }
+
+  /** Where `win`'s thumbnail is on screen now, for the window to fly out of it. */
+  minimizedRect(win: Meta.Window): Rect | null {
+    const item = this._minItems.get(win.get_id());
+    return item ? this._minRect(item.actor) : null;
+  }
+
+  /** The window is back: its thumbnail goes (the genie has its rect already). */
+  removeMinimized(win: Meta.Window): void {
+    const item = this._minItems.get(win.get_id());
+    if (item) this._removeMinItem(win.get_id(), item, true);
+    this._updateMinSeparator();
+    this._refreshAllIndicators();
+    if (this._onIconsChanged) this._onIconsChanged();
+  }
+
+  /** Total length of the minimized section along the dock, separator included, for the dock's size. */
+  getMinimizedExtent(): number {
+    if (this._minItems.size === 0) return 0;
+    let extent = 9 + this._spacing;
+    for (const item of this._minItems.values()) extent += item.width + this._spacing;
+    return extent;
+  }
+
+  private _minRect(actor: IconActor): Rect {
+    const [x, y] = actor.get_transformed_position();
+    const [w, h] = actor.get_transformed_size();
+    return { x: Math.round(x), y: Math.round(y), width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)) };
+  }
+
+  /** The thumbnail's size: as tall as an icon, as wide as the window's shape asks within reason. */
+  private _thumbSize(win: Meta.Window): { width: number; height: number } {
+    const frame = win.get_frame_rect();
+    const aspect = frame.height > 0 ? frame.width / frame.height : 1;
+    const height = this._iconSize;
+    const width = Math.round(Math.max(this._iconSize * 0.9, Math.min(this._iconSize * 1.8, this._iconSize * aspect)));
+    return { width, height };
+  }
+
+  private _updateMinSeparator(): void {
+    const wanted = this._minItems.size > 0;
+    if (wanted && !this._minSeparator) {
+      this._minSeparator = new St.Widget({
+        style_class: "dock-separator",
+        width: 1,
+        height: 32,
+        x_align: Clutter.ActorAlign.CENTER,
+        y_align: Clutter.ActorAlign.CENTER,
+      });
+      // Right before the first thumbnail.
+      const first = [...this._minItems.values()][0]?.actor;
+      const index = first ? this._container.get_children().indexOf(first) : this._container.get_n_children();
+      this._container.insert_child_at_index(this._minSeparator, Math.max(0, index));
+    } else if (!wanted && this._minSeparator) {
+      this._minSeparator.destroy();
+      this._minSeparator = null;
+    }
+  }
+
+  /** `delay` ms before it shows (the genie is on its way); -1 for at once without the pop. */
+  private _addMinItem(win: Meta.Window, delay: number): void {
+    const windowActor = win.get_compositor_private() as Clutter.Actor | null;
+    const tracker = Shell.WindowTracker.get_default();
+    const app = tracker.get_window_app(win);
+    if (!windowActor || !app) return;
+    const { width, height } = this._thumbSize(win);
+    const actor = new St.BoxLayout({
+      style_class: "dock-icon dock-minimized",
+      reactive: true,
+      track_hover: true,
+      ...box(true),
+      x_align: Clutter.ActorAlign.CENTER,
+      y_align: Clutter.ActorAlign.FILL,
+    }) as IconActor;
+    actor.set_size(width + 12, this._iconSize + 12 - 4);
+
+    const thumb = new St.Widget({
+      style_class: "dock-minimized-thumb",
+      layout_manager: new Clutter.FixedLayout(),
+      x_align: Clutter.ActorAlign.CENTER,
+      width,
+      height,
+      clip_to_allocation: true,
+    });
+    const [aw, ah] = windowActor.get_size();
+    if (aw > 0 && ah > 0) {
+      const clone = new Clutter.Clone({ source: windowActor, reactive: false });
+      const scale = Math.min(width / aw, height / ah);
+      clone.set_scale(scale, scale);
+      clone.set_position(Math.round((width - aw * scale) / 2), Math.round((height - ah * scale) / 2));
+      thumb.add_child(clone);
+    }
+    // The app's icon in the corner, so a thumbnail says whose window it is.
+    const badgeSize = Math.round(this._iconSize * 0.4);
+    const badge = app.create_icon_texture(badgeSize);
+    badge.set_position(width - badgeSize + 2, height - badgeSize + 2);
+    thumb.add_child(badge);
+    actor.add_child(thumb);
+    (actor as unknown as Record<string, unknown>)._minimizedWindow = win;
+
+    this._signals.connect(actor, "button-release-event", (_a, event) => {
+      if ((event as { get_button: () => number }).get_button() !== 1) return Clutter.EVENT_PROPAGATE;
+      if (!this._isPointerOver(actor)) return Clutter.EVENT_PROPAGATE;
+      this._hideTooltip();
+      win.unminimize();
+      win.activate(global.get_current_time());
+      return Clutter.EVENT_STOP;
+    });
+    this._signals.connect(actor, "notify::hover", () => {
+      if (actor.hover) this._showTooltip(actor, win.get_title() || app.get_name());
+      else this._hideTooltip();
+    });
+
+    this._container.add_child(actor);
+    this._positionAppButton();
+    this._minItems.set(win.get_id(), { win, actor, width: width + 12 });
+
+    if (delay >= 0) {
+      actor.opacity = 0;
+      actor.set_pivot_point(0.5, 1.0);
+      actor.scale_x = 0.6;
+      actor.scale_y = 0.6;
+      (actor as unknown as { ease(p: Record<string, unknown>): void }).ease({
+        opacity: 255,
+        scale_x: 1,
+        scale_y: 1,
+        delay,
+        duration: 220,
+        mode: Clutter.AnimationMode.EASE_OUT_BACK,
+      });
+    }
+  }
+
+  private _removeMinItem(id: number, item: MinItem, animate: boolean): void {
+    this._minItems.delete(id);
+    const { actor } = item;
+    this._hideTooltip();
+    if (!animate) {
+      actor.destroy();
+      return;
+    }
+    (actor as unknown as { ease(p: Record<string, unknown>): void }).ease({
+      opacity: 0,
+      duration: 140,
+      mode: Clutter.AnimationMode.EASE_IN_QUAD,
+      onComplete: () => actor.destroy(),
+    });
+  }
+
 }
