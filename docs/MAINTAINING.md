@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 158 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 162 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -169,3 +169,15 @@ With the island on, GNOME's own top bar is taken away (island setting `hide-top-
 ## Controls page (the island's quick settings)
 
 The island's Controls page (`shell/island/src/pages/controls.ts`, shortcut Super+Alt+K) sets what one reaches for in GNOME's Quick Settings: volume and the microphone (sliders and mute), the screen's brightness, Bluetooth (power, and the paired devices to connect and disconnect), Wi-Fi (power, networks), the sound outputs and inputs, power mode, Do Not Disturb, Night Light, dark style and airplane mode. Four views under small tabs: Quick, Bluetooth, Wi-Fi, Sound. What the computer does not have (no backlight on a desktop, no Wi-Fi, no Bluetooth) is not shown. The services are in `systemControls.ts` and use what GNOME uses, so both always agree: the shell's mixer (`audio.ts`, now with the default input), `Main.brightnessManager` (GNOME 48+) or the settings daemon, GnomeBluetooth, nmcli for NetworkManager, power-profiles-daemon over D-Bus, rfkill. Secured Wi-Fi networks NetworkManager does not know yet open GNOME's own Wi-Fi settings for the password. Not run on real hardware here: brightness (the test computer is a desktop with no backlight) and Wi-Fi (none).
+
+## Session restore (open apps come back after a reboot)
+
+`shell/island/src/sessionRestore.ts`, started by the island controller. The open applications (normal windows of apps that
+have a desktop file) and where their windows are (workspace, monitor, size, place, maximized, minimized) are written to
+`~/.local/state/niro/session.json` five seconds after the last change. The delay is what keeps a logout from emptying the
+file: the apps close one by one as the session ends and the shell is gone before it settles, so the last settled state stays.
+At the next login, once (a marker in `$XDG_RUNTIME_DIR`, which goes with the login, so a shell restart or unlock does not
+restore again), the apps that are not running are started `restore-session-delay` seconds after the session is up, 0.9 s
+apart, and their first window is put back (`restore-positions`). Saving stays off until that is done. Settings:
+`restore-session`, `restore-positions`, `restore-session-delay`, `restore-session-exclude` (desktop file ids). Tested by
+running two headless shells with the same `XDG_STATE_HOME` (`NIRO_RESTORE_MARKER` picks the marker file).

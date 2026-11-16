@@ -56,6 +56,7 @@ import * as Theme from './theme.js';
 import {GREETING, InstalledApps, UNDO_MS, VoiceView, stopUnit, actionTypes, aiSettings, openSetUp, openSignIn, runActions, signInHint, stopPending, voiceContext} from './voice.js';
 import {autoHide, revealBand} from './visibilityRules.js';
 import {BarHider} from './barHider.js';
+import {SessionRestore} from './sessionRestore.js';
 import {TextWriter} from './writer.js';
 
 /** While the pointer rests before the island opens (Settings: hover-delay), it moves at most this far (CSS px). */
@@ -328,6 +329,8 @@ export class Controller {
         this._topBar = new TopBar(this._settings);
         // GNOME's own bar goes (setting `hide-top-bar`): the island stands alone at the top.
         this._barHider = new BarHider(this._settings, () => this._syncAutoHide());
+        // The open applications are remembered and opened again at the next login (setting `restore-session`).
+        this._sessionRestore = new SessionRestore(this._settings);
         this._shelf = this._expanded.pageNamed('shelf');
         this._shelfHelper = new ShelfHelper(this._island, this._shelf);
         for (const view of [this._compact, ...this._peeks, this._expanded, this._voice])
@@ -3413,6 +3416,8 @@ export class Controller {
         this._privacy.destroy();
         this._audio.destroy();
         this._notifications.destroy();
+        this._sessionRestore?.destroy();
+        this._sessionRestore = null;
         this._barHider?.destroy();
         this._barHider = null;
         this._topBar.destroy();

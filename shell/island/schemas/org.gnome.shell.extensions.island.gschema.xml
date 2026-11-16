@@ -1,6 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
   <schema id="org.gnome.shell.extensions.island" path="/org/gnome/shell/extensions/island/">
+    <key name="restore-session" type="b">
+      <default>true</default>
+      <summary>Open the applications that were open at the next login</summary>
+      <description>The open applications and where their windows are are remembered, and opened again at the next login (a reboot, a logout), a few seconds after the session is up. Applications that start by themselves are not started twice.</description>
+    </key>
+    <key name="restore-positions" type="b">
+      <default>true</default>
+      <summary>Put the windows back where they were</summary>
+      <description>A restored application's first window goes back to its workspace, monitor, size and place. Off: the applications only open.</description>
+    </key>
+    <key name="restore-session-delay" type="i">
+      <default>4</default>
+      <range min="1" max="60"/>
+      <summary>Wait before restoring the session, in seconds</summary>
+      <description>How long after the session is up the applications are started again, so that what starts by itself is there first (1-60)</description>
+    </key>
+    <key name="restore-session-exclude" type="as">
+      <default>[]</default>
+      <summary>Applications not to restore</summary>
+      <description>Desktop file ids (org.gnome.Nautilus.desktop) that are neither remembered nor opened again.</description>
+    </key>
     <key name="hide-top-bar" type="b">
       <default>true</default>
       <summary>Take GNOME's top bar away</summary>

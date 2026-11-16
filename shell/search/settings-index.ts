@@ -203,6 +203,46 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "island.restore-session",
+  "menu": "Island",
+  "group": "Pages and Features",
+  "title": "Open the applications that were open at the next login",
+  "help": "The open applications and where their windows are are remembered, and opened again at the next login (a reboot, a logout), a few seconds after the…",
+  "key": "restore-session",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "island.restore-positions",
+  "menu": "Island",
+  "group": "Pages and Features",
+  "title": "Put the windows back where they were",
+  "help": "A restored application's first window goes back to its workspace, monitor, size and place.",
+  "key": "restore-positions",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "island.restore-session-delay",
+  "menu": "Island",
+  "group": "Pages and Features",
+  "title": "Wait before restoring the session, in seconds",
+  "help": "How long after the session is up the applications are started again, so that what starts by itself is there first (1-60)",
+  "key": "restore-session-delay",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "island.restore-session-exclude",
+  "menu": "Island",
+  "group": "Pages and Features",
+  "title": "Applications not to restore",
+  "help": "Desktop file ids (org.gnome.Nautilus.desktop) that are neither remembered nor opened again.",
+  "key": "restore-session-exclude",
+  "kind": "list",
+  "managed": false
+ },
+ {
   "id": "island.hide-top-bar",
   "menu": "Island",
   "group": "Appearance and Behavior",
