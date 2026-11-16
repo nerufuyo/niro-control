@@ -194,6 +194,13 @@ export default class DockPreferences extends ExtensionPreferences {
     settings.bind("auto-hide", autoHideRow, "active", BIND_FLAGS);
     behaviorGroup.add(autoHideRow);
 
+    const coverHideRow = new Adw.SwitchRow({
+      title: "Hide under maximized and full-screen windows",
+      subtitle: "Stays up on the desktop; slides away while a maximized or full-screen window covers it",
+    });
+    settings.bind("hide-when-maximized", coverHideRow, "active", BIND_FLAGS);
+    behaviorGroup.add(coverHideRow);
+
     const bounceRow = new Adw.SwitchRow({
       title: "Bounce on launch",
       subtitle: "Animate the dock icon when an app starts",

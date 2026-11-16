@@ -12,6 +12,11 @@
       <summary>Auto-hide</summary>
       <description>Whether to auto-hide the dock when the pointer moves away</description>
     </key>
+    <key name="hide-when-maximized" type="b">
+      <default>true</default>
+      <summary>Hide under maximized and full-screen windows</summary>
+      <description>The dock stays up on the desktop and over small windows, and slides away while a maximized or full-screen window covers it; the screen edge brings it back. With Auto-hide on it hides whenever the pointer leaves.</description>
+    </key>
     <key name="minimized-in-dock" type="b">
       <default>true</default>
       <summary>Minimized windows at the end of the dock</summary>

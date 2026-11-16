@@ -19,7 +19,7 @@ Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built by `ma
 | **Rounded corners** | Round corners and shadows for every window, including Chrome and Electron apps. |
 | **Emoji, Emulator** | An emoji picker; keeps the Android Emulator window on top. |
 | **Profiles** | Save the whole desktop as a profile and switch with one action: four built-ins (Everyday, Deep Work, Creative, Gaming), preview before applying, backups, rollback, import and export. |
-| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 162 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
+| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 163 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
 
 Opacity, blur, blur strength, accent and tint are set once, in **Look**, and the island, dock, search and windows follow.
 Light and dark appearance both work, and the panel adapts to narrow windows.
@@ -114,7 +114,7 @@ for how the parts talk to each other and where to change things.
 ## Status
 
 A personal desktop project, shared as it is. Tested on Ubuntu 24.04 (GNOME 46, Wayland, NVIDIA) and Fedora 45 (GNOME 51, Wayland):
-on Fedora, all seven extensions enable in a real headless GNOME Shell 51 and the 162 node and GJS tests pass.
+on Fedora, all seven extensions enable in a real headless GNOME Shell 51 and the 163 node and GJS tests pass.
 The Fedora `.rpm` has not yet been installed and used in a full session; `docs/UAT.md` is the checklist for that.
 The island's TypeScript still carries `// @ts-nocheck`: converted from JavaScript, to be typed file by file.
 
