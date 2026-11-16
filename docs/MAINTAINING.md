@@ -222,7 +222,7 @@ and is tested in `tests/island/tileLayouts.test.js`), `extension.js` places the 
 before that. Ten layouts: Dwindle, Master left/right, Center master, Grid, Three columns, Horizontal and Vertical split, Scrolling
 (columns that do not fit sit behind the nearest one in view) and Monocle. Dwindle is stateless: from the order of the windows, each one takes half of what is
 left (the split follows the shape of the space), so it matches Hyprland's on the first windows but does not keep a tree.
-Tiled: normal, resizable windows, not minimized, maximized, full-screen, transient (dialogs) or on all workspaces, and not floated (`Super+Alt+F`)
+Tiled: normal, resizable windows, not minimized, full-screen, transient (dialogs) or on all workspaces (a window maximized before the tiling took it is unmaximized into a tile; one maximized after being tiled stays maximized: `_placed`; `allows_move()` and `allows_resize()` are false for a maximized window, so `resizeable` is what is asked then), and not floated (`Super+Alt+F`)
 or in `floating-apps`. The order is the order the windows came in; `Super+Alt+Return` moves the focused one first. The windows are looked at
 again 60 ms after a window comes, goes, is minimized, maximized or moved, the workspace or the work area changes. It is the Windows menu of the
 panel ("Tiling"). The GNOME shortcuts `Super+Alt+Left/Right` are workspace switches, so the master size is on `Super+Alt+=` and `-`.

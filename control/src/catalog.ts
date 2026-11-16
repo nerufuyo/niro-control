@@ -2879,7 +2879,7 @@ export const CATALOG: Item[] = [
   "group": "Tiling",
   "title": "Tile the windows",
   "help": "Windows on a monitor are arranged by the chosen layout, none over another.",
-  "detail": "Windows on a monitor are arranged by the chosen layout, none over another. Off: windows are left where they are. Dialogs, full-screen and maximized windows are never tiled.",
+  "detail": "Windows on a monitor are arranged by the chosen layout, none over another. Off: windows are left where they are. Dialogs and full-screen windows are never tiled. A window that is maximized when the tiling starts is brought into a tile; one you maximize afterwards stays maximized until you restore it.",
   "source": "tile",
   "key": "enabled",
   "type": "b",
@@ -3064,7 +3064,7 @@ export const CATALOG: Item[] = [
   "source": "tile",
   "key": "shortcut-toggle",
   "type": "as",
-  "default": "[\"<Super><Alt>t\"]",
+  "default": "[\"<Super><Alt>g\"]",
   "unit": "",
   "kind": "shortcut",
   "depends": {
