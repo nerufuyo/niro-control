@@ -6,6 +6,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
+import St from 'gi://St';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -29,6 +30,9 @@ export default class Tile extends Extension {
         this._retileId = 0;
         this._state = new Map();          // window: "maximized|fullscreen" when last looked at
         this._dragging = null;            // the tiled window being moved with the pointer
+        this._ghosts = [];                // the preview of the layout shown while a window is carried
+        this._ghostTimer = 0;
+        this._ghostCell = null;           // {monitor, index}: the tile the carried window would take
         this._placed = new WeakSet();     // windows the tiling has put in a tile: one of them maximized afterwards stays maximized
 
         const wm = global.window_manager;
@@ -79,6 +83,7 @@ export default class Tile extends Extension {
         this._order = [];
         this._floating = null;
         this._state = null;
+        this._stopGhost();
         this._placed = null;
         this._settings = null;
     }
@@ -186,37 +191,127 @@ export default class Tile extends Extension {
         win.move_resize_frame(true, r.x, r.y, r.width, r.height);
     }
 
-    // ---- Drag and drop
+    // ---- Drag and drop, with a preview of the layout
+    //
+    // While a tiled window is carried, the layout it would make is drawn over the screen: one outlined cell for each tile (the carried
+    // window included), the cell under the pointer lit. Letting go puts the window in that cell and the others move over for it.
 
     _beginDrag(win, op) {
         if (!this._settings?.get_boolean('enabled') || op !== Meta.GrabOp.MOVING || !this._order.includes(win) || !this._eligible(win))
             return;
         this._dragging = win;
+        this._startGhost();
     }
 
     _endDrag(win) {
         if (!this._dragging || this._dragging !== win)
             return;
         this._dragging = null;
-        this._dropOn(win, ...global.get_pointer());
+        const cell = this._ghostCell;
+        this._stopGhost();
+        if (cell)
+            this._insertAt(win, cell.monitor, cell.index);
         this._schedule();
     }
 
-    /** `win` was dropped with the pointer at (x, y): it takes the place of the tiled window under the pointer, and that one takes its place. */
-    _dropOn(win, x, y) {
+    /** The tiled windows of a monitor on the active workspace, but for `except`, in tile order. */
+    _tiledOn(monitor, except) {
         const workspace = global.workspace_manager.get_active_workspace();
-        const target = this._order.find(w => {
-            if (w === win || !this._eligible(w) || w.get_workspace() !== workspace)
-                return false;
-            const r = w.get_frame_rect();
-            return x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height;
+        return this._order.filter(w => w !== except && this._eligible(w) && w.get_workspace() === workspace && w.get_monitor() === monitor);
+    }
+
+    _options(focus = 0) {
+        return {
+            gapInner: this._settings.get_int('gap-inner'),
+            gapOuter: this._settings.get_int('gap-outer'),
+            masterFactor: this._settings.get_double('master-factor'),
+            columnWidth: this._settings.get_double('column-width'),
+            focus,
+        };
+    }
+
+    _monitorAt(x, y) {
+        const monitors = Main.layoutManager.monitors;
+        const i = monitors.findIndex(m => x >= m.x && x < m.x + m.width && y >= m.y && y < m.y + m.height);
+        return i >= 0 ? i : global.display.get_primary_monitor();
+    }
+
+    /** The cell of `rects` the point is in, else the nearest by its centre. */
+    _cellAt(rects, x, y) {
+        const inside = rects.findIndex(r => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height);
+        if (inside >= 0)
+            return inside;
+        let best = 0, bestD = Infinity;
+        rects.forEach((r, i) => {
+            const d = (r.x + r.width / 2 - x) ** 2 + (r.y + r.height / 2 - y) ** 2;
+            if (d < bestD) { best = i; bestD = d; }
         });
-        if (!target)
-            return false;   // dropped on nothing: it goes back to its tile
-        const a = this._order.indexOf(win);
-        const b = this._order.indexOf(target);
-        [this._order[a], this._order[b]] = [target, win];
-        return true;
+        return best;
+    }
+
+    _startGhost() {
+        this._stopGhost();
+        this._updateGhost();
+        this._ghostTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 40, () => {
+            this._updateGhost();
+            return GLib.SOURCE_CONTINUE;
+        });
+    }
+
+    _stopGhost() {
+        if (this._ghostTimer) {
+            GLib.Source.remove(this._ghostTimer);
+            this._ghostTimer = 0;
+        }
+        for (const g of this._ghosts)
+            g.destroy();
+        this._ghosts = [];
+        this._ghostCell = null;
+    }
+
+    _updateGhost() {
+        const win = this._dragging;
+        if (!win || !this._settings)
+            return;
+        const [x, y] = global.get_pointer();
+        const monitor = this._monitorAt(x, y);
+        const others = this._tiledOn(monitor, win);
+        const area = Main.layoutManager.getWorkAreaForMonitor(monitor);
+        const rects = arrange(this._settings.get_string('layout'), others.length + 1, {x: area.x, y: area.y, width: area.width, height: area.height}, this._options());
+        const shown = rects.filter(r => !r.hidden);
+        const index = this._cellAt(shown, x, y);
+        this._ghostCell = {monitor, index};
+        while (this._ghosts.length < shown.length) {
+            const g = new St.Widget({style_class: 'tile-ghost', reactive: false});
+            Main.layoutManager.uiGroup.add_child(g);
+            this._ghosts.push(g);
+        }
+        while (this._ghosts.length > shown.length)
+            this._ghosts.pop().destroy();
+        shown.forEach((r, i) => {
+            const g = this._ghosts[i];
+            g.set_position(r.x, r.y);
+            g.set_size(r.width, r.height);
+            if (i === index)
+                g.add_style_pseudo_class('active');
+            else
+                g.remove_style_pseudo_class('active');
+        });
+    }
+
+    /** `win` goes to place `index` among the tiled windows of `monitor`; the others move over. */
+    _insertAt(win, monitor, index) {
+        if (win.get_monitor() !== monitor)
+            win.move_to_monitor(monitor);
+        const others = this._tiledOn(monitor, win);
+        this._order = this._order.filter(w => w !== win);
+        const before = others[index];
+        if (before)
+            this._order.splice(this._order.indexOf(before), 0, win);
+        else if (others.length)
+            this._order.splice(this._order.indexOf(others[others.length - 1]) + 1, 0, win);
+        else
+            this._order.push(win);
     }
 
     // ---- Shortcuts
