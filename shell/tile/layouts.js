@@ -27,32 +27,56 @@ function parts(length, n, gap) {
     return Array.from({length: n}, (_, i) => [i * (size + gap), size]);
 }
 
-const column = (area, n, gap) => parts(area.height, n, gap).map(([o, s]) => rect(area.x, area.y + o, area.width, s));
-const row = (area, n, gap) => parts(area.width, n, gap).map(([o, s]) => rect(area.x + o, area.y, s, area.height));
+/** `n` parts of `length` with `gap` between them, in proportion to `weights` (equal when there are none). */
+function weighted(length, n, gap, weights) {
+    const w = Array.from({length: n}, (_, i) => Math.max(0.05, weights?.length === n ? weights[i] : 1));
+    const total = w.reduce((a, b) => a + b, 0);
+    const room = length - gap * (n - 1);
+    const out = [];
+    let at = 0;
+    w.forEach((x, i) => {
+        const size = i === n - 1 ? length - at : (room * x) / total;
+        out.push([at, size]);
+        at += size + gap;
+    });
+    return out;
+}
+
+const column = (area, n, gap, weights) => weighted(area.height, n, gap, weights).map(([o, s]) => rect(area.x, area.y + o, area.width, s));
+const row = (area, n, gap, weights) => weighted(area.width, n, gap, weights).map(([o, s]) => rect(area.x + o, area.y, s, area.height));
 
 /** A rectangle's tiles in a stack: top to bottom (`vertical`), or left to right. */
 const stack = (area, n, gap, vertical) => (vertical ? column(area, n, gap) : row(area, n, gap));
 
-function dwindle(n, area, gap) {
+const clampRatio = r => Math.max(0.1, Math.min(0.9, r));
+
+/** Each split of Dwindle: the space it divides, whether it divides it left/right (`wide`), and the share the first half takes. */
+export function dwindleSplits(n, area, gap, ratios = []) {
     const out = [];
     let rest = area;
     for (let i = 0; i < n - 1; i++) {
         const wide = rest.width >= rest.height;   // a wide space splits into left and right, a tall one into top and bottom
-        // the second half ends where the space ends: the rounding of the first never pushes it out
-        let a, b;
+        const share = clampRatio(ratios[i] ?? 0.5);
+        out.push({rest, wide, share});
         if (wide) {
-            const aw = Math.round((rest.width - gap) / 2);
-            a = rect(rest.x, rest.y, aw, rest.height);
-            b = rect(rest.x + aw + gap, rest.y, rest.width - gap - aw, rest.height);
+            const aw = Math.round((rest.width - gap) * share);
+            rest = rect(rest.x + aw + gap, rest.y, rest.width - gap - aw, rest.height);
         } else {
-            const ah = Math.round((rest.height - gap) / 2);
-            a = rect(rest.x, rest.y, rest.width, ah);
-            b = rect(rest.x, rest.y + ah + gap, rest.width, rest.height - gap - ah);
+            const ah = Math.round((rest.height - gap) * share);
+            rest = rect(rest.x, rest.y + ah + gap, rest.width, rest.height - gap - ah);
         }
-        out.push(a);
-        rest = b;
     }
-    out.push(rect(rest.x, rest.y, rest.width, rest.height));
+    out.last = rest;
+    return out;
+}
+
+function dwindle(n, area, gap, ratios) {
+    const splits = dwindleSplits(n, area, gap, ratios);
+    const out = splits.map(({rest, wide, share}) => (wide
+        // the second half ends where the space ends: the rounding of the first never pushes it out
+        ? rect(rest.x, rest.y, Math.round((rest.width - gap) * share), rest.height)
+        : rect(rest.x, rest.y, rest.width, Math.round((rest.height - gap) * share))));
+    out.push(rect(splits.last.x, splits.last.y, splits.last.width, splits.last.height));
     return out;
 }
 
@@ -128,7 +152,8 @@ function scrolling(n, area, gap, columnWidth, focus) {
  * @param layout one of LAYOUT_IDS
  * @param count how many windows
  * @param area `{x, y, width, height}`: the work area of the monitor
- * @param options `{gapInner, gapOuter, masterFactor (0.1 to 0.9), columnWidth (scrolling, share of the area), focus (index of the focused window)}`
+ * @param options `{gapInner, gapOuter, masterFactor (0.1 to 0.9), columnWidth (scrolling, share of the area), focus (index of the focused window),
+ *   ratios (Dwindle: the share each split gives its first half), weights (Horizontal and Vertical: relative sizes)}`
  */
 export function arrange(layout, count, area, options = {}) {
     if (count <= 0) return [];
@@ -143,13 +168,16 @@ export function arrange(layout, count, area, options = {}) {
     case 'center-master': return centerMaster(count, a, gapInner, factor);
     case 'grid': return grid(count, a, gapInner);
     case 'three-columns': return threeColumns(count, a, gapInner);
-    case 'horizontal': return row(a, count, gapInner);
-    case 'vertical': return column(a, count, gapInner);
+    case 'horizontal': return row(a, count, gapInner, options.weights);
+    case 'vertical': return column(a, count, gapInner, options.weights);
     case 'scrolling': return scrolling(count, a, gapInner, options.columnWidth ?? 0.5, options.focus ?? 0);
     case 'monocle': return Array.from({length: count}, () => rect(a.x, a.y, a.width, a.height));
-    default: return dwindle(count, a, gapInner);
+    default: return dwindle(count, a, gapInner, options.ratios);
     }
 }
+
+/** The area `arrange` works in: the work area less the outer gap. */
+export const inner = (area, gapOuter) => rect(area.x + gapOuter, area.y + gapOuter, area.width - 2 * gapOuter, area.height - 2 * gapOuter);
 
 /** Whether a layout lays windows side by side without overlap (all but Monocle, and Scrolling's hidden ones). */
 export const overlaps = layout => layout === 'monocle';

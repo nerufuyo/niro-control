@@ -3036,6 +3036,24 @@ export const CATALOG: Item[] = [
   }
  },
  {
+  "id": "tile.animate",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Slide windows into their tiles",
+  "help": "A window that goes to its tile glides there instead of jumping.",
+  "detail": "A window that goes to its tile glides there instead of jumping. Follows the system's animations switch.",
+  "source": "tile",
+  "key": "animate",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
   "id": "tile.floating-apps",
   "menu": "Windows",
   "group": "Tiling",

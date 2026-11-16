@@ -1693,6 +1693,16 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "tile.animate",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Slide windows into their tiles",
+  "help": "A window that goes to its tile glides there instead of jumping.",
+  "key": "animate",
+  "kind": "switch",
+  "managed": false
+ },
+ {
   "id": "tile.floating-apps",
   "menu": "Windows",
   "group": "Tiling",
