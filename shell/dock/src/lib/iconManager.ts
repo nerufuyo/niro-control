@@ -756,6 +756,14 @@ export class IconManager {
     // Before the minimized windows, which stay at the end.
     this._container.insert_child_at_index(actor, this._container.get_n_children() - this._minChildCount());
     this._icons.set(appId, actor);
+    // GNOME takes every actor down as the shell shuts down, before this runs again: a destroyed icon is let go at once, so the timers
+    // that walk the icons do not touch it.
+    actor.connect("destroy", () => {
+      if (this._icons.get(appId) === actor) {
+        this._icons.delete(appId);
+        this._apps.delete(appId);
+      }
+    });
     this._apps.set(appId, app);
     this._positionAppButton();
 
