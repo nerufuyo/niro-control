@@ -3,7 +3,7 @@
 set -e
 cd "$(dirname "$0")/../.."
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
-for d in control shell/island/schemas shell/dock/schemas shell/blur/schemas shell/corners/schemas shell/tile/schemas; do
+for d in control shell/island/schemas shell/dock/schemas shell/blur/schemas shell/corners/schemas shell/tile/schemas shell/emoji/schemas; do
   for f in $d/*.gschema.xml; do cp "$f" "$T/"; done
 done
 glib-compile-schemas "$T"
@@ -11,5 +11,7 @@ GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" gjs -m tests/gjs/blurPipeline
 GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/controlUi.test.js
 GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/profiles.test.js
 GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/appearance.test.js
-GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/tileBackend.test.js
-GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/tilingPage.test.js
+# no shell on the bus: the real session's extension (if it runs) must not answer
+DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/tileBackend.test.js
+# no shell on the bus: the real session's extension (if it runs) must not answer
+DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/tilingPage.test.js

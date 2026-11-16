@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 186 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 197 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -257,3 +257,12 @@ of the one chosen, arrows/Tab to move, Enter or a click to apply it to the activ
 windows in a headless shell, applies each of the ten layouts, and compares every window's frame with `arrange()` (`tileExpect.mjs`); a window that cannot be as small as
 its tile keeps its own minimum size at the tile's corner (`_holdMinimum`), which the check accepts. It then closes a window and checks the nine left are laid out again.
 It runs with its own settings file (keyfile backend) so `gsettings` and the extension see the same values.
+
+## Emoji picker: kaomoji, text symbols, the shortcut
+
+`Super+.` and `Super+;` open it (`emoji-keybind`, two defaults, as on Windows); `Super+.` was already the old default, and the settings (shortcut, where it opens, size,
+columns, paste, keep open…) are now in the panel's Search page ("Emoji Picker", the `emoji` source of the catalog). The database `shell/emoji/data/emojis.db` has two more groups than
+the Unicode emoji (which are untouched): "Kaomoji" (text faces) and "Text Symbols". They are made by `scripts/build-emoji-extras.py` (edit the lists in it and run it again: the two groups
+are replaced); a symbol's search words are its Unicode name plus English and Indonesian words for its set. In the picker they are categories 9 and 10 (`emojiCategory.js`):
+Kaomoji are laid out two to a row, in a text font, in wide buttons. `tests/island/emojiExtras.test.js` reads the database with `node:sqlite`. The extension's code
+(categories, buttons) is loaded once per shell: a new version shows after the next login; a new database is read each time the extension is enabled.

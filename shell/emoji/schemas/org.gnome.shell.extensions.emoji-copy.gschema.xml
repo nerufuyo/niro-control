@@ -3,6 +3,10 @@
 	<schema id="org.gnome.shell.extensions.emoji-copy"
 	path="/org/gnome/shell/extensions/emoji-copy/">
     <key type="s" name="position">
+      <choices>
+        <choice value="top"/>
+        <choice value="bottom"/>
+      </choices>
       <default>'top'</default>
       <summary>orientation of the interface</summary>
       <description>Possible values can be 'top' or 'bottom'.</description>
@@ -76,9 +80,9 @@
       <description>0 is none, 1 is women, 2 is men.</description>
     </key>
     <key name="emoji-keybind" type="as">
-      <default><![CDATA[['<Super>period']]]></default>
+      <default><![CDATA[['<Super>period', '<Super>semicolon']]]></default>
       <summary>Keyboard shortcut.</summary>
-      <description>Keyboard shortcut which opens the extension's menu.</description>
+      <description>Keyboard shortcuts which open the extension's menu: Super+. and Super+; by default.</description>
     </key>
 	</schema>
 </schemalist>

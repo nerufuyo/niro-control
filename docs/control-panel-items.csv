@@ -185,3 +185,14 @@ Windows,Tiling,Swap with the window on the left,shortcut,,"[""<Super><Control><S
 Windows,Tiling,Swap with the window on the right,shortcut,,"[""<Super><Control><Shift>Right""]",Trades places with the tiled window nearest on the right.,shortcut-swap-right,tile.shortcut-swap-right
 Windows,Tiling,Swap with the window above,shortcut,,"[""<Super><Control><Shift>Up""]",Trades places with the tiled window nearest above.,shortcut-swap-up,tile.shortcut-swap-up
 Windows,Tiling,Swap with the window below,shortcut,,"[""<Super><Control><Shift>Down""]",Trades places with the tiled window nearest below.,shortcut-swap-down,tile.shortcut-swap-down
+Search,Emoji Picker,Open the emoji picker,shortcut,,"['<Super>period', '<Super>semicolon']","Super+. and Super+; by default, as on Windows. Add or change them here.",emoji-keybind,emoji.emoji-keybind
+Search,Emoji Picker,Open with the shortcut,switch,,true,Off: the picker only opens from its icon in the top bar.,active-keybind,emoji.active-keybind
+Search,Emoji Picker,Show the picker's icon,switch,,true,The smiley in the top bar. Off: only the shortcut opens it.,always-show,emoji.always-show
+Search,Emoji Picker,Where it opens,select,Top bar / At the cursor,top-bar,"Under the top bar, or next to the text cursor.",window-location,emoji.window-location
+Search,Emoji Picker,Order of the pieces,select,Search on top / Search at the bottom,top,"Search and the recent row above the emoji, or below them.",position,emoji.position
+Search,Emoji Picker,Emoji per row,stepper,6–16,11,How many emoji fit in a row of the picker.,nbcols,emoji.nbcols
+Search,Emoji Picker,Size of the emoji,stepper,18–56,30,In pixels.,emojisize,emoji.emojisize
+Search,Emoji Picker,Rows of recent emoji,stepper,1–5,1,How many rows of the emoji used last are kept above the list.,recent-rows,emoji.recent-rows
+Search,Emoji Picker,Paste when one is picked,switch,,true,"Off: it is only copied, and you paste it yourself.",paste-on-select,emoji.paste-on-select
+Search,Emoji Picker,Stay open after a pick,switch,,false,Pick several in a row.,keep-open,emoji.keep-open
+Search,Emoji Picker,Copy several at once,switch,,false,Right-click or Shift+Enter collects; the whole is copied when the picker closes.,copy-on-close,emoji.copy-on-close
