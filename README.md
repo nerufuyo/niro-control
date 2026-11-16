@@ -17,7 +17,7 @@ Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built by `ma
 | **Search** | `Super+Space`: a command palette for applications, a calculator, unit conversion, open windows, every Niro setting, profiles, system actions (lock, Do Not Disturb, suspend, log out…) and the island's clipboard history. One typed action registry, also on D-Bus. |
 | **Window blur** | Frosted glass behind application windows, with one strength and opacity for everything. |
 | **Rounded corners** | Round corners and shadows for every window, including Chrome and Electron apps. |
-| **Tile** | Hyprland-style tiling for GNOME windows, off until you switch it on (`Super+Alt+T`): Dwindle, Master left/right, Center master, Grid, Three columns, Horizontal and Vertical split, Scrolling and Monocle, with gaps, a main-window size, and shortcuts to switch layout, make a window the main one, or float it. |
+| **Tile** | Hyprland-style tiling for GNOME windows, off until you switch it on (`Super+Alt+G`): Dwindle, Master left/right, Center master, Grid, Three columns, Horizontal and Vertical split, Scrolling and Monocle, with gaps, a main-window size, and shortcuts to switch layout, make a window the main one, or float it. |
 | **Emoji, Emulator** | An emoji picker; keeps the Android Emulator window on top. |
 | **Profiles** | Save the whole desktop as a profile and switch with one action: four built-ins (Everyday, Deep Work, Creative, Gaming), preview before applying, backups, rollback, import and export. |
 | **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 176 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
