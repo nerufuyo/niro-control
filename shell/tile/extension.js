@@ -14,6 +14,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {PACKAGE_VERSION} from 'resource:///org/gnome/shell/misc/config.js';
 
 import {arrange, dwindleSplits, inner, LAYOUT_IDS, LAYOUTS} from './layouts.js';
+import {matchRule, neighbor, parseLayoutMap, parseRules, resolveLayout, withLayout, withoutLayout} from './config.js';
 
 const RETILE_MS = 60;
 const SHELL_MAJOR = parseInt(PACKAGE_VERSION.split('.')[0], 10);
@@ -21,7 +22,19 @@ const unmaximize = win => (SHELL_MAJOR >= 49 ? win.unmaximize() : win.unmaximize
 // the grab operations that pull a window's edge or corner
 const RESIZING = new Set(Object.entries(Meta.GrabOp).filter(([name]) => /^RESIZING/.test(name)).map(([, v]) => v));
 const isMaximized = win => Boolean(win.maximized_horizontally && win.maximized_vertically);
-const KEYS = ['toggle', 'layout', 'promote', 'float', 'grow', 'shrink'];
+const KEYS = ['toggle', 'layout', 'promote', 'float', 'grow', 'shrink', 'switcher',
+    'focus-left', 'focus-right', 'focus-up', 'focus-down', 'swap-left', 'swap-right', 'swap-up', 'swap-down'];
+
+// What other programs may ask of the tiling, and read from it (the command line and the panel use this)
+const DBUS_XML = `<node><interface name="org.niro.Tile">
+  <method name="GetState"><arg type="s" direction="out" name="json"/></method>
+  <method name="ListLayouts"><arg type="s" direction="out" name="json"/></method>
+  <method name="ApplyLayout"><arg type="s" direction="in" name="layout"/><arg type="i" direction="in" name="workspace"/><arg type="i" direction="in" name="monitor"/><arg type="b" direction="out" name="ok"/></method>
+  <method name="ClearLayout"><arg type="i" direction="in" name="workspace"/><arg type="i" direction="in" name="monitor"/></method>
+  <method name="SetEnabled"><arg type="b" direction="in" name="enabled"/></method>
+  <method name="Retile"/>
+  <signal name="StateChanged"/>
+</interface></node>`;
 
 export default class Tile extends Extension {
     enable() {
@@ -41,6 +54,8 @@ export default class Tile extends Extension {
         this._weights = new Map();        // monitor: the sizes of Horizontal and Vertical's tiles, made by resizing
         this._shape = new Map();          // monitor: which layout and count those belong to; another and they are forgotten
         this._placed = new WeakSet();     // windows the tiling has put in a tile: one of them maximized afterwards stays maximized
+        this._map = parseLayoutMap(this._settings.get_string('layout-map'));
+        this._rules = parseRules(this._settings.get_string('window-rules'));
 
         const wm = global.window_manager;
         const display = global.display;
@@ -53,6 +68,14 @@ export default class Tile extends Extension {
         // Drag and drop: moving a tiled window over another and letting go swaps their places
         this._signals.push([display, display.connect('grab-op-begin', (_d, win, op) => this._beginDrag(win, op))]);
         this._signals.push([display, display.connect('grab-op-end', (_d, win) => this._endDrag(win))]);
+        this._signals.push([this._settings, this._settings.connect('changed::layout-map', () => {
+            this._map = parseLayoutMap(this._settings.get_string('layout-map'));
+            this._schedule();
+        })]);
+        this._signals.push([this._settings, this._settings.connect('changed::window-rules', () => {
+            this._rules = parseRules(this._settings.get_string('window-rules'));
+            this._schedule();
+        })]);
         for (const key of ['enabled', 'layout', 'gap-inner', 'gap-outer', 'master-factor', 'column-width', 'floating-apps'])
             this._signals.push([this._settings, this._settings.connect(`changed::${key}`, again)]);
         this._signals.push([this._settings, this._settings.connect('changed::enabled', () => this._osd(this._settings.get_boolean('enabled') ? 'Tiling on' : 'Tiling off'))]);
@@ -65,13 +88,21 @@ export default class Tile extends Extension {
             float: () => this._toggleFloat(),
             grow: () => this._grow(0.05),
             shrink: () => this._grow(-0.05),
+            switcher: () => this._openSwitcher(),
         };
+        for (const dir of ['left', 'right', 'up', 'down']) {
+            handlers[`focus-${dir}`] = () => this._focusDir(dir);
+            handlers[`swap-${dir}`] = () => this._swapDir(dir);
+        }
         for (const key of KEYS)
             Main.wm.addKeybinding(`shortcut-${key}`, this._settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.NORMAL, handlers[key]);
+        this._exportDBus();
         this._schedule();
     }
 
     disable() {
+        this._unexportDBus();
+        this._closeSwitcher?.();
         for (const key of KEYS)
             Main.wm.removeKeybinding(`shortcut-${key}`);
         for (const [source, id] of this._signals)
@@ -93,6 +124,8 @@ export default class Tile extends Extension {
         this._stopGhost();
         this._ratios = this._weights = this._shape = null;
         this._placed = null;
+        this._map = null;
+        this._rules = null;
         this._settings = null;
     }
 
@@ -111,8 +144,18 @@ export default class Tile extends Extension {
         // allows_move()/allows_resize() are false while a window is maximized: a window that can be resized at all is meant
         if (!win.resizeable || (!isMaximized(win) && (!win.allows_move() || !win.allows_resize())))
             return false;
-        const klass = win.get_wm_class_instance() ?? win.get_wm_class() ?? win.get_gtk_application_id?.();
-        return !(klass && this._settings.get_strv('floating-apps').includes(klass));
+        const rule = matchRule(this._rules, this._classes(win));
+        if (rule?.action === 'float')
+            return false;
+        if (rule?.action === 'tile')
+            return true;
+        const floating = this._settings.get_strv('floating-apps');
+        return !this._classes(win).some(c => c && floating.includes(c));
+    }
+
+    /** The names a window is known by: the X11 instance, the class (the Wayland app id) and the desktop id. */
+    _classes(win) {
+        return [win.get_wm_class_instance(), win.get_wm_class(), win.get_gtk_application_id?.()];
     }
 
     /** Takes in the windows that are new and lets go of the ones that are gone. */
@@ -131,6 +174,9 @@ export default class Tile extends Extension {
             if (this._order.includes(w) || !w.get_compositor_private())
                 continue;
             this._order.push(w);
+            const rule = matchRule(this._rules, this._classes(w));
+            if (rule?.workspace && rule.workspace <= global.workspace_manager.get_n_workspaces())
+                w.change_workspace_by_index(rule.workspace - 1, false);
             const ids = [w.connect('workspace-changed', () => this._schedule())];
             // maximizing or full screen takes a window out of the tiling and back: looked at when its size changes
             ids.push(w.connect('size-changed', () => {
@@ -155,6 +201,7 @@ export default class Tile extends Extension {
             this._retileId = 0;
             try {
                 this._retile();
+                this._stateChanged();
             } catch (e) {
                 console.warn(`Tile: ${e.message}`);
             }
@@ -170,8 +217,8 @@ export default class Tile extends Extension {
             return;
         const workspace = global.workspace_manager.get_active_workspace();
         const focus = global.display.focus_window;
-        const layout = this._settings.get_string('layout');
         for (let monitor = 0; monitor < global.display.get_n_monitors(); monitor++) {
+            const layout = this._layoutAt(monitor);
             const windows = this._order.filter(w => this._eligible(w) && w.get_workspace() === workspace && w.get_monitor() === monitor);
             if (!windows.length)
                 continue;
@@ -252,9 +299,15 @@ export default class Tile extends Extension {
         return this._order.filter(w => w !== except && this._eligible(w) && w.get_workspace() === workspace && w.get_monitor() === monitor);
     }
 
+    /** The layout of a monitor on the active workspace: the workspace's own, else the monitor's, else the general one. */
+    _layoutAt(monitor) {
+        const workspace = global.workspace_manager.get_active_workspace_index();
+        return resolveLayout(this._map, workspace, monitor, this._settings.get_string('layout'));
+    }
+
     _options(focus = 0, monitor = -1, count = 0) {
         // what resizing made belongs to one layout and one number of windows on a monitor: another, and it starts over
-        const key = `${this._settings.get_string('layout')}:${count}`;
+        const key = `${this._layoutAt(monitor)}:${count}`;
         const mine = this._shape.get(monitor) === key;
         return {
             gapInner: this._settings.get_int('gap-inner'),
@@ -314,7 +367,7 @@ export default class Tile extends Extension {
         const monitor = this._monitorAt(x, y);
         const others = this._tiledOn(monitor, win);
         const area = Main.layoutManager.getWorkAreaForMonitor(monitor);
-        const rects = arrange(this._settings.get_string('layout'), others.length + 1, {x: area.x, y: area.y, width: area.width, height: area.height}, this._options(0, -1, others.length + 1));
+        const rects = arrange(this._layoutAt(monitor), others.length + 1, {x: area.x, y: area.y, width: area.width, height: area.height}, this._options(0, -1, others.length + 1));
         const shown = rects.filter(r => !r.hidden);
         const index = this._cellAt(shown, x, y);
         this._ghostCell = {monitor, index};
@@ -348,7 +401,7 @@ export default class Tile extends Extension {
         const n = windows.length;
         if (i < 0)
             return;
-        const layout = this._settings.get_string('layout');
+        const layout = this._layoutAt(monitor);
         const area = Main.layoutManager.getWorkAreaForMonitor(monitor);
         const opts = this._options(0, monitor, n);
         const a = inner({x: area.x, y: area.y, width: area.width, height: area.height}, opts.gapOuter);
@@ -431,11 +484,159 @@ export default class Tile extends Extension {
             this._order.push(win);
     }
 
+    // ---- Directional focus and swap
+
+    /** The tiled window nearest in `direction` to the focused one, and the list it was found in. */
+    _neighborOf(direction) {
+        const win = global.display.focus_window;
+        if (!win || !this._eligible(win))
+            return null;
+        const windows = this._tiledOn(win.get_monitor());
+        const from = windows.indexOf(win);
+        if (from < 0)
+            return null;
+        const to = neighbor(windows.map(w => w.get_frame_rect()), from, direction);
+        return to < 0 ? null : {win, other: windows[to]};
+    }
+
+    _focusDir(direction) {
+        const found = this._neighborOf(direction);
+        if (found)
+            found.other.activate(global.get_current_time());
+    }
+
+    _swapDir(direction) {
+        const found = this._neighborOf(direction);
+        if (!found)
+            return;
+        const a = this._order.indexOf(found.win);
+        const b = this._order.indexOf(found.other);
+        [this._order[a], this._order[b]] = [found.other, found.win];
+        this._schedule();
+    }
+
+    _openSwitcher() { /* the layout switcher: see switcher.js */ }
+
+    // ---- What other programs see and ask (D-Bus: org.niro.Tile)
+
+    _exportDBus() {
+        try {
+            this._dbus = Gio.DBusExportedObject.wrapJSObject(DBUS_XML, this);
+            this._dbus.export(Gio.DBus.session, '/org/niro/Tile');
+            this._nameId = Gio.bus_own_name_on_connection(Gio.DBus.session, 'org.niro.Tile', Gio.BusNameOwnerFlags.NONE, null, null);
+        } catch (e) {
+            console.warn(`Tile: could not offer org.niro.Tile: ${e.message}`);
+            this._dbus = null;
+        }
+    }
+
+    _unexportDBus() {
+        if (this._nameId) {
+            Gio.bus_unown_name(this._nameId);
+            this._nameId = 0;
+        }
+        this._dbus?.unexport();
+        this._dbus = null;
+    }
+
+    ListLayouts() {
+        return JSON.stringify(LAYOUTS.map(([id, title, description]) => ({id, title, description})));
+    }
+
+    ApplyLayout(layout, workspace, monitor) {
+        return this.applyLayout(layout, {workspace: workspace >= 1 ? workspace - 1 : null, monitor: monitor >= 0 ? monitor : null});
+    }
+
+    ClearLayout(workspace, monitor) {
+        this.clearLayout({workspace: workspace >= 1 ? workspace - 1 : null, monitor: monitor >= 0 ? monitor : null});
+    }
+
+    SetEnabled(enabled) {
+        this._settings.set_boolean('enabled', enabled);
+    }
+
+    Retile() {
+        this._schedule();
+    }
+
+    /** Everything a program needs to know: the settings that matter, the workspaces, the monitors and the windows. Workspaces and windows count from 1. */
+    GetState() {
+        const workspaceManager = global.workspace_manager;
+        const active = workspaceManager.get_active_workspace_index();
+        const names = (() => {
+            try { return new Gio.Settings({schema_id: 'org.gnome.desktop.wm.preferences'}).get_strv('workspace-names'); } catch (_e) { return []; }
+        })();
+        const monitors = Main.layoutManager.monitors.map((m, index) => ({
+            index, x: m.x, y: m.y, width: m.width, height: m.height,
+            scale: global.display.get_monitor_scale(index), primary: index === global.display.get_primary_monitor(),
+            layout: this._layoutAt(index), tiled: this._tiledOn(index).length,
+        }));
+        const workspaces = [];
+        for (let i = 0; i < workspaceManager.get_n_workspaces(); i++) {
+            workspaces.push({
+                index: i + 1, name: names[i] ?? '', active: i === active,
+                layout: resolveLayout(this._map, i, global.display.get_primary_monitor(), this._settings.get_string('layout')),
+                windows: workspaceManager.get_workspace_by_index(i).list_windows().filter(w => w.window_type === Meta.WindowType.NORMAL && !w.skip_taskbar).length,
+            });
+        }
+        const windows = global.get_window_actors().map(a => a.meta_window).filter(w => w.window_type === Meta.WindowType.NORMAL && !w.skip_taskbar).map(w => {
+            const r = w.get_frame_rect();
+            return {
+                id: w.get_id(), title: w.get_title(), class: w.get_wm_class() ?? '', workspace: w.is_on_all_workspaces() ? 0 : w.get_workspace().index() + 1,
+                monitor: w.get_monitor(), tiled: this._order.includes(w) && this._eligible(w), floating: this._floating.has(w) || matchRule(this._rules, this._classes(w))?.action === 'float',
+                fullscreen: w.fullscreen, maximized: isMaximized(w), minimized: w.minimized, rect: {x: r.x, y: r.y, width: r.width, height: r.height},
+            };
+        });
+        return JSON.stringify({
+            version: 1, enabled: this._settings.get_boolean('enabled'), layout: this._settings.get_string('layout'), layoutMap: this._map,
+            rules: this._rules, gapInner: this._settings.get_int('gap-inner'), gapOuter: this._settings.get_int('gap-outer'),
+            masterFactor: this._settings.get_double('master-factor'), columnWidth: this._settings.get_double('column-width'),
+            animate: this._settings.get_boolean('animate'),
+            session: {type: Meta.is_wayland_compositor?.() ?? true ? 'wayland' : 'x11', shell: PACKAGE_VERSION},
+            monitors, workspaces, windows,
+        });
+    }
+
+    _stateChanged() {
+        try {
+            this._dbus?.emit_signal('StateChanged', null);
+        } catch (_e) { /* nobody listens */ }
+    }
+
     // ---- Shortcuts
 
+    /** The next layout in the list, for what the active workspace takes its layout from: itself, its monitor, or the general setting. */
     _nextLayout() {
-        const i = LAYOUT_IDS.indexOf(this._settings.get_string('layout'));
-        this._settings.set_string('layout', LAYOUT_IDS[(i + 1) % LAYOUT_IDS.length]);
+        const monitor = global.display.focus_window?.get_monitor() ?? global.display.get_primary_monitor();
+        const current = this._layoutAt(monitor);
+        const next = LAYOUT_IDS[(LAYOUT_IDS.indexOf(current) + 1) % LAYOUT_IDS.length];
+        const workspace = global.workspace_manager.get_active_workspace_index();
+        if (this._map.workspaces[String(workspace + 1)])
+            this.applyLayout(next, {workspace});
+        else if (this._map.monitors[String(monitor)])
+            this.applyLayout(next, {monitor});
+        else
+            this.applyLayout(next, {});
+        this._osd(LAYOUTS.find(l => l[0] === next)[1]);
+    }
+
+    /**
+     * Gives a workspace (from 0), a monitor, or neither (the general layout) a layout. False for a layout that is not one.
+     * Nothing is moved here: the setting changes and the tiling follows it, as for any other way of changing it.
+     */
+    applyLayout(layout, {workspace = null, monitor = null} = {}) {
+        if (!LAYOUT_IDS.includes(layout) || !this._settings)
+            return false;
+        if ((workspace === null || workspace < 0) && (monitor === null || monitor < 0)) {
+            this._settings.set_string('layout', layout);
+        } else {
+            this._settings.set_string('layout-map', JSON.stringify(withLayout(this._map, layout, {workspace, monitor})));
+        }
+        return true;
+    }
+
+    clearLayout({workspace = null, monitor = null} = {}) {
+        this._settings.set_string('layout-map', JSON.stringify(withoutLayout(this._map, {workspace, monitor})));
     }
 
     _promote() {
@@ -466,7 +667,8 @@ export default class Tile extends Extension {
     }
 
     _layoutTitle() {
-        return LAYOUTS.find(l => l[0] === this._settings.get_string('layout'))?.[1] ?? '';
+        const monitor = global.display.focus_window?.get_monitor() ?? global.display.get_primary_monitor();
+        return LAYOUTS.find(l => l[0] === this._layoutAt(monitor))?.[1] ?? '';
     }
 
     _osd(text) {

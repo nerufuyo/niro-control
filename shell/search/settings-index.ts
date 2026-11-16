@@ -1771,5 +1771,95 @@ export const INDEX = [
   "key": "shortcut-shrink",
   "kind": "shortcut",
   "managed": false
+ },
+ {
+  "id": "tile.shortcut-switcher",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Layout switcher",
+  "help": "Opens the list of layouts: type to search, arrows and Enter, or click, to apply one to this workspace.",
+  "key": "shortcut-switcher",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-focus-left",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Focus the window on the left",
+  "help": "Moves the focus to the tiled window nearest on the left.",
+  "key": "shortcut-focus-left",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-focus-right",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Focus the window on the right",
+  "help": "Moves the focus to the tiled window nearest on the right.",
+  "key": "shortcut-focus-right",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-focus-up",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Focus the window above",
+  "help": "Moves the focus to the tiled window nearest above.",
+  "key": "shortcut-focus-up",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-focus-down",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Focus the window below",
+  "help": "Moves the focus to the tiled window nearest below.",
+  "key": "shortcut-focus-down",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-swap-left",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Swap with the window on the left",
+  "help": "Trades places with the tiled window nearest on the left.",
+  "key": "shortcut-swap-left",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-swap-right",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Swap with the window on the right",
+  "help": "Trades places with the tiled window nearest on the right.",
+  "key": "shortcut-swap-right",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-swap-up",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Swap with the window above",
+  "help": "Trades places with the tiled window nearest above.",
+  "key": "shortcut-swap-up",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-swap-down",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Swap with the window below",
+  "help": "Trades places with the tiled window nearest below.",
+  "key": "shortcut-swap-down",
+  "kind": "shortcut",
+  "managed": false
  }
 ] as unknown as Item[];

@@ -47,6 +47,16 @@
       <summary>Width of a column in Scrolling</summary>
       <description>The share of the screen one column takes in the Scrolling layout (0.2-1).</description>
     </key>
+    <key name="layout-map" type="s">
+      <default>'{}'</default>
+      <summary>Layouts of workspaces and monitors</summary>
+      <description>JSON: {"workspaces": {"2": "grid"}, "monitors": {"1": "master-left"}}. A workspace's own layout wins over its monitor's, which wins over Layout. Set it from the panel or `niro-tile apply`.</description>
+    </key>
+    <key name="window-rules" type="s">
+      <default>'[]'</default>
+      <summary>Rules for applications</summary>
+      <description>JSON list: {"match": "org.gnome.Calculator", "action": "float"} keeps an app out of the tiling, "tile" tiles it anyway, {"match": "firefox", "workspace": 2} sends its windows to workspace 2 when they open.</description>
+    </key>
     <key name="animate" type="b">
       <default>true</default>
       <summary>Slide windows into their tiles</summary>
@@ -86,6 +96,51 @@
       <default>["&lt;Super&gt;&lt;Alt&gt;minus"]</default>
       <summary>Smaller main window</summary>
       <description>Makes the main window of the Master layouts smaller.</description>
+    </key>
+    <key name="shortcut-switcher" type="as">
+      <default>["&lt;Super&gt;&lt;Alt&gt;space"]</default>
+      <summary>Layout switcher</summary>
+      <description>Opens the list of layouts: type to search, arrows and Enter, or click, to apply one to this workspace.</description>
+    </key>
+    <key name="shortcut-focus-left" type="as">
+      <default>["&lt;Super&gt;&lt;Control&gt;Left"]</default>
+      <summary>Focus the window on the left</summary>
+      <description>Moves the focus to the tiled window nearest on the left.</description>
+    </key>
+    <key name="shortcut-focus-right" type="as">
+      <default>["&lt;Super&gt;&lt;Control&gt;Right"]</default>
+      <summary>Focus the window on the right</summary>
+      <description>Moves the focus to the tiled window nearest on the right.</description>
+    </key>
+    <key name="shortcut-focus-up" type="as">
+      <default>["&lt;Super&gt;&lt;Control&gt;Up"]</default>
+      <summary>Focus the window above</summary>
+      <description>Moves the focus to the tiled window nearest above.</description>
+    </key>
+    <key name="shortcut-focus-down" type="as">
+      <default>["&lt;Super&gt;&lt;Control&gt;Down"]</default>
+      <summary>Focus the window below</summary>
+      <description>Moves the focus to the tiled window nearest below.</description>
+    </key>
+    <key name="shortcut-swap-left" type="as">
+      <default>["&lt;Super&gt;&lt;Control&gt;&lt;Shift&gt;Left"]</default>
+      <summary>Swap with the window on the left</summary>
+      <description>Trades places with the tiled window nearest on the left.</description>
+    </key>
+    <key name="shortcut-swap-right" type="as">
+      <default>["&lt;Super&gt;&lt;Control&gt;&lt;Shift&gt;Right"]</default>
+      <summary>Swap with the window on the right</summary>
+      <description>Trades places with the tiled window nearest on the right.</description>
+    </key>
+    <key name="shortcut-swap-up" type="as">
+      <default>["&lt;Super&gt;&lt;Control&gt;&lt;Shift&gt;Up"]</default>
+      <summary>Swap with the window above</summary>
+      <description>Trades places with the tiled window nearest above.</description>
+    </key>
+    <key name="shortcut-swap-down" type="as">
+      <default>["&lt;Super&gt;&lt;Control&gt;&lt;Shift&gt;Down"]</default>
+      <summary>Swap with the window below</summary>
+      <description>Trades places with the tiled window nearest below.</description>
     </key>
   </schema>
 </schemalist>
