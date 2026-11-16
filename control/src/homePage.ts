@@ -13,7 +13,7 @@ import {validateDependencies} from './profileLogic.js';
 const POSITIONS = ['Bottom', 'Left', 'Right', 'Top'];
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const PARTS = [['Island', 'island@niro.local'], ['Dock', 'dock@niro.local'], ['Search', 'search@niro.local'], ['Window blur', 'blur@niro.local'],
-    ['Rounded corners', 'corners@niro.local'], ['Emoji', 'emoji@niro.local'], ['Emulator', 'emulator@niro.local']];
+    ['Rounded corners', 'corners@niro.local'], ['Emoji', 'emoji@niro.local'], ['Emulator', 'emulator@niro.local'], ['Tile', 'tile@niro.local']];
 
 /** Whether a name has an owner on the session bus (the island's programs are separate from its extension). */
 export function busNameOwned(name: string): boolean {

@@ -1631,5 +1631,135 @@ export const INDEX = [
   "key": "focused-shadow",
   "kind": "dict",
   "managed": false
+ },
+ {
+  "id": "tile.enabled",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Tile the windows",
+  "help": "Windows on a monitor are arranged by the chosen layout, none over another.",
+  "key": "enabled",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "tile.layout",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Layout",
+  "help": "How the windows are arranged: Dwindle (splits again and again), Master left/right, Center master, Grid, Three columns, Horizontal or Vertical split,…",
+  "key": "layout",
+  "kind": "select",
+  "managed": false
+ },
+ {
+  "id": "tile.gap-inner",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Gap between windows",
+  "help": "Space between tiled windows, in pixels (0-40).",
+  "key": "gap-inner",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "tile.gap-outer",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Gap to the screen edge",
+  "help": "Space between the tiles and the edge of the work area, in pixels (0-60).",
+  "key": "gap-outer",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "tile.master-factor",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Size of the main window",
+  "help": "The share of the screen the main window takes in the Master layouts (0.1-0.9).",
+  "key": "master-factor",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "tile.column-width",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Width of a column in Scrolling",
+  "help": "The share of the screen one column takes in the Scrolling layout (0.2-1).",
+  "key": "column-width",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "tile.floating-apps",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Applications never tiled",
+  "help": "Window classes (the app id, like org.gnome.Calculator) that stay as they are: calculators, pickers and the like.",
+  "key": "floating-apps",
+  "kind": "list",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-toggle",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Tiling on or off",
+  "help": "Turns the tiling of windows on and off.",
+  "key": "shortcut-toggle",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-layout",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Next layout",
+  "help": "Goes to the next layout in the list.",
+  "key": "shortcut-layout",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-promote",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Make the window the main one",
+  "help": "Moves the focused window to the first place: the main window of the Master layouts.",
+  "key": "shortcut-promote",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-float",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Float or tile the window",
+  "help": "Takes the focused window out of the tiling, or puts it back.",
+  "key": "shortcut-float",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-grow",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Bigger main window",
+  "help": "Makes the main window of the Master layouts bigger.",
+  "key": "shortcut-grow",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "tile.shortcut-shrink",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Smaller main window",
+  "help": "Makes the main window of the Master layouts smaller.",
+  "key": "shortcut-shrink",
+  "kind": "shortcut",
+  "managed": false
  }
 ] as unknown as Item[];

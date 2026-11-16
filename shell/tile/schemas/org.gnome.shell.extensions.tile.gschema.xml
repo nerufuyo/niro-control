@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.tile" path="/org/gnome/shell/extensions/tile/">
+    <key name="enabled" type="b">
+      <default>false</default>
+      <summary>Tile the windows</summary>
+      <description>Windows on a monitor are arranged by the chosen layout, none over another. Off: windows are left where they are. Dialogs, full-screen and maximized windows are never tiled.</description>
+    </key>
+    <key name="layout" type="s">
+      <choices>
+        <choice value="dwindle"/>
+        <choice value="master-left"/>
+        <choice value="master-right"/>
+        <choice value="center-master"/>
+        <choice value="grid"/>
+        <choice value="three-columns"/>
+        <choice value="horizontal"/>
+        <choice value="vertical"/>
+        <choice value="scrolling"/>
+        <choice value="monocle"/>
+      </choices>
+      <default>'dwindle'</default>
+      <summary>Layout</summary>
+      <description>How the windows are arranged: Dwindle (splits again and again), Master left/right, Center master, Grid, Three columns, Horizontal or Vertical split, Scrolling, Monocle.</description>
+    </key>
+    <key name="gap-inner" type="i">
+      <range min="0" max="40"/>
+      <default>8</default>
+      <summary>Gap between windows</summary>
+      <description>Space between tiled windows, in pixels (0-40).</description>
+    </key>
+    <key name="gap-outer" type="i">
+      <range min="0" max="60"/>
+      <default>8</default>
+      <summary>Gap to the screen edge</summary>
+      <description>Space between the tiles and the edge of the work area, in pixels (0-60).</description>
+    </key>
+    <key name="master-factor" type="d">
+      <range min="0.1" max="0.9"/>
+      <default>0.55</default>
+      <summary>Size of the main window</summary>
+      <description>The share of the screen the main window takes in the Master layouts (0.1-0.9).</description>
+    </key>
+    <key name="column-width" type="d">
+      <range min="0.2" max="1.0"/>
+      <default>0.5</default>
+      <summary>Width of a column in Scrolling</summary>
+      <description>The share of the screen one column takes in the Scrolling layout (0.2-1).</description>
+    </key>
+    <key name="floating-apps" type="as">
+      <default>[]</default>
+      <summary>Applications never tiled</summary>
+      <description>Window classes (the app id, like org.gnome.Calculator) that stay as they are: calculators, pickers and the like.</description>
+    </key>
+    <key name="shortcut-toggle" type="as">
+      <default>["&lt;Super&gt;&lt;Alt&gt;t"]</default>
+      <summary>Tiling on or off</summary>
+      <description>Turns the tiling of windows on and off.</description>
+    </key>
+    <key name="shortcut-layout" type="as">
+      <default>["&lt;Super&gt;&lt;Alt&gt;l"]</default>
+      <summary>Next layout</summary>
+      <description>Goes to the next layout in the list.</description>
+    </key>
+    <key name="shortcut-promote" type="as">
+      <default>["&lt;Super&gt;&lt;Alt&gt;Return"]</default>
+      <summary>Make the window the main one</summary>
+      <description>Moves the focused window to the first place: the main window of the Master layouts.</description>
+    </key>
+    <key name="shortcut-float" type="as">
+      <default>["&lt;Super&gt;&lt;Alt&gt;f"]</default>
+      <summary>Float or tile the window</summary>
+      <description>Takes the focused window out of the tiling, or puts it back.</description>
+    </key>
+    <key name="shortcut-grow" type="as">
+      <default>["&lt;Super&gt;&lt;Alt&gt;equal"]</default>
+      <summary>Bigger main window</summary>
+      <description>Makes the main window of the Master layouts bigger.</description>
+    </key>
+    <key name="shortcut-shrink" type="as">
+      <default>["&lt;Super&gt;&lt;Alt&gt;minus"]</default>
+      <summary>Smaller main window</summary>
+      <description>Makes the main window of the Master layouts smaller.</description>
+    </key>
+  </schema>
+</schemalist>

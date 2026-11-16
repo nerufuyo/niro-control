@@ -3,7 +3,7 @@
 set -e
 cd "$(dirname "$0")/../.."
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
-for d in control shell/island/schemas shell/dock/schemas shell/blur/schemas shell/corners/schemas; do
+for d in control shell/island/schemas shell/dock/schemas shell/blur/schemas shell/corners/schemas shell/tile/schemas; do
   for f in $d/*.gschema.xml; do cp "$f" "$T/"; done
 done
 glib-compile-schemas "$T"

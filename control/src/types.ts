@@ -1,6 +1,6 @@
 // What the catalog says about one setting.
 export type Kind = 'switch' | 'slider' | 'stepper' | 'select' | 'text' | 'textarea' | 'shortcut' | 'shortcuts' | 'list' | 'color' | 'dict';
-export type Source = 'niro' | 'island' | 'dock' | 'blur' | 'corners';
+export type Source = 'niro' | 'island' | 'dock' | 'blur' | 'corners' | 'tile';
 
 export interface Item {
     id: string;

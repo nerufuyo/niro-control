@@ -15,13 +15,13 @@ has() { if [[ "$2" == *"$3"* ]]; then echo "ok   $1"; else echo "FAIL $1: [$2] l
 timeout 150 dbus-run-session -- bash -c '
 gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-test --virtual-monitor 1280x720 > '"$LOG"' 2>&1 & SP=$!
 sleep 22
-[ -n "${NIRO_EXT_ROOT:-}" ] && { for e in island dock search blur corners emoji emulator; do gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "Main.extensionManager.enableExtension(\"$e@niro.local\")" >/dev/null 2>&1; done; sleep 10; }
+[ -n "${NIRO_EXT_ROOT:-}" ] && { for e in island dock search blur corners emoji emulator tile; do gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "Main.extensionManager.enableExtension(\"$e@niro.local\")" >/dev/null 2>&1; done; sleep 10; }
 export DAEMON='"$DAEMON"'
 eval_js() { gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "$1" 2>&1; }
 call() { gdbus call --session --dest org.niro.Search --object-path /org/niro/Search --method org.niro.Search."$@" 2>&1; }
 O="Main.extensionManager.lookup(\"search@niro.local\").stateObj"
 {
-echo "STATE $(for e in island dock search blur corners emoji emulator; do echo -n "$e=$(gnome-extensions info $e@niro.local 2>&1 | grep State | tr -d " ") "; done)"
+echo "STATE $(for e in island dock search blur corners emoji emulator tile; do echo -n "$e=$(gnome-extensions info $e@niro.local 2>&1 | grep State | tr -d " ") "; done)"
 echo "ACTIONS $(call ListActions | grep -o "\"id\":\"[a-z.-]*\"" | wc -l)"
 echo "NOHANDLER $(call ListActions | grep -c "\"run\":")"
 echo "AVAIL $(call Availability profile.apply | grep -o "available\":[a-z]*")"
@@ -59,7 +59,7 @@ echo "HISTORY $(call History 50 | grep -o "\"caller\":\"[a-z-]*\"" | sort -u | t
 kill $SP; wait $SP 2>/dev/null' > /tmp/niro_headless.out 2>&1
 
 OUT=$(grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)" /tmp/niro_headless.out)
-has "all seven extensions active" "$OUT" "island=State:ACTIVE dock=State:ACTIVE search=State:ACTIVE blur=State:ACTIVE corners=State:ACTIVE emoji=State:ACTIVE emulator=State:ACTIVE"
+has "all eight extensions active" "$OUT" "island=State:ACTIVE dock=State:ACTIVE search=State:ACTIVE blur=State:ACTIVE corners=State:ACTIVE emoji=State:ACTIVE emulator=State:ACTIVE tile=State:ACTIVE"
 has "twelve actions listed" "$OUT" "ACTIONS 12"
 has "no handlers exposed" "$OUT" "NOHANDLER 0"
 has "availability answers" "$OUT" 'available":true'

@@ -1,7 +1,7 @@
 #!/bin/bash
 # niro-doctor: is Niro Control loaded in this session, and if not, load it.
 #
-#   niro-doctor              report: package, the seven extensions, the daemon, the icon, the dock's pin
+#   niro-doctor              report: package, the eight extensions, the daemon, the icon, the dock's pin
 #   niro-doctor --relogin    report; if the shell has not loaded Niro yet, log out (after a countdown) and,
 #                            once you are back, check by itself and tell you in a notification
 #   niro-doctor --relogin --yes     the same without the countdown
@@ -12,7 +12,7 @@
 #
 # GNOME Shell on Wayland reads its extensions only at login, so a new install needs one login. That is all this does for you.
 set -u
-EXTS=(island dock search blur corners emoji emulator)
+EXTS=(island dock search blur corners emoji emulator tile)
 STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niro"; LOG="$STATE_DIR/doctor.log"
 AUTOSTART="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/niro-verify.desktop"
 RELOGIN=0; YES=0; DRY=0; AFTER=0; PIN=0; FORCE=0; GDM=1

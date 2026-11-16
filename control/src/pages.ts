@@ -380,7 +380,8 @@ export function windowsPage(model: Model) {
     const items = CATALOG.filter(i => i.menu === 'Windows');
     return page(previewBlock(model, windowsPreview(model.read)),
         model.section('Window Blur', items.filter(i => i.group === 'Window Blur'), 'Opacity and blur are set once, in Look'),
-        model.section('Rounded Corners', items.filter(i => i.group === 'Rounded Corners')));
+        model.section('Rounded Corners', items.filter(i => i.group === 'Rounded Corners')),
+        model.section('Tiling', items.filter(i => i.group === 'Tiling'), 'Arranges the windows of each monitor in Hyprland-style layouts. Off until you switch it on.'));
 }
 
 export function searchPage(model: Model) {
@@ -394,7 +395,7 @@ export function aboutPage(model: Model) {
     try { version = new TextDecoder().decode(GLib.file_get_contents('/usr/share/niro-control/VERSION')[1]).trim(); } catch (_e) { /* not installed */ }
     const group = new Adw.PreferencesGroup({title: 'Niro Control', description: `Version ${version}`});
     const parts = [['Island', 'island@niro.local'], ['Dock', 'dock@niro.local'], ['Search', 'search@niro.local'], ['Window blur', 'blur@niro.local'],
-        ['Rounded corners', 'corners@niro.local'], ['Emoji', 'emoji@niro.local'], ['Emulator', 'emulator@niro.local']];
+        ['Rounded corners', 'corners@niro.local'], ['Emoji', 'emoji@niro.local'], ['Emulator', 'emulator@niro.local'], ['Tile', 'tile@niro.local']];
     const installed = uuid => GLib.file_test(`/usr/share/gnome-shell/extensions/${uuid}`, GLib.FileTest.IS_DIR);
     const parts_group = new Adw.PreferencesGroup({title: 'Parts'});
     for (const [name, uuid] of parts) {
