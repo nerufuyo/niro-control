@@ -41,6 +41,8 @@ export class DockManager {
   private _fsForced = false;
   /** Whether this dock holds back X11's unredirection of a full-screen window, so its edge can show over it. */
   private _scanoutInhibited = false;
+  /** The dock is on screen or sliding (told by DockVisibility). */
+  private _dockActive = false;
   /** The system docks this one turned off, to turn on again when it goes (see `_syncSystemDocks`). */
   private _disabledDocks: string[] = [];
   private _systemDocksSourceId: number | null = null;
@@ -402,9 +404,14 @@ export class DockManager {
     for (const uuid of this._disabledDocks.splice(0)) Main.extensionManager.enableExtension(uuid);
   }
 
-  /** On X11 a full-screen window goes straight to the screen, past the dock's edge: while one has the display, it is held back. */
+  /**
+   * A full-screen window goes straight to the screen (X11's unredirection, Wayland's direct scanout), past what is drawn over it:
+   * while the dock is up over one it is held back, so the dock shows. On X11 also for the whole time the edge is wanted: the
+   * stage must be on top of the window to feel the pointer at the edge. Not otherwise: it costs a full-screen video or game
+   * its direct path.
+   */
   private _syncScanout(): void {
-    const want = this._fsForced && !isWayland();
+    const want = this._fsForced && (this._dockActive || !isWayland());
     if (want === this._scanoutInhibited) return;
     this._scanoutInhibited = want;
     inhibitScanout(want);
@@ -573,6 +580,10 @@ export class DockManager {
     }
     // Must set dock rect AFTER creating intellihide so it can detect overlap.
     this._updatePosition();
+    this._visibility.setOnActiveChanged((active) => {
+      this._dockActive = active;
+      this._syncScanout();
+    });
     this._visibility.start();
     this._visibility.setFullEdge(this._fsForced);
     if (this._overviewHidden) this._visibility.setOverviewHidden(true);

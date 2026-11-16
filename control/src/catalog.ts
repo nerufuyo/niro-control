@@ -1287,6 +1287,20 @@ export const CATALOG: Item[] = [
   "kind": "shortcut"
  },
  {
+  "id": "island.shortcut-controls",
+  "menu": "Island",
+  "group": "Shortcuts",
+  "title": "Shortcut to the Controls page",
+  "help": "Opens the island on the Controls page (volume, brightness, Bluetooth, Wi-Fi, power mode and more) from anywhere, holding the keyboard; pressed again,…",
+  "detail": "Opens the island on the Controls page (volume, brightness, Bluetooth, Wi-Fi, power mode and more) from anywhere, holding the keyboard; pressed again, it closes.",
+  "source": "island",
+  "key": "shortcut-controls",
+  "type": "as",
+  "default": "['<Super><Alt>k']",
+  "unit": "",
+  "kind": "shortcut"
+ },
+ {
   "id": "island.shortcut-system",
   "menu": "Island",
   "group": "Shortcuts",

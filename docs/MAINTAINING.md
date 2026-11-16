@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 157 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 158 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -144,7 +144,7 @@ The dock and the closed island step out of the Overview: the dock slides off its
 
 GNOME hides chrome under a full-screen window and gives it no way back; both parts leave that rule on their own terms (setting `fullscreen-reveal`, on by default, in the island's and the dock's schemas).
 
-- **Dock:** auto-hides there whatever its setting; the whole bottom (or side) edge of the screen brings it back, not only the stretch in front of it (`DockManager._syncFullscreen`, `DockVisibility.setFullEdge`). `DockVisibility` polls the pointer while it is up, as no motion event reaches the stage over a full-screen window.
+- **Dock:** auto-hides there whatever its setting; the whole bottom (or side) edge of the screen brings it back, not only the stretch in front of it (`DockManager._syncFullscreen`, `DockVisibility.setFullEdge`). `DockVisibility` polls the pointer while it is up, as no motion event reaches the stage over a full-screen window. A full-screen window may be sent straight to the screen (Wayland's direct scanout, X11's unredirection), past what is drawn over it: while the dock is up over one, `DockManager._syncScanout` holds that back (`inhibitScanout`, counted and paired with the dock's `setOnActiveChanged`), and not otherwise, so a video or game keeps its direct path. This only shows on real graphics hardware; the headless shell has no scanout, so the test counts the calls.
 - **Island:** a strip along the whole top edge (`Controller._syncFullscreenReveal`) brings it in; it stays while the pointer is parked at the top edge anywhere, over it, or while it is open. (A strip as wide as the island once flickered: the island went, the strip came back under the still pointer and brought the island again.) The same works from the keyboard: the shortcuts for the clipboard/calendar pages and for the voice assistant bring it in too.
 - **What shows over a full-screen app** is the island setting `fullscreen-alerts`: `all` (the default: notifications, music, calls, timers, volume...), `important` (notifications, calls, timers, reminders, meetings, questions from AIs; `_fullscreenImportant`), or `off` (everything waits until the app leaves full screen). What waits is shown when it does. The old `alerts-over-fullscreen` is deprecated and not read.
 
@@ -165,3 +165,7 @@ Size: `icon-size` (slider, 16-128), `icon-spacing` and `dock-padding`; the dock'
 ## No top bar (the island alone)
 
 With the island on, GNOME's own top bar is taken away (island setting `hide-top-bar`, on by default; `shell/island/src/barHider.ts`): windows use the whole screen and the island stands alone at the top (`docs/images/island-active.png`). The bar is slid off the screen, not hidden, so its buttons still have a place: Quick Settings on Super+S, the calendar and other extensions' menus open as before. GNOME reserves the bar's room in the work area from its position and size without asking whether it is shown (`LayoutManager._updateRegions`), so the bar is also taken out of the struts (`trackChrome` with `affectsStruts: false`) and put back as it was. In the island's code `_barHidden` is false for a bar this setting took away, so the auto-hide mode "top-bar" does not hide the island for it.
+
+## Controls page (the island's quick settings)
+
+The island's Controls page (`shell/island/src/pages/controls.ts`, shortcut Super+Alt+K) sets what one reaches for in GNOME's Quick Settings: volume and the microphone (sliders and mute), the screen's brightness, Bluetooth (power, and the paired devices to connect and disconnect), Wi-Fi (power, networks), the sound outputs and inputs, power mode, Do Not Disturb, Night Light, dark style and airplane mode. Four views under small tabs: Quick, Bluetooth, Wi-Fi, Sound. What the computer does not have (no backlight on a desktop, no Wi-Fi, no Bluetooth) is not shown. The services are in `systemControls.ts` and use what GNOME uses, so both always agree: the shell's mixer (`audio.ts`, now with the default input), `Main.brightnessManager` (GNOME 48+) or the settings daemon, GnomeBluetooth, nmcli for NetworkManager, power-profiles-daemon over D-Bus, rfkill. Secured Wi-Fi networks NetworkManager does not know yet open GNOME's own Wi-Fi settings for the password. Not run on real hardware here: brightness (the test computer is a desktop with no backlight) and Wi-Fi (none).

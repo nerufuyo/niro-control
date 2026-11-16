@@ -753,6 +753,16 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "island.shortcut-controls",
+  "menu": "Island",
+  "group": "Shortcuts",
+  "title": "Shortcut to the Controls page",
+  "help": "Opens the island on the Controls page (volume, brightness, Bluetooth, Wi-Fi, power mode and more) from anywhere, holding the keyboard; pressed again,…",
+  "key": "shortcut-controls",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
   "id": "island.shortcut-system",
   "menu": "Island",
   "group": "Shortcuts",

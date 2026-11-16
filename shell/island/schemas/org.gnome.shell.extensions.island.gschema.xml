@@ -367,6 +367,11 @@
       <summary>Shortcut to the Power page</summary>
       <description>Opens the island on the Power page (lock, sleep, log out, restart, shut down) from anywhere, holding the keyboard; pressed again, it closes.</description>
     </key>
+    <key name="shortcut-controls" type="as">
+      <default>['&lt;Super&gt;&lt;Alt&gt;k']</default>
+      <summary>Shortcut to the Controls page</summary>
+      <description>Opens the island on the Controls page (volume, brightness, Bluetooth, Wi-Fi, power mode and more) from anywhere, holding the keyboard; pressed again, it closes.</description>
+    </key>
     <key name="shortcut-system" type="as">
       <default>['&lt;Super&gt;&lt;Alt&gt;i']</default>
       <summary>Shortcut to the System page</summary>

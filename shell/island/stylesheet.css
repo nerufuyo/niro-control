@@ -1753,3 +1753,21 @@
 .island-power-action, .island-power-switch { text-align: center; }
 .island-power-danger { color: #E8472B; }
 .island-power-on { background-color: #E8472B; color: #ffffff; }
+
+/* Controls page: sliders, switches, Bluetooth, Wi-Fi and sound lists */
+.island-controls-tabs { spacing: 6px; padding: 0 0 6px 0; }
+.island-controls-tab { padding: 2px 12px; }
+.island-controls-sliders { spacing: 16px; }
+.island-controls-column { spacing: 4px; }
+.island-controls-slider-row { spacing: 8px; }
+.island-controls-icon { padding: 4px; }
+.island-controls-pills { padding: 6px 0 0 0; spacing: 6px; }
+.island-controls-view { spacing: 6px; }
+.island-controls-sound { spacing: 16px; }
+.island-controls-list { min-height: 56px; }
+.island-controls-row { padding: 4px 10px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.08); margin-bottom: 3px; }
+.island-controls-row:hover, .island-controls-row:focus { background-color: rgba(255, 255, 255, 0.16); }
+.island-controls-row.island-power-on { background-color: #E8472B; color: #ffffff; }
+.island-controls-row-text { font-size: 13px; font-weight: 600; }
+.island-controls-row-detail { font-size: 11px; color: rgba(255, 255, 255, 0.7); padding-left: 8px; }
+.island-controls-empty { font-size: 12px; color: rgba(255, 255, 255, 0.6); padding: 8px 0; }

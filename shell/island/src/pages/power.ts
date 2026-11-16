@@ -29,7 +29,7 @@ const SWITCHES = [
 ];
 
 /** Whether a radio of this rfkill type (bluetooth, wlan) is switched on; null when the PC has none. */
-function radioOn(type) {
+export function radioOn(type) {
     let found = false;
     for (let i = 0; i < 16; i++) {
         const dir = `/sys/class/rfkill/rfkill${i}`;

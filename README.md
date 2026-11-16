@@ -12,14 +12,14 @@ Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built by `ma
 
 | Part | What it does |
 |---|---|
-| **Island** | A notch on the top bar that opens into music with synced lyrics, calls, a focus timer, reminders, a clipboard and file shelf, calendar, notifications, system stats, power controls, AI plan usage, and a voice assistant. Alerts for volume, battery, Bluetooth, meetings and more. |
+| **Island** | A notch on the top bar that opens into music with synced lyrics, calls, a focus timer, quick controls (volume, brightness, Bluetooth, Wi-Fi, power mode…), reminders, a clipboard and file shelf, calendar, notifications, system stats, power controls, AI plan usage, and a voice assistant. Alerts for volume, battery, Bluetooth, meetings and more. |
 | **Dock** | A dock with icon magnification, window previews, genie minimise (a pinned app's window becomes a thumbnail at the dock's end as on macOS, an unpinned app's icon becomes its overview), running indicators, auto-hide (also over full-screen apps, brought back by the screen edge) four positions, and its size and icons your own: icon size, spacing and padding, any installed icon theme, tiles (rounded, circle, glass), muted or grey icons. |
 | **Search** | `Super+Space`: a command palette for applications, a calculator, unit conversion, open windows, every Niro setting, profiles, system actions (lock, Do Not Disturb, suspend, log out…) and the island's clipboard history. One typed action registry, also on D-Bus. |
 | **Window blur** | Frosted glass behind application windows, with one strength and opacity for everything. |
 | **Rounded corners** | Round corners and shadows for every window, including Chrome and Electron apps. |
 | **Emoji, Emulator** | An emoji picker; keeps the Android Emulator window on top. |
 | **Profiles** | Save the whole desktop as a profile and switch with one action: four built-ins (Everyday, Deep Work, Creative, Gaming), preview before applying, backups, rollback, import and export. |
-| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 157 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
+| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 158 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
 
 Opacity, blur, blur strength, accent and tint are set once, in **Look**, and the island, dock, search and windows follow.
 Light and dark appearance both work, and the panel adapts to narrow windows.
@@ -114,7 +114,7 @@ for how the parts talk to each other and where to change things.
 ## Status
 
 A personal desktop project, shared as it is. Tested on Ubuntu 24.04 (GNOME 46, Wayland, NVIDIA) and Fedora 45 (GNOME 51, Wayland):
-on Fedora, all seven extensions enable in a real headless GNOME Shell 51 and the 157 node and GJS tests pass.
+on Fedora, all seven extensions enable in a real headless GNOME Shell 51 and the 158 node and GJS tests pass.
 The Fedora `.rpm` has not yet been installed and used in a full session; `docs/UAT.md` is the checklist for that.
 The island's TypeScript still carries `// @ts-nocheck`: converted from JavaScript, to be typed file by file.
 

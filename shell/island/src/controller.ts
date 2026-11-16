@@ -50,6 +50,7 @@ import {TimerPage} from './pages/timer.js';
 import {UsagePage} from './pages/usage.js';
 import {SystemPage} from './pages/system.js';
 import {PowerPage} from './pages/power.js';
+import {ControlsPage} from './pages/controls.js';
 import {ReminderWatcher} from './reminders.js';
 import * as Theme from './theme.js';
 import {GREETING, InstalledApps, UNDO_MS, VoiceView, stopUnit, actionTypes, aiSettings, openSetUp, openSignIn, runActions, signInHint, stopPending, voiceContext} from './voice.js';
@@ -142,7 +143,7 @@ const PILL_HEADER_TOP = 8;
 /** The pages a shortcut of their own may open from anywhere (Settings → Shortcuts; `shortcut-<page>`, none set at
  * first: the usual ones are GNOME's). As prefs.js lists them. */
 const SHORTCUT_PAGES = ['music', 'notifications', 'focus', 'reminders', 'shelf', 'calendar', 'apps', 'devices',
-    'usage', 'system', 'power'];
+    'usage', 'controls', 'system', 'power'];
 
 /** A question back is shown this long before the island listens for the reply. */
 const VOICE_LISTEN_AGAIN_MS = 900;
@@ -449,6 +450,7 @@ export class Controller {
             () => new AppsPage(this._daemon, this._appUsage, size),
             () => new DevicesPage(this._daemon, size),
             () => new UsagePage(this._daemon, size),
+            () => new ControlsPage(this._daemon, this._audio, size),
             () => new SystemPage(this._daemon, size),
             () => new PowerPage(this._daemon, size),
         ];
