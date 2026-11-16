@@ -203,6 +203,16 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "island.hide-top-bar",
+  "menu": "Island",
+  "group": "Appearance and Behavior",
+  "title": "Take GNOME's top bar away",
+  "help": "With the island on, GNOME's own top bar is slid off the screen and no room is kept for it: windows use the whole screen and the island stands alone…",
+  "key": "hide-top-bar",
+  "kind": "switch",
+  "managed": false
+ },
+ {
   "id": "island.top-bar-style",
   "menu": "Island",
   "group": "Appearance and Behavior",

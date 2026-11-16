@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 156 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 157 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -161,3 +161,7 @@ Size: `icon-size` (slider, 16-128), `icon-spacing` and `dock-padding`; the dock'
 - **GNOME's own notification banners** are hidden while the island is on (island setting `gnome-banners` off, the default; `notifications.ts` keeps the tray's `bannerBlocked` set); the island shows the notification instead. `gnome-banners` on hands the banners back to GNOME.
 - **System docks:** with `hide-system-dock` on (default) the dock turns off Ubuntu Dock and Dash to Dock while it runs and turns them on again when it goes or the setting is off (`DockManager._syncSystemDocks`, deferred: the extension manager must not rewrite its list inside `enable()`). GNOME's own dash in the Overview is always hidden.
 - **X11** (GNOME 48 and older, Ubuntu's Xorg session): the island has its own paths (`isWayland()`: input region, screen sharing). A full-screen window on X11 goes straight to the screen, past the edge reveal, so both the island and the dock hold back unredirection (`inhibitScanout`) while a full-screen reveal is wanted. GNOME 49 and later have no X11 session, so none of this has been run on a real Xorg session: it follows Dash to Dock's approach and the island's earlier X11 code. Check it on Ubuntu 24.04 with `docs/UAT.md` under Xorg.
+
+## No top bar (the island alone)
+
+With the island on, GNOME's own top bar is taken away (island setting `hide-top-bar`, on by default; `shell/island/src/barHider.ts`): windows use the whole screen and the island stands alone at the top (`docs/images/island-active.png`). The bar is slid off the screen, not hidden, so its buttons still have a place: Quick Settings on Super+S, the calendar and other extensions' menus open as before. GNOME reserves the bar's room in the work area from its position and size without asking whether it is shown (`LayoutManager._updateRegions`), so the bar is also taken out of the struts (`trackChrome` with `affectsStruts: false`) and put back as it was. In the island's code `_barHidden` is false for a bar this setting took away, so the auto-hide mode "top-bar" does not hide the island for it.

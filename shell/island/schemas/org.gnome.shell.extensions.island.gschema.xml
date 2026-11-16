@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
   <schema id="org.gnome.shell.extensions.island" path="/org/gnome/shell/extensions/island/">
+    <key name="hide-top-bar" type="b">
+      <default>true</default>
+      <summary>Take GNOME's top bar away</summary>
+      <description>With the island on, GNOME's own top bar is slid off the screen and no room is kept for it: windows use the whole screen and the island stands alone at the top. Its buttons still answer to their shortcuts (Super+S for Quick Settings). Off: the bar stays as GNOME has it.</description>
+    </key>
     <key name="top-bar-style" type="s">
       <choices>
         <choice value="glass"/>

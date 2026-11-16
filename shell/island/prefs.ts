@@ -363,6 +363,8 @@ export default class IslandPreferences extends ExtensionPreferences {
             ['notch', 'Notch'],
             ['pill', 'Pill'],
         ]));
+        look.add(switchRow(settings, 'hide-top-bar', 'Take GNOME’s top bar away',
+            'The island stands alone at the top and windows use the whole screen; Super+S still opens Quick Settings'));
         look.add(topBarRow(settings, window));
         look.add(blackBesideWindowsRow(settings, window));
         look.add(switchRow(settings, 'compact-top-bar', 'Compact top bar', 'Smaller text and spacing in the top bar; slimmer too with the island below it'));

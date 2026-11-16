@@ -54,6 +54,7 @@ import {ReminderWatcher} from './reminders.js';
 import * as Theme from './theme.js';
 import {GREETING, InstalledApps, UNDO_MS, VoiceView, stopUnit, actionTypes, aiSettings, openSetUp, openSignIn, runActions, signInHint, stopPending, voiceContext} from './voice.js';
 import {autoHide, revealBand} from './visibilityRules.js';
+import {BarHider} from './barHider.js';
 import {TextWriter} from './writer.js';
 
 /** While the pointer rests before the island opens (Settings: hover-delay), it moves at most this far (CSS px). */
@@ -324,6 +325,8 @@ export class Controller {
     // The bar and the island appear together: the clock gives way to it in the same frame.
     _buildIsland() {
         this._topBar = new TopBar(this._settings);
+        // GNOME's own bar goes (setting `hide-top-bar`): the island stands alone at the top.
+        this._barHider = new BarHider(this._settings, () => this._syncAutoHide());
         this._shelf = this._expanded.pageNamed('shelf');
         this._shelfHelper = new ShelfHelper(this._island, this._shelf);
         for (const view of [this._compact, ...this._peeks, this._expanded, this._voice])
@@ -1207,7 +1210,8 @@ export class Controller {
     /** Whether the top bar over the island (on `monitor`) is away: hidden or slid off the screen by another
      * extension. */
     _barHidden(monitor = this._monitor) {
-        if (!this._isOnBar(monitor))
+        // Taken away by this very setting: the island is not left without a bar to be with.
+        if (!this._isOnBar(monitor) || this._barHider?.hidden)
             return false;
         const panelBox = Main.layoutManager.panelBox;
         return !panelBox.mapped || panelBox.get_transformed_position()[1] + panelBox.height <= monitor.y + 1;
@@ -3407,6 +3411,8 @@ export class Controller {
         this._privacy.destroy();
         this._audio.destroy();
         this._notifications.destroy();
+        this._barHider?.destroy();
+        this._barHider = null;
         this._topBar.destroy();
         this._daemon.destroy();
         this._settings = null;

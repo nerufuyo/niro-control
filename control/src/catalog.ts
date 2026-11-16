@@ -341,6 +341,20 @@ export const CATALOG: Item[] = [
   "kind": "shortcut"
  },
  {
+  "id": "island.hide-top-bar",
+  "menu": "Island",
+  "group": "Appearance and Behavior",
+  "title": "Take GNOME's top bar away",
+  "help": "With the island on, GNOME's own top bar is slid off the screen and no room is kept for it: windows use the whole screen and the island stands alone…",
+  "detail": "With the island on, GNOME's own top bar is slid off the screen and no room is kept for it: windows use the whole screen and the island stands alone at the top. Its buttons still answer to their shortcuts (Super+S for Quick Settings). Off: the bar stays as GNOME has it.",
+  "source": "island",
+  "key": "hide-top-bar",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
   "id": "island.top-bar-style",
   "menu": "Island",
   "group": "Appearance and Behavior",
@@ -1702,7 +1716,7 @@ export const CATALOG: Item[] = [
   "source": "dock",
   "key": "icon-size",
   "type": "i",
-  "default": "48",
+  "default": "38",
   "unit": "px",
   "kind": "slider",
   "digits": 0,

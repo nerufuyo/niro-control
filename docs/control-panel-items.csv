@@ -19,6 +19,7 @@ Look,Universal Appearance,Per-application rules (JSON),textarea,,{},"The per-app
 Look,Universal Appearance,Old whole-window fade for every application,switch,,false,"Warning: this fades the whole window, so text, icons and controls lose opacity with the background.",legacy-global-fade,niro.legacy-global-fade
 Look,Universal Appearance,"Style the top bar, menus, notifications, Quick Settings and Overview",switch,,false,"Turns the blur extension's panel, Overview and popup blur on, in step with the shared look (strength, safe mode, performance mode).",shell-surfaces,niro.shell-surfaces
 Search,Application Search,Search shortcut,shortcut,,['<Super>space'],Opens the application search.,search-shortcut,niro.search-shortcut
+Island,Appearance and Behavior,Take GNOME's top bar away,switch,,true,"With the island on, GNOME's own top bar is slid off the screen and no room is kept for it: windows use the whole screen and the island stands alone…",hide-top-bar,island.hide-top-bar
 Island,Appearance and Behavior,Top bar style,select,Glass / Black,glass,"“glass”: see-through, with no colour of its own, with the island as a black notch hanging from the top of the screen.",top-bar-style,island.top-bar-style
 Island,Appearance and Behavior,The island's look,select,Black / Glass,black,black: Island's own black island.,island-theme,island.island-theme
 Island,Appearance and Behavior,How large the open island is,select,Standard / Large,standard,"""standard"": 600 px wide, its pages 150 px tall.",open-size,island.open-size
@@ -97,7 +98,7 @@ Island,AI Usage,Show Grok's usage,switch,,true,,usage-grok,island.usage-grok
 Island,AI Usage,Warn at this share of a limit (%),slider,50–99,80,,usage-warn,island.usage-warn
 Island,AI Usage,Warn again at this share of a limit (%),slider,50–100,95,,usage-critical,island.usage-critical
 Island,Alerts,"Play a sound when a focus session or break ends, and for reminders",switch,,true,,chimes,island.chimes
-Dock,Appearance,Icon size,slider,16–128,48,Size of dock icons in pixels (16-96),icon-size,dock.icon-size
+Dock,Appearance,Icon size,slider,16–128,38,Size of dock icons in pixels (16-96),icon-size,dock.icon-size
 Dock,Applications and Indicators,Auto-hide,switch,,true,Whether to auto-hide the dock when the pointer moves away,auto-hide,dock.auto-hide
 Dock,Applications and Indicators,Minimized windows at the end of the dock,switch,,true,"A minimized window of a pinned app goes to a thumbnail at the dock's right end, after a separator, as on macOS; a click brings it back.",minimized-in-dock,dock.minimized-in-dock
 Dock,Applications and Indicators,Turn off the system's own dock,switch,,true,"While this dock is on, the docks the system brings (Ubuntu Dock, Dash to Dock) are turned off, and turned on again when this one is.",hide-system-dock,dock.hide-system-dock
