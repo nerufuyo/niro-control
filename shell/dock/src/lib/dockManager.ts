@@ -73,7 +73,7 @@ export class DockManager {
   }
 
   private get _dockHeight(): number {
-    const iconSize = this._settings?.get_int("icon-size") ?? 48;
+    const iconSize = this._settings?.get_int("icon-size") ?? 38;
     const iconActorHeight = iconSize + 8;
     return iconActorHeight + 2 * this._verticalPadding();
   }
@@ -429,8 +429,10 @@ export class DockManager {
     }
     if (wanted) {
       if (!this._visibility) this._startAutoHide();
-    } else if (!settings.get_boolean("auto-hide")) {
-      this._stopAutoHide();
+      this._visibility?.setFullEdge(true);
+    } else {
+      this._visibility?.setFullEdge(false);
+      if (!settings.get_boolean("auto-hide")) this._stopAutoHide();
     }
   }
 
@@ -567,6 +569,7 @@ export class DockManager {
     // Must set dock rect AFTER creating intellihide so it can detect overlap.
     this._updatePosition();
     this._visibility.start();
+    this._visibility.setFullEdge(this._fsForced);
     if (this._overviewHidden) this._visibility.setOverviewHidden(true);
   }
 
@@ -790,7 +793,7 @@ export class DockManager {
     const iconCount = iconManager.getIconCount();
     const hasSeparator = iconManager.hasSeparator();
     const hasAppButton = iconManager.hasAppButton();
-    const iconPadded = (this._settings?.get_int("icon-size") ?? 48) + 12;
+    const iconPadded = (this._settings?.get_int("icon-size") ?? 38) + 12;
     const spacing = this._iconSpacing();
     const padding = 2 * this._sidePadding();
     const separatorWidth = 9; // 1px width + 4px margin each side

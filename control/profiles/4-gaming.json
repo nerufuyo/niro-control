@@ -12,7 +12,7 @@
     "dock.magnification-enabled": false,
     "dock.bounce-on-launch": false,
     "island.auto-hide": "always",
-    "island.alerts-over-fullscreen": false,
+    "island.fullscreen-alerts": "off",
     "island.system-alerts": false,
     "island.event-alerts": false,
     "island.privacy-indicators": true,

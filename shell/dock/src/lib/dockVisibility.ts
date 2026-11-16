@@ -43,6 +43,8 @@ export class DockVisibility {
   private _shown = false;
   /** The Overview is open: the dock stays out of it, whatever the pointer or a window does. */
   private _overviewHidden = false;
+  /** Over a full-screen app the whole screen edge brings the dock, not only the stretch in front of it. */
+  private _fullEdge = false;
   /** What intellihide last said, to come back right when the Overview closes. */
   private _overlap: OverlapStatus = true;
   private _restingTranslationX = 0;
@@ -98,6 +100,12 @@ export class DockVisibility {
     } else {
       this._updatePointerState();
     }
+  }
+
+  setFullEdge(full: boolean): void {
+    if (full === this._fullEdge) return;
+    this._fullEdge = full;
+    this._updateEdgeActivatorBounds();
   }
 
   setEdge(edge: number): void {
@@ -432,22 +440,27 @@ export class DockVisibility {
     if (!monitor || !bounds || !activator) return;
 
     const thickness = Math.max(2, this._showThreshold);
+    // Along the edge: in front of the dock, or all of it over a full-screen app.
+    const spanX = this._fullEdge ? monitor.x : bounds.x;
+    const spanW = this._fullEdge ? monitor.width : bounds.width;
+    const spanY = this._fullEdge ? monitor.y : bounds.y;
+    const spanH = this._fullEdge ? monitor.height : bounds.height;
     switch (this._edge) {
       case 0:
-        activator.set_position(bounds.x, monitor.y + monitor.height - thickness);
-        activator.set_size(bounds.width, thickness);
+        activator.set_position(spanX, monitor.y + monitor.height - thickness);
+        activator.set_size(spanW, thickness);
         break;
       case 1:
-        activator.set_position(monitor.x, bounds.y);
-        activator.set_size(thickness, bounds.height);
+        activator.set_position(monitor.x, spanY);
+        activator.set_size(thickness, spanH);
         break;
       case 2:
-        activator.set_position(monitor.x + monitor.width - thickness, bounds.y);
-        activator.set_size(thickness, bounds.height);
+        activator.set_position(monitor.x + monitor.width - thickness, spanY);
+        activator.set_size(thickness, spanH);
         break;
       case 3:
-        activator.set_position(bounds.x, monitor.y);
-        activator.set_size(bounds.width, thickness);
+        activator.set_position(spanX, monitor.y);
+        activator.set_size(spanW, thickness);
         break;
     }
   }

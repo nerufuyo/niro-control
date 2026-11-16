@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist>
   <schema id="org.gnome.shell.extensions.island" path="/org/gnome/shell/extensions/island/">
+    <key name="hide-top-bar" type="b">
+      <default>true</default>
+      <summary>Take GNOME's top bar away</summary>
+      <description>With the island on, GNOME's own top bar is slid off the screen and no room is kept for it: windows use the whole screen and the island stands alone at the top. Its buttons still answer to their shortcuts (Super+S for Quick Settings). Off: the bar stays as GNOME has it.</description>
+    </key>
     <key name="top-bar-style" type="s">
       <choices>
         <choice value="glass"/>
@@ -129,9 +134,19 @@
       <summary>How long the closed island waits before hiding, in seconds</summary>
     </key>
     <key name="alerts-over-fullscreen" type="b">
-      <default>false</default>
+      <default>true</default>
+      <summary>Deprecated: replaced by fullscreen-alerts</summary>
+      <description>Not read any more: see the key fullscreen-alerts.</description>
+    </key>
+    <key name="fullscreen-alerts" type="s">
+      <choices>
+        <choice value="all"/>
+        <choice value="important"/>
+        <choice value="off"/>
+      </choices>
+      <default>'all'</default>
       <summary>Alerts over full-screen apps</summary>
-      <description>When on, alerts (notifications, calls, timers…) show over a full-screen app (a video, a game), the island hidden again between them. Off, they wait until the app leaves full screen, as GNOME's own.</description>
+      <description>What the island shows over a full-screen app (a video, a game): all (notifications, music, calls, timers, volume...), important ones only (notifications, calls, timers, reminders, meetings, questions from AIs), or none: they then wait until the app leaves full screen. The island itself stays out of the way and comes back at the top edge.</description>
     </key>
     <key name="fullscreen-reveal" type="b">
       <default>true</default>

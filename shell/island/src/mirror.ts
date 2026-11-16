@@ -55,7 +55,7 @@ export class MirrorIsland {
         // GNOME's rule for chrome over a fullscreen window (layout.js `_updateActorVisibility`), here.
         this._fullscreenChanged = global.display.connect('in-fullscreen-changed', () => this._syncVisible());
         this._windowsShown = global.window_group.connect('notify::visible', () => this._syncVisible());
-        this._overFullscreenChanged = settings.connect('changed::alerts-over-fullscreen', () => this._syncVisible());
+        this._overFullscreenChanged = settings.connect('changed::fullscreen-alerts', () => this._syncVisible());
         // Also when GNOME Shell shuts down, taking it with the stage before Island is turned off.
         this.island.connect('destroy', () => this._onDestroy());
     }
@@ -101,7 +101,7 @@ export class MirrorIsland {
      * the closed copy). Shown again, it is measured afresh (out of sight, an alert's lines are not fitted) and takes
      * its shape at once: what it showed out of sight did not animate. */
     _syncVisible() {
-        const overFullscreen = this._settings.get_boolean('alerts-over-fullscreen');
+        const overFullscreen = this._settings.get_string('fullscreen-alerts') !== 'off';
         const visible = this._shown && (overFullscreen || !(global.window_group.visible && this.monitor.inFullscreen));
         if (visible === this.island.visible)
             return;

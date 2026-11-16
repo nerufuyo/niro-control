@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 156 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 157 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -142,7 +142,11 @@ The dock and the closed island step out of the Overview: the dock slides off its
 
 ## Full-screen apps
 
-GNOME hides chrome under a full-screen window and gives it no way back; both parts leave that rule on their own terms (setting `fullscreen-reveal`, on by default, in the island's and the dock's schemas). The dock auto-hides there whatever its setting and its bottom (or side) edge brings it back (`DockManager._syncFullscreen`; `DockVisibility` polls the pointer while it is up, as no motion event reaches the stage over a full-screen window). The island stays hidden, its alerts waiting as before, and a strip at the display's top edge (`Controller._syncFullscreenReveal`) brings it in for as long as the pointer is on it or it is open (`_revealOverFullscreen`, `_scheduleRevealEnd`). While revealed it counts as visible, so the queued alerts show.
+GNOME hides chrome under a full-screen window and gives it no way back; both parts leave that rule on their own terms (setting `fullscreen-reveal`, on by default, in the island's and the dock's schemas).
+
+- **Dock:** auto-hides there whatever its setting; the whole bottom (or side) edge of the screen brings it back, not only the stretch in front of it (`DockManager._syncFullscreen`, `DockVisibility.setFullEdge`). `DockVisibility` polls the pointer while it is up, as no motion event reaches the stage over a full-screen window.
+- **Island:** a strip along the whole top edge (`Controller._syncFullscreenReveal`) brings it in; it stays while the pointer is parked at the top edge anywhere, over it, or while it is open. (A strip as wide as the island once flickered: the island went, the strip came back under the still pointer and brought the island again.) The same works from the keyboard: the shortcuts for the clipboard/calendar pages and for the voice assistant bring it in too.
+- **What shows over a full-screen app** is the island setting `fullscreen-alerts`: `all` (the default: notifications, music, calls, timers, volume...), `important` (notifications, calls, timers, reminders, meetings, questions from AIs; `_fullscreenImportant`), or `off` (everything waits until the app leaves full screen). What waits is shown when it does. The old `alerts-over-fullscreen` is deprecated and not read.
 
 ## Minimized windows in the dock
 
@@ -157,3 +161,7 @@ Size: `icon-size` (slider, 16-128), `icon-spacing` and `dock-padding`; the dock'
 - **GNOME's own notification banners** are hidden while the island is on (island setting `gnome-banners` off, the default; `notifications.ts` keeps the tray's `bannerBlocked` set); the island shows the notification instead. `gnome-banners` on hands the banners back to GNOME.
 - **System docks:** with `hide-system-dock` on (default) the dock turns off Ubuntu Dock and Dash to Dock while it runs and turns them on again when it goes or the setting is off (`DockManager._syncSystemDocks`, deferred: the extension manager must not rewrite its list inside `enable()`). GNOME's own dash in the Overview is always hidden.
 - **X11** (GNOME 48 and older, Ubuntu's Xorg session): the island has its own paths (`isWayland()`: input region, screen sharing). A full-screen window on X11 goes straight to the screen, past the edge reveal, so both the island and the dock hold back unredirection (`inhibitScanout`) while a full-screen reveal is wanted. GNOME 49 and later have no X11 session, so none of this has been run on a real Xorg session: it follows Dash to Dock's approach and the island's earlier X11 code. Check it on Ubuntu 24.04 with `docs/UAT.md` under Xorg.
+
+## No top bar (the island alone)
+
+With the island on, GNOME's own top bar is taken away (island setting `hide-top-bar`, on by default; `shell/island/src/barHider.ts`): windows use the whole screen and the island stands alone at the top (`docs/images/island-active.png`). The bar is slid off the screen, not hidden, so its buttons still have a place: Quick Settings on Super+S, the calendar and other extensions' menus open as before. GNOME reserves the bar's room in the work area from its position and size without asking whether it is shown (`LayoutManager._updateRegions`), so the bar is also taken out of the struts (`trackChrome` with `affectsStruts: false`) and put back as it was. In the island's code `_barHidden` is false for a bar this setting took away, so the auto-hide mode "top-bar" does not hide the island for it.

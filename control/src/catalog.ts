@@ -341,6 +341,20 @@ export const CATALOG: Item[] = [
   "kind": "shortcut"
  },
  {
+  "id": "island.hide-top-bar",
+  "menu": "Island",
+  "group": "Appearance and Behavior",
+  "title": "Take GNOME's top bar away",
+  "help": "With the island on, GNOME's own top bar is slid off the screen and no room is kept for it: windows use the whole screen and the island stands alone…",
+  "detail": "With the island on, GNOME's own top bar is slid off the screen and no room is kept for it: windows use the whole screen and the island stands alone at the top. Its buttons still answer to their shortcuts (Super+S for Quick Settings). Off: the bar stays as GNOME has it.",
+  "source": "island",
+  "key": "hide-top-bar",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
   "id": "island.top-bar-style",
   "menu": "Island",
   "group": "Appearance and Behavior",
@@ -677,23 +691,37 @@ export const CATALOG: Item[] = [
   }
  },
  {
-  "id": "island.alerts-over-fullscreen",
+  "id": "island.fullscreen-alerts",
   "menu": "Island",
   "group": "Alerts",
   "title": "Alerts over full-screen apps",
-  "help": "When on, alerts (notifications, calls, timers…) show over a full-screen app (a video, a game), the island hidden again between them.",
-  "detail": "When on, alerts (notifications, calls, timers…) show over a full-screen app (a video, a game), the island hidden again between them. Off, they wait until the app leaves full screen, as GNOME's own.",
+  "help": "What the island shows over a full-screen app (a video, a game): all (notifications, music, calls, timers, volume...), important ones only…",
+  "detail": "What the island shows over a full-screen app (a video, a game): all (notifications, music, calls, timers, volume...), important ones only (notifications, calls, timers, reminders, meetings, questions from AIs), or none: they then wait until the app leaves full screen. The island itself stays out of the way and comes back at the top edge.",
   "source": "island",
-  "key": "alerts-over-fullscreen",
-  "type": "b",
-  "default": "false",
+  "key": "fullscreen-alerts",
+  "type": "s",
+  "default": "all",
   "unit": "",
-  "kind": "switch"
+  "kind": "select",
+  "options": [
+   {
+    "value": "all",
+    "label": "All"
+   },
+   {
+    "value": "important",
+    "label": "Important"
+   },
+   {
+    "value": "off",
+    "label": "Off"
+   }
+  ]
  },
  {
   "id": "island.fullscreen-reveal",
   "menu": "Island",
-  "group": "Pages and Features",
+  "group": "Alerts",
   "title": "Show the island at the top edge over full-screen apps",
   "help": "Over a full-screen app (a video, a game) the island stays away, and the top edge of the screen brings it back while the pointer is on it.",
   "detail": "Over a full-screen app (a video, a game) the island stays away, and the top edge of the screen brings it back while the pointer is on it. Alerts still wait for the app to leave full screen unless \"Alerts over full-screen apps\" is on.",
@@ -1688,7 +1716,7 @@ export const CATALOG: Item[] = [
   "source": "dock",
   "key": "icon-size",
   "type": "i",
-  "default": "48",
+  "default": "38",
   "unit": "px",
   "kind": "slider",
   "digits": 0,

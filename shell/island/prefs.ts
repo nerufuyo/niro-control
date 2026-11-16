@@ -363,6 +363,8 @@ export default class IslandPreferences extends ExtensionPreferences {
             ['notch', 'Notch'],
             ['pill', 'Pill'],
         ]));
+        look.add(switchRow(settings, 'hide-top-bar', 'Take GNOME’s top bar away',
+            'The island stands alone at the top and windows use the whole screen; Super+S still opens Quick Settings'));
         look.add(topBarRow(settings, window));
         look.add(blackBesideWindowsRow(settings, window));
         look.add(switchRow(settings, 'compact-top-bar', 'Compact top bar', 'Smaller text and spacing in the top bar; slimmer too with the island below it'));
@@ -444,8 +446,9 @@ export default class IslandPreferences extends ExtensionPreferences {
         settings.bind('gnome-banners', notifications, 'active', Gio.SettingsBindFlags.INVERT_BOOLEAN);
         alerts.add(notifications);
         alerts.add(switchRow(settings, 'replace-osd', 'Volume and brightness', 'Show them in the island instead of the centre of the screen'));
-        alerts.add(switchRow(settings, 'alerts-over-fullscreen', 'Over full-screen apps',
-            'Alerts show over a video or game, then hide again; off, they wait until it leaves full screen'));
+        alerts.add(choiceRow(settings, 'fullscreen-alerts', 'Over full-screen apps',
+            'What shows over a video or game, then hides again; the rest waits until it leaves full screen', [
+                ['all', 'Everything'], ['important', 'Important ones only'], ['off', 'Nothing']]));
         alerts.add(switchRow(settings, 'alert-power', 'Charging and battery', 'Plugged in, unplugged, full and low'));
         alerts.add(switchRow(settings, 'alert-network', 'Network', 'When the connection drops'));
         alerts.add(switchRow(settings, 'alert-bluetooth', 'Bluetooth', 'Devices connecting, with their battery'));

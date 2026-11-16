@@ -20,7 +20,7 @@
     "island.island-shape": "notch",
     "island.system-alerts": true,
     "island.event-alerts": true,
-    "island.alerts-over-fullscreen": false,
+    "island.fullscreen-alerts": "all",
     "blur.unblur-when-fullscreen": false
   }
 }
