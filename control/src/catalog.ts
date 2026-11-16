@@ -3394,7 +3394,7 @@ export const CATALOG: Item[] = [
   "source": "emoji",
   "key": "window-location",
   "type": "s",
-  "default": "top-bar",
+  "default": "cursor",
   "unit": "",
   "kind": "select",
   "options": [
