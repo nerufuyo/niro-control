@@ -3,7 +3,11 @@
 # stage first in XDG_DATA_DIRS. Needs a built daemon (cargo build --release -p island-daemon).
 set -u
 cd "$(dirname "$0")/../.."
-P=$(tests/shell/stage.sh) || exit 1; trap 'rm -rf "$P"' EXIT
+P=$(tests/shell/stage.sh) || exit 1
+# The headless shells must not touch the real session's state: the session restore of the island would read the real snapshot, start those apps in the
+# test shell and write its own snapshot over it.
+STATE=$(mktemp -d); trap 'rm -rf "$P" "$STATE"' EXIT
+export XDG_STATE_HOME="$STATE" NIRO_RESTORE_MARKER="$STATE/restored"
 export PATH="$P/bin:$PATH"
 export NIRO_BUILTIN_DIR="$P/share/niro-control/profiles"
 export NIRO_EXT_ROOT="$P/share/gnome-shell/extensions" XDG_DATA_DIRS="$P/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
