@@ -45,6 +45,10 @@ export class DockVisibility {
   private _overviewHidden = false;
   /** Over a full-screen app the whole screen edge brings the dock, not only the stretch in front of it. */
   private _fullEdge = false;
+  /** Told when the dock starts or stops being on screen (shown, or still sliding): the manager holds back a full-screen window's
+   * direct scanout meanwhile, which would otherwise carry it past the dock drawn over it. */
+  private _onActiveChanged: ((active: boolean) => void) | null = null;
+  private _active = false;
   /** What intellihide last said, to come back right when the Overview closes. */
   private _overlap: OverlapStatus = true;
   private _restingTranslationX = 0;
@@ -100,6 +104,18 @@ export class DockVisibility {
     } else {
       this._updatePointerState();
     }
+  }
+
+  setOnActiveChanged(callback: (active: boolean) => void): void {
+    this._onActiveChanged = callback;
+  }
+
+  /** Whether the dock is on screen or on its way: shown, or a slide is not finished. */
+  private _notifyActive(): void {
+    const active = this._shown || this._animationSourceId !== null;
+    if (active === this._active) return;
+    this._active = active;
+    this._onActiveChanged?.(active);
   }
 
   setFullEdge(full: boolean): void {
@@ -256,6 +272,8 @@ export class DockVisibility {
 
     this._cancelAnimation();
     this._dragActive = false;
+    this._shown = false;
+    this._notifyActive();
 
     this._container.translation_x = 0;
     this._container.translation_y = 0;
@@ -482,6 +500,7 @@ export class DockVisibility {
 
     this._shown = true;
     this._animateVisibility(true);
+    this._notifyActive();
     this._startPointerPoll();
   }
 
@@ -516,6 +535,7 @@ export class DockVisibility {
     this._shown = false;
     this._stopPointerPoll();
     this._animateVisibility(false);
+    this._notifyActive();
   }
 
   private _animateVisibility(show: boolean, distance?: number): void {
@@ -563,6 +583,7 @@ export class DockVisibility {
     this._container.translation_y = this._animationToY;
     this._container.opacity = this._animationToOpacity;
     this._container.visible = show;
+    this._notifyActive();
   }
 
   private _cancelAnimation(): void {
