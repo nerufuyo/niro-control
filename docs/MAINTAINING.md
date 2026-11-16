@@ -204,3 +204,13 @@ layouts are the four Hyprland names itself lists (dwindle, master, scrolling, mo
 names are those of current Hyprland (`decoration:shadow:*`, not the old `drop_shadow`); an older Hyprland ignores what it does not
 know. `NIRO_HYPR_DIR` moves the folder for tests. Not tested against a running Hyprland (none is installed here): the file and the
 line are, by `tests/island/hyprland.test.js` and `tests/gjs/hyprland.test.js`.
+
+## Rounded corners on GNOME 51 (Wayland windows)
+
+On GNOME 51 the corners extension did nothing for a native Wayland window (Chrome, GTK apps): `Meta.Window.get_wm_class_instance()` is
+null there, so `shouldEnableEffect` skipped it (the window keeps its own corners: for Chrome, rounded on top and square at the
+bottom). `windowClass()` in `shell/corners/manager/utils.js` now falls back to the Wayland app id. Two more things only showed once the
+effect ran: GNOME 51's `org.gnome.mutter` schema has no `experimental-features` key (reading it threw, so the shader never got its
+bounds and the window was clipped to nothing) and `Meta.is_wayland_compositor` is gone; `windowScaleFactor` asks the schema first and
+takes the logical scale of 1 on Wayland. Check with a GTK 3 window (square bottom corners of its own) in a headless shell, with
+`/run/user/1000/gnome-shell-disable-extensions` removed first (a killed headless shell leaves it, and extensions then do not load).

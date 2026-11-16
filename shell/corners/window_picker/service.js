@@ -9,6 +9,7 @@ import { Inspector } from 'resource:///org/gnome/shell/ui/lookingGlass.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import { readRelativeFile } from '../utils/file.js';
 import { logDebug } from '../utils/log.js';
+import { windowClass } from '../manager/utils.js';
 /**
  * This class provides the implementation of the DBus interface for the window
  * picker. It implements a single method - `pick` - which opens the window picker
@@ -54,7 +55,7 @@ export class WindowPicker {
                 this.#sendPickedWindow('window-not-found');
                 return;
             }
-            this.#sendPickedWindow(actor.metaWindow.get_wm_class_instance() ?? 'window-not-found');
+            this.#sendPickedWindow(windowClass(actor.metaWindow) ?? 'window-not-found');
         });
         inspector.connect('closed', () => {
             lookingGlass.close();

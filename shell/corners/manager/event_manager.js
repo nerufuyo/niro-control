@@ -5,6 +5,7 @@
 import { logDebug } from '../utils/log.js';
 import { prefs } from '../utils/settings.js';
 import * as handlers from './event_handlers.js';
+import { windowClass } from './utils.js';
 /**
  * The rounded corners effect has to perform some actions when differen events
  * happen. For example, when a new window is opened, the effect has to detect
@@ -28,7 +29,7 @@ export function enableEffect() {
         const actor = win.get_compositor_private();
         // If wm_class_instance of Meta.Window is null, wait for it to be
         // set before applying the effect.
-        if (win?.get_wm_class_instance() == null) {
+        if (win && windowClass(win) == null) {
             const notifyId = win.connect('notify::wm-class', () => {
                 applyEffectTo(actor);
                 win.disconnect(notifyId);
