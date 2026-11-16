@@ -9,10 +9,14 @@ import Shell from 'gi://Shell';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import {PACKAGE_VERSION} from 'resource:///org/gnome/shell/misc/config.js';
 
 import {arrange, LAYOUT_IDS, LAYOUTS} from './layouts.js';
 
 const RETILE_MS = 60;
+const SHELL_MAJOR = parseInt(PACKAGE_VERSION.split('.')[0], 10);
+const unmaximize = win => (SHELL_MAJOR >= 49 ? win.unmaximize() : win.unmaximize(Meta.MaximizeFlags.BOTH));
+const isMaximized = win => Boolean(win.maximized_horizontally && win.maximized_vertically);
 const KEYS = ['toggle', 'layout', 'promote', 'float', 'grow', 'shrink'];
 
 export default class Tile extends Extension {
@@ -25,6 +29,7 @@ export default class Tile extends Extension {
         this._retileId = 0;
         this._state = new Map();          // window: "maximized|fullscreen" when last looked at
         this._dragging = null;            // the tiled window being moved with the pointer
+        this._placed = new WeakSet();     // windows the tiling has put in a tile: one of them maximized afterwards stays maximized
 
         const wm = global.window_manager;
         const display = global.display;
@@ -74,6 +79,7 @@ export default class Tile extends Extension {
         this._order = [];
         this._floating = null;
         this._state = null;
+        this._placed = null;
         this._settings = null;
     }
 
@@ -82,11 +88,15 @@ export default class Tile extends Extension {
     _eligible(win) {
         if (!win || win.window_type !== Meta.WindowType.NORMAL || win.skip_taskbar || win.is_override_redirect?.())
             return false;
-        if (win.minimized || win.fullscreen || (win.maximized_horizontally && win.maximized_vertically))
+        if (win.minimized || win.fullscreen)
+            return false;
+        // A window maximized before the tiling took it is brought into a tile; one the person maximized afterwards is left maximized
+        if (isMaximized(win) && this._placed.has(win))
             return false;
         if (this._floating.has(win) || win.get_transient_for() || win.is_on_all_workspaces())
             return false;
-        if (!win.allows_move() || !win.allows_resize())
+        // allows_move()/allows_resize() are false while a window is maximized: a window that can be resized at all is meant
+        if (!win.resizeable || (!isMaximized(win) && (!win.allows_move() || !win.allows_resize())))
             return false;
         const klass = win.get_wm_class_instance() ?? win.get_wm_class() ?? win.get_gtk_application_id?.();
         return !(klass && this._settings.get_strv('floating-apps').includes(klass));
@@ -111,14 +121,14 @@ export default class Tile extends Extension {
             const ids = [w.connect('workspace-changed', () => this._schedule())];
             // maximizing or full screen takes a window out of the tiling and back: looked at when its size changes
             ids.push(w.connect('size-changed', () => {
-                const now = `${w.maximized_horizontally && w.maximized_vertically}|${w.fullscreen}`;
+                const now = `${isMaximized(w)}|${w.fullscreen}`;
                 if (this._state.get(w) !== now) {
                     this._state.set(w, now);
                     this._schedule();
                 }
             }));
             this._winSignals.set(w, ids);
-            this._state.set(w, `${w.maximized_horizontally && w.maximized_vertically}|${w.fullscreen}`);
+            this._state.set(w, `${isMaximized(w)}|${w.fullscreen}`);
         }
     }
 
@@ -167,6 +177,9 @@ export default class Tile extends Extension {
     }
 
     _place(win, r) {
+        if (isMaximized(win))
+            unmaximize(win);
+        this._placed.add(win);
         const now = win.get_frame_rect();
         if (now.x === r.x && now.y === r.y && now.width === r.width && now.height === r.height)
             return;

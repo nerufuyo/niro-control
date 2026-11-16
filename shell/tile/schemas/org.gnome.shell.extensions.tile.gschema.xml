@@ -4,7 +4,7 @@
     <key name="enabled" type="b">
       <default>false</default>
       <summary>Tile the windows</summary>
-      <description>Windows on a monitor are arranged by the chosen layout, none over another. Off: windows are left where they are. Dialogs, full-screen and maximized windows are never tiled.</description>
+      <description>Windows on a monitor are arranged by the chosen layout, none over another. Off: windows are left where they are. Dialogs and full-screen windows are never tiled. A window that is maximized when the tiling starts is brought into a tile; one you maximize afterwards stays maximized until you restore it.</description>
     </key>
     <key name="layout" type="s">
       <choices>
