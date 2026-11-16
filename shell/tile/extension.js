@@ -24,6 +24,7 @@ export default class Tile extends Extension {
         this._signals = [];
         this._retileId = 0;
         this._state = new Map();          // window: "maximized|fullscreen" when last looked at
+        this._dragging = null;            // the tiled window being moved with the pointer
 
         const wm = global.window_manager;
         const display = global.display;
@@ -33,6 +34,9 @@ export default class Tile extends Extension {
         for (const s of ['window-created', 'in-fullscreen-changed', 'workareas-changed', 'window-entered-monitor', 'window-left-monitor'])
             this._signals.push([display, display.connect(s, again)]);
         this._signals.push([Main.layoutManager, Main.layoutManager.connect('monitors-changed', again)]);
+        // Drag and drop: moving a tiled window over another and letting go swaps their places
+        this._signals.push([display, display.connect('grab-op-begin', (_d, win, op) => this._beginDrag(win, op))]);
+        this._signals.push([display, display.connect('grab-op-end', (_d, win) => this._endDrag(win))]);
         for (const key of ['enabled', 'layout', 'gap-inner', 'gap-outer', 'master-factor', 'column-width', 'floating-apps'])
             this._signals.push([this._settings, this._settings.connect(`changed::${key}`, again)]);
         this._signals.push([this._settings, this._settings.connect('changed::enabled', () => this._osd(this._settings.get_boolean('enabled') ? 'Tiling on' : 'Tiling off'))]);
@@ -121,7 +125,8 @@ export default class Tile extends Extension {
     // ---- Tiling
 
     _schedule() {
-        if (this._retileId || !this._settings)
+        // not while a window is carried: it would be put back under the pointer
+        if (this._retileId || !this._settings || this._dragging)
             return;
         this._retileId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, RETILE_MS, () => {
             this._retileId = 0;
@@ -166,6 +171,39 @@ export default class Tile extends Extension {
         if (now.x === r.x && now.y === r.y && now.width === r.width && now.height === r.height)
             return;
         win.move_resize_frame(true, r.x, r.y, r.width, r.height);
+    }
+
+    // ---- Drag and drop
+
+    _beginDrag(win, op) {
+        if (!this._settings?.get_boolean('enabled') || op !== Meta.GrabOp.MOVING || !this._order.includes(win) || !this._eligible(win))
+            return;
+        this._dragging = win;
+    }
+
+    _endDrag(win) {
+        if (!this._dragging || this._dragging !== win)
+            return;
+        this._dragging = null;
+        this._dropOn(win, ...global.get_pointer());
+        this._schedule();
+    }
+
+    /** `win` was dropped with the pointer at (x, y): it takes the place of the tiled window under the pointer, and that one takes its place. */
+    _dropOn(win, x, y) {
+        const workspace = global.workspace_manager.get_active_workspace();
+        const target = this._order.find(w => {
+            if (w === win || !this._eligible(w) || w.get_workspace() !== workspace)
+                return false;
+            const r = w.get_frame_rect();
+            return x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height;
+        });
+        if (!target)
+            return false;   // dropped on nothing: it goes back to its tile
+        const a = this._order.indexOf(win);
+        const b = this._order.indexOf(target);
+        [this._order[a], this._order[b]] = [target, win];
+        return true;
     }
 
     // ---- Shortcuts
