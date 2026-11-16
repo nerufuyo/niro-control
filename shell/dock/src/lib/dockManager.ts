@@ -258,13 +258,15 @@ export class DockManager {
     this._signals.connect(settings, "changed::app-button-icon", () =>
       iconManager.setAppButtonIcon(APP_BUTTON_ICONS[settings.get_string("app-button-icon")] ?? APP_BUTTON_ICONS.grid),
     );
-    this._signals.connect(settings, "changed::auto-hide", () => {
-      if (settings.get_boolean("auto-hide")) {
+    const syncHiding = () => {
+      if (this._hidingWanted()) {
         this._startAutoHide();
       } else if (!this._fsForced) {
         this._stopAutoHide();
       }
-    });
+    };
+    this._signals.connect(settings, "changed::auto-hide", syncHiding);
+    this._signals.connect(settings, "changed::hide-when-maximized", syncHiding);
     this._signals.connect(settings, "changed::fullscreen-reveal", () => this._syncFullscreen());
     this._signals.connect(global.display, "in-fullscreen-changed", () => this._syncFullscreen());
     // The windows are hidden while the Overview is up, which is no full screen: looked at again as it goes.
@@ -297,7 +299,7 @@ export class DockManager {
       iconManager.setIndicatorStyle(settings.get_int("running-indicator-style"));
     });
     this._signals.connect(settings, "changed::show-threshold", () => {
-      if (this._visibility && settings.get_boolean("auto-hide")) {
+      if (this._visibility && this._hidingWanted()) {
         this._startAutoHide();
       }
     });
@@ -354,7 +356,7 @@ export class DockManager {
       iconManager.setMediaControlsEnabled(settings.get_boolean("media-controls"));
     });
 
-    if (settings.get_boolean("auto-hide")) {
+    if (this._hidingWanted()) {
       this._startAutoHide();
     }
 
@@ -440,7 +442,7 @@ export class DockManager {
       this._visibility?.setFullEdge(true);
     } else {
       this._visibility?.setFullEdge(false);
-      if (!settings.get_boolean("auto-hide")) this._stopAutoHide();
+      if (!this._hidingWanted()) this._stopAutoHide();
     }
   }
 
@@ -559,6 +561,12 @@ export class DockManager {
     this._settings = null;
   }
 
+  /** The dock goes away at times: always (`auto-hide`) or under a maximized or full-screen window (`hide-when-maximized`). */
+  private _hidingWanted(): boolean {
+    const settings = this._settings;
+    return Boolean(settings && (settings.get_boolean("auto-hide") || settings.get_boolean("hide-when-maximized")));
+  }
+
   private _startAutoHide(): void {
     if (!this._container || !this._settings) return;
 
@@ -584,6 +592,7 @@ export class DockManager {
       this._dockActive = active;
       this._syncScanout();
     });
+    this._visibility.setAlwaysHide(this._settings.get_boolean("auto-hide"));
     this._visibility.start();
     this._visibility.setFullEdge(this._fsForced);
     if (this._overviewHidden) this._visibility.setOverviewHidden(true);

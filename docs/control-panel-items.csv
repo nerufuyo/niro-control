@@ -105,6 +105,7 @@ Island,AI Usage,Warn again at this share of a limit (%),slider,50–100,95,,usag
 Island,Alerts,"Play a sound when a focus session or break ends, and for reminders",switch,,true,,chimes,island.chimes
 Dock,Appearance,Icon size,slider,16–128,38,Size of dock icons in pixels (16-96),icon-size,dock.icon-size
 Dock,Applications and Indicators,Auto-hide,switch,,true,Whether to auto-hide the dock when the pointer moves away,auto-hide,dock.auto-hide
+Dock,Applications and Indicators,Hide under maximized and full-screen windows,switch,,true,"The dock stays up on the desktop and over small windows, and slides away while a maximized or full-screen window covers it; the screen edge brings it…",hide-when-maximized,dock.hide-when-maximized
 Dock,Applications and Indicators,Minimized windows at the end of the dock,switch,,true,"A minimized window of a pinned app goes to a thumbnail at the dock's right end, after a separator, as on macOS; a click brings it back.",minimized-in-dock,dock.minimized-in-dock
 Dock,Applications and Indicators,Turn off the system's own dock,switch,,true,"While this dock is on, the docks the system brings (Ubuntu Dock, Dash to Dock) are turned off, and turned on again when this one is.",hide-system-dock,dock.hide-system-dock
 Dock,Applications and Indicators,"Hide over full-screen apps, show at the edge",switch,,true,"Over a full-screen app (a video, a game) the dock stays away, and the screen edge it sits on brings it back while the pointer is there.",fullscreen-reveal,dock.fullscreen-reveal

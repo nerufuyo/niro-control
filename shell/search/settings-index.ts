@@ -1063,6 +1063,16 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "dock.hide-when-maximized",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Hide under maximized and full-screen windows",
+  "help": "The dock stays up on the desktop and over small windows, and slides away while a maximized or full-screen window covers it; the screen edge brings it…",
+  "key": "hide-when-maximized",
+  "kind": "switch",
+  "managed": false
+ },
+ {
   "id": "dock.minimized-in-dock",
   "menu": "Dock",
   "group": "Applications and Indicators",

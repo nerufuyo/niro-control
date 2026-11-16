@@ -45,6 +45,8 @@ export class DockVisibility {
   private _overviewHidden = false;
   /** Over a full-screen app the whole screen edge brings the dock, not only the stretch in front of it. */
   private _fullEdge = false;
+  /** Auto-hide proper: the dock goes away whenever the pointer leaves it. Not: only while a maximized or full-screen window covers it. */
+  private _alwaysHide = true;
   /** Told when the dock starts or stops being on screen (shown, or still sliding): the manager holds back a full-screen window's
    * direct scanout meanwhile, which would otherwise carry it past the dock drawn over it. */
   private _onActiveChanged: ((active: boolean) => void) | null = null;
@@ -116,6 +118,10 @@ export class DockVisibility {
     if (active === this._active) return;
     this._active = active;
     this._onActiveChanged?.(active);
+  }
+
+  setAlwaysHide(always: boolean): void {
+    this._alwaysHide = always;
   }
 
   setFullEdge(full: boolean): void {
@@ -256,7 +262,10 @@ export class DockVisibility {
     const [x, y] = global.get_pointer();
     this._pointerX = x;
     this._pointerY = y;
-    this._updatePointerState();
+    this._overlap = this._intellihide.isOverlapping();
+    // Hiding only under a covering window: the dock is up until one covers it.
+    if (!this._alwaysHide && !this._overlap) this._show();
+    else this._updatePointerState();
   }
 
   stop(): void {
@@ -306,7 +315,7 @@ export class DockVisibility {
       return;
     }
 
-    if (this._shown) this._scheduleHide();
+    if (this._shown && (this._alwaysHide || this._overlap)) this._scheduleHide();
   }
 
   private _isPointerInPopupOrMenu(): boolean {

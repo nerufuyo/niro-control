@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 162 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 163 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -181,3 +181,12 @@ restore again), the apps that are not running are started `restore-session-delay
 apart, and their first window is put back (`restore-positions`). Saving stays off until that is done. Settings:
 `restore-session`, `restore-positions`, `restore-session-delay`, `restore-session-exclude` (desktop file ids). Tested by
 running two headless shells with the same `XDG_STATE_HOME` (`NIRO_RESTORE_MARKER` picks the marker file).
+
+## Dock under maximized and full-screen windows
+
+`hide-when-maximized` (dock, on by default): the dock is up on the desktop and over small windows, and slides away while a
+maximized or full-screen window on the dock's monitor covers it; the edge brings it back (`DockVisibility.setAlwaysHide(false)`:
+the dock hides only while `_overlap` is set by `Intellihide`). `auto-hide` stays the plain mode that hides whenever the pointer
+leaves. `Intellihide` looks again on `size-changed`, `minimize`, `unminimize`, `map`, `destroy`, workspace and full-screen
+changes: maximizing restacks nothing, so `restacked` alone missed it. A headless test that checks the dock must keep the
+Overview closed (an empty headless shell opens it, and the dock rightly leaves with it).

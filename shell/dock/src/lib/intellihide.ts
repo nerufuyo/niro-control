@@ -19,11 +19,21 @@ export class Intellihide {
     this._signals.connect(global.display, "restacked", () => this._checkOverlap());
 
     this._signals.connect(global.display, "window-created", () => this._checkOverlap());
+    // Maximizing, full screen, minimizing and the like change what covers the dock without restacking anything.
+    const wm = global.window_manager;
+    for (const signal of ["size-changed", "minimize", "unminimize", "map", "destroy", "switch-workspace"])
+      this._signals.connect(wm, signal, () => this._checkOverlap());
+    this._signals.connect(global.display, "in-fullscreen-changed", () => this._checkOverlap());
 
     const tracker = Shell.WindowTracker.get_default();
     this._signals.connect(tracker, "notify::focus-app", () => this._checkOverlap());
 
     this._checkOverlap();
+  }
+
+  /** Whether a maximized or full-screen window covers the dock now. */
+  isOverlapping(): boolean {
+    return this._status;
   }
 
   setDockRect(x: number, y: number, width: number, height: number): void {

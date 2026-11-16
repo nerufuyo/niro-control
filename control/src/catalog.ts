@@ -1813,6 +1813,20 @@ export const CATALOG: Item[] = [
   "kind": "switch"
  },
  {
+  "id": "dock.hide-when-maximized",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Hide under maximized and full-screen windows",
+  "help": "The dock stays up on the desktop and over small windows, and slides away while a maximized or full-screen window covers it; the screen edge brings it…",
+  "detail": "The dock stays up on the desktop and over small windows, and slides away while a maximized or full-screen window covers it; the screen edge brings it back. With Auto-hide on it hides whenever the pointer leaves.",
+  "source": "dock",
+  "key": "hide-when-maximized",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
   "id": "dock.minimized-in-dock",
   "menu": "Dock",
   "group": "Applications and Indicators",

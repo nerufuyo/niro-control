@@ -46,7 +46,7 @@ for (const item of CATALOG) {
     });
     bound++;
 }
-if (bound !== 162) fail(`bound ${bound} items, expected 162`);
+if (bound !== 163) fail(`bound ${bound} items, expected 163`);
 
 // dictionary fields keep their siblings: changing the radius leaves the rest of the setting as it was
 const radius = bindingFor(CATALOG.find(i => i.id === 'corners.global-rounded-corner-settings.borderRadius'), stores);
@@ -147,7 +147,7 @@ if (Gtk.init_check()) {
     model.setMode('advanced', false);
     const advanced = rowsNow();
     model.setMode('simple', false);
-    if (simple.names.size !== 162 || advanced.names.size !== 162) fail(`rows: simple ${simple.names.size}, advanced ${advanced.names.size}`);
+    if (simple.names.size !== 163 || advanced.names.size !== 163) fail(`rows: simple ${simple.names.size}, advanced ${advanced.names.size}`);
     if (JSON.stringify(engine.capture()) !== values) fail('switching mode changed a value');
     if (model.advancedWidgets.length < 5) fail('the Advanced groups were not found');
     // in Simple mode the advanced groups are hidden and a hint says how many are; in Advanced the reverse
