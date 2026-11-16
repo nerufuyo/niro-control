@@ -11,6 +11,7 @@ import {
     settingsSwitch, settingsText, shortcutRecorder, resetControl,
 } from './components.js';
 import type {Context} from './components.js';
+import {aiConnectionsGroup} from './aiConnections.js';
 import {dependencyBlocks, dependencyMet} from './logic.js';
 import {dockPreview, lookPreview, windowsPreview} from './previews.js';
 import {ProfileEngine} from './profiles.js';
@@ -328,7 +329,7 @@ export function lookPage(model: Model) {
 }
 
 // ---- A module with sub-pages (Island, Dock): a list of its groups beside them
-function subnav(model: Model, menu: string, order: string[], header?: any) {
+function subnav(model: Model, menu: string, order: string[], header?: any, extras?: Record<string, () => any>) {
     const items = CATALOG.filter(i => i.menu === menu);
     const groups = order.filter(g => items.some(i => i.group === g));
     const stack = new Gtk.Stack({hexpand: true, vexpand: true, transition_type: Gtk.StackTransitionType.CROSSFADE, transition_duration: 120});
@@ -341,7 +342,7 @@ function subnav(model: Model, menu: string, order: string[], header?: any) {
         const box = new Gtk.Box({spacing: 6}); box.append(label); box.append(count);
         const row = new Gtk.ListBoxRow({child: box}); row.set_name(g);
         list.append(row);
-        stack.add_named(page(model.section(g, gi)), g);
+        stack.add_named(page(model.section(g, gi), ...(extras?.[g] ? [extras[g]()] : [])), g);
     }
     // in a narrow window the list becomes a menu above the page
     const picker = Gtk.DropDown.new_from_strings(groups);
@@ -367,7 +368,9 @@ function subnav(model: Model, menu: string, order: string[], header?: any) {
 }
 
 export const islandPage = (model: Model) => subnav(model, 'Island', ['Appearance and Behavior', 'Alerts', 'Music', 'Focus', 'Clipboard',
-    'Voice Assistant', 'AI Usage', 'AI Agents', 'Shortcuts', 'Pages and Features']);
+    'Voice Assistant', 'AI Usage', 'AI Agents', 'Shortcuts', 'Pages and Features'], undefined,
+    // the AI sign-ins and the DeepSeek key: not settings, so not in the catalog
+    {'AI Usage': () => aiConnectionsGroup(model, model.ctx)});
 
 export function dockPage(model: Model) {
     const preview = new Gtk.Box({margin_top: 14, margin_start: 18, margin_end: 18, margin_bottom: 6});

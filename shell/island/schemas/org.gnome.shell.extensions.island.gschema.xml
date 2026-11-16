@@ -495,7 +495,7 @@
     <key name="usage-enabled" type="b">
       <default>true</default>
       <summary>Show AI plan usage</summary>
-      <description>A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT (as Codex last saw it) and Grok, when found.</description>
+      <description>A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT Plus or Pro (signed in with Codex, `codex login`), Grok, and the balance of a DeepSeek API account (with its key).</description>
     </key>
     <key name="usage-claude" type="b">
       <default>true</default>
@@ -508,6 +508,11 @@
     <key name="usage-grok" type="b">
       <default>true</default>
       <summary>Show Grok's usage</summary>
+    </key>
+    <key name="usage-deepseek" type="b">
+      <default>false</default>
+      <summary>Show DeepSeek's balance</summary>
+      <description>The money left on your DeepSeek API account, read with an API key that you add in Settings (Island, AI Usage). The key stays in a private file of yours, never in these settings.</description>
     </key>
     <key name="usage-warn" type="i">
       <range min="50" max="99"/>

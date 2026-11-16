@@ -3,6 +3,7 @@
 // Copyright (C) 2026 zickrian
 
 // Usage: how much of each AI plan's limits is used (Claude, ChatGPT as Codex saw it, Grok), a bar per
+// limit, and the balance left on a DeepSeek API account (no limits: its card says the money). A bar per
 // limit. One provider at a time, scrolled through like a widget stack; no tab without any.
 
 import Clutter from 'gi://Clutter';
@@ -20,7 +21,7 @@ import {Page} from './page.js';
 /** A limit warns (an alert) and then turns red at these shares; Settings may move them (see `setMarks`). */
 const MARKS = {warn: 80, critical: 95};
 /** Each provider's colour, for its bars. */
-const ACCENTS = {claude: [0.85, 0.47, 0.34], codex: [0.06, 0.64, 0.5], grok: [0.93, 0.94, 0.96]};
+const ACCENTS = {claude: [0.85, 0.47, 0.34], codex: [0.06, 0.64, 0.5], grok: [0.93, 0.94, 0.96], deepseek: [0.3, 0.42, 1]};
 const FALLBACK = Palette.BLUE;
 /** How far a scroll goes before it moves to the next provider. */
 const WHEEL_STEP = 1;
@@ -308,8 +309,13 @@ class UsagePage extends Page {
         const limits = new St.BoxLayout({...VERTICAL, style_class: 'island-usage-limits'});
         for (const window of provider.windows.slice(0, 3))
             limits.add_child(this._limit(window, accent));
-        if (provider.windows.length === 0)
-            limits.add_child(label(provider.empty || 'No limits reported yet', 'island-usage-empty'));
+        if (provider.windows.length === 0) {
+            const note = label(provider.empty || 'No limits reported yet', 'island-usage-empty');
+            // A balance in two currencies, or where to put the key, is longer than the card is wide
+            note.clutter_text.line_wrap = true;
+            note.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+            limits.add_child(note);
+        }
         content.add_child(limits);
         return content;
     }

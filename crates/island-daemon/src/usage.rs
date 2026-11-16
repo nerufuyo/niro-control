@@ -2,7 +2,7 @@
 // Copyright (C) 2026 zickrian
 
 //! AI plan usage for the island: Claude's, ChatGPT's and Grok's limits, read where each CLI's /usage or
-//! /status reads them (Codex's session logs fill in). Warns once as a limit nears.
+//! /status reads them (Codex's session logs fill in), and DeepSeek's balance, read with an API key. Warns once as a limit nears.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -44,6 +44,8 @@ const CLAUDE_TIMEOUT: Duration = Duration::from_secs(10);
 const CODEX_FILES: usize = 8;
 /// Where Codex's /status reads the plan and its limits.
 const CODEX_USAGE: &str = "https://chatgpt.com/backend-api/wham/usage";
+/// Where DeepSeek says how much is left of what was paid for and granted.
+const DEEPSEEK_BALANCE: &str = "https://api.deepseek.com/user/balance";
 
 /// Every plan's limits, as the page draws them.
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
@@ -87,6 +89,8 @@ struct Config {
     /// Missing from an older extension: on, like the setting's own default.
     #[serde(default = "on")]
     grok: bool,
+    /// Off until asked for (it needs an API key): the page has no DeepSeek card for anyone who did not.
+    deepseek: bool,
     /// The AI assistant turned on: off, a plan seen here starts no AI to list its models.
     #[serde(default = "on")]
     assistant: bool,
@@ -108,6 +112,7 @@ impl Default for Config {
             claude: true,
             codex: true,
             grok: true,
+            deepseek: false,
             assistant: true,
             warn: 80.0,
             critical: 95.0,
@@ -139,7 +144,7 @@ impl UsageService {
 
 #[interface(name = "org.niro.island.Usage1")]
 impl UsageService {
-    /// JSON `{enabled, claude, codex, grok, assistant, warn, critical}`, from Settings.
+    /// JSON `{enabled, claude, codex, grok, deepseek, assistant, warn, critical}`, from Settings.
     fn set_config(&mut self, config: &str) -> fdo::Result<()> {
         self.config =
             serde_json::from_str(config).map_err(|err| fdo::Error::InvalidArgs(err.to_string()))?;
@@ -188,6 +193,8 @@ pub async fn run(iface: InterfaceRef<UsageService>, refresh: Arc<Notify>) {
     let mut grok_wait = CLAUDE_EVERY;
     let mut grok_failures = 0;
     let mut grok_last_error = None;
+    let mut deepseek: Option<Provider> = None;
+    let mut asked_deepseek: Option<Instant> = None;
     let mut codex = CodexReader::default();
     // Unlocking wakes the loop, to ask Claude if it came due meanwhile.
     let mut locked = crate::system::locked();
@@ -291,6 +298,29 @@ pub async fn run(iface: InterfaceRef<UsageService>, refresh: Arc<Notify>) {
         } else {
             grok = None;
         }
+        if config.deepseek {
+            let due = |every| asked_deepseek.is_none_or(|at: Instant| at.elapsed() >= every);
+            if deepseek_key().is_none() {
+                // Asked for, but with no key yet: a card that says where to put it.
+                deepseek = Some(deepseek_shell(DeepseekError::NoKey));
+            } else if (forced && due(CLAUDE_AT_MOST)) || (!paused && due(CLAUDE_EVERY)) {
+                asked_deepseek = Some(Instant::now());
+                let fresh = tokio::task::spawn_blocking(read_deepseek).await.ok();
+                deepseek = match (fresh, deepseek.take()) {
+                    (Some(Ok(fresh)), _) => Some(fresh),
+                    // The last balance stays, saying why it is old.
+                    (Some(Err(why)), Some(mut last)) if !last.id.is_empty() && last.updated_ms > 0 => Some(Provider {
+                        note: why.note().into(),
+                        ..std::mem::take(&mut last)
+                    }),
+                    (Some(Err(why)), _) => Some(deepseek_shell(why)),
+                    (None, last) => last,
+                };
+            }
+            providers.extend(deepseek.clone());
+        } else {
+            deepseek = None;
+        }
         if config.codex && paused && !forced {
             // Locked, nobody sees them: the last numbers stand until unlocking wakes the loop.
             providers.extend(codex.shown.clone());
@@ -333,8 +363,16 @@ pub async fn run(iface: InterfaceRef<UsageService>, refresh: Arc<Notify>) {
             .as_ref()
             .filter(|_| !paused)
             .map(|_| due_in(asked_grok, grok_wait));
+        let deepseek_due_in = deepseek
+            .as_ref()
+            .filter(|d| !paused && d.updated_ms > 0)
+            .map(|_| due_in(asked_deepseek, CLAUDE_EVERY));
         let remote_due = match (claude_due_in, grok_due_in) {
             (Some(claude_in), Some(grok_in)) => Some(claude_in.min(grok_in)),
+            (due, None) | (None, due) => due,
+        };
+        let remote_due = match (remote_due, deepseek_due_in) {
+            (Some(a), Some(b)) => Some(a.min(b)),
             (due, None) | (None, due) => due,
         };
         next = Some(next_wait(
@@ -597,6 +635,136 @@ fn claude_windows(response: &Value) -> Vec<Window> {
         })
     })
     .collect()
+}
+
+/// Why DeepSeek's balance could not be read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeepseekError {
+    /// No API key saved yet.
+    NoKey,
+    /// The key was turned down.
+    BadKey,
+    /// No network (yet).
+    Offline,
+    /// The server failed or answered in a way not understood.
+    Busy,
+}
+
+impl DeepseekError {
+    /// What the card says.
+    fn note(self) -> &'static str {
+        match self {
+            DeepseekError::NoKey => "Add your DeepSeek API key in Settings > Island > AI Usage",
+            DeepseekError::BadKey => "DeepSeek turned the API key down; check it in Settings",
+            DeepseekError::Offline => "Offline; showing the last balance",
+            DeepseekError::Busy => "Could not reach DeepSeek; showing the last balance",
+        }
+    }
+}
+
+/// Where the DeepSeek API key is kept: a file of the user's own (`~/.config/niro/deepseek-api-key`, mode 600, one line),
+/// which Settings writes; or `DEEPSEEK_API_KEY` in the environment the daemon got from the login shell.
+pub fn deepseek_key_file() -> PathBuf {
+    dirs::config_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join("niro")
+        .join("deepseek-api-key")
+}
+
+/// The API key, or `None`: the file first, then the environment.
+fn deepseek_key() -> Option<String> {
+    let from_file = std::fs::read_to_string(deepseek_key_file())
+        .ok()
+        .map(|text| text.trim().to_string())
+        .filter(|key| !key.is_empty());
+    from_file.or_else(|| {
+        std::env::var("DEEPSEEK_API_KEY")
+            .ok()
+            .map(|key| key.trim().to_string())
+            .filter(|key| !key.is_empty())
+    })
+}
+
+/// A DeepSeek card with nothing to read yet, saying why (a missing key is the card's own words, the rest a warning above).
+fn deepseek_shell(why: DeepseekError) -> Provider {
+    Provider {
+        id: "deepseek".into(),
+        name: "DeepSeek".into(),
+        plan: "API".into(),
+        note: if why == DeepseekError::NoKey { String::new() } else { why.note().into() },
+        empty: why.note().into(),
+        ..Provider::default()
+    }
+}
+
+/// DeepSeek's balance now, with the API key (the request is the one DeepSeek documents for it).
+fn read_deepseek() -> Result<Provider, DeepseekError> {
+    let key = deepseek_key().ok_or(DeepseekError::NoKey)?;
+    read_deepseek_at(&key, DEEPSEEK_BALANCE)
+}
+
+/// The same, from `url` with `key`.
+fn read_deepseek_at(key: &str, url: &str) -> Result<Provider, DeepseekError> {
+    let response: Value = crate::http::get(url, CLAUDE_TIMEOUT)
+        .header("Authorization", &format!("Bearer {key}"))
+        .header("Accept", "application/json")
+        // Said plainly who asks, never another app.
+        .header("User-Agent", concat!("Island/", env!("CARGO_PKG_VERSION")))
+        .call()
+        .and_then(|mut reply| reply.body_mut().read_json())
+        .map_err(|err| {
+            // Never the key in the log: the error carries the status, not the headers.
+            warn!("could not read DeepSeek's balance: {err}");
+            match err {
+                ureq::Error::StatusCode(401 | 403) => DeepseekError::BadKey,
+                ureq::Error::StatusCode(_) | ureq::Error::Json(_) => DeepseekError::Busy,
+                _ => DeepseekError::Offline,
+            }
+        })?;
+    deepseek_live(&response, now_ms()).ok_or(DeepseekError::Busy)
+}
+
+/// The answer of DeepSeek's balance endpoint as a card: no limits, the balance in words (one line for each currency).
+fn deepseek_live(response: &Value, now: i64) -> Option<Provider> {
+    let infos = response["balance_infos"].as_array()?;
+    let money = |value: &Value| -> Option<f64> {
+        value
+            .as_str()
+            .and_then(|text| text.parse::<f64>().ok())
+            .or_else(|| value.as_f64())
+    };
+    let mut lines = Vec::new();
+    for info in infos {
+        let currency = info["currency"].as_str().unwrap_or("");
+        let total = money(&info["total_balance"])?;
+        let symbol = match currency {
+            "USD" => "$",
+            "CNY" => "¥",
+            _ => "",
+        };
+        let mut line = format!("{symbol}{total:.2}{}", if symbol.is_empty() { format!(" {currency}") } else { String::new() });
+        let granted = money(&info["granted_balance"]).unwrap_or(0.0);
+        let topped = money(&info["topped_up_balance"]).unwrap_or(0.0);
+        if granted > 0.0 || topped > 0.0 {
+            line.push_str(&format!("  (topped up {topped:.2}, granted {granted:.2})"));
+        }
+        lines.push(line);
+    }
+    let available = response["is_available"].as_bool().unwrap_or(true);
+    let empty = if lines.is_empty() {
+        "No balance reported".to_string()
+    } else {
+        format!("Balance {}", lines.join("  ·  "))
+    };
+    Some(Provider {
+        id: "deepseek".into(),
+        name: "DeepSeek".into(),
+        plan: "API".into(),
+        updated_ms: now,
+        note: if available { String::new() } else { "The balance is too low to call the API".into() },
+        empty,
+        ..Provider::default()
+    })
 }
 
 /// Why Grok's allowance could not be read.
@@ -989,6 +1157,91 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn reads_deepseeks_balance_in_each_currency() {
+        let both = json!({"is_available": true, "balance_infos": [
+            {"currency": "USD", "total_balance": "12.50", "granted_balance": "2.50", "topped_up_balance": "10.00"},
+            {"currency": "CNY", "total_balance": "110.00", "granted_balance": "0.00", "topped_up_balance": "110.00"}]});
+        let card = deepseek_live(&both, 5_000).unwrap();
+        assert_eq!((card.id.as_str(), card.name.as_str(), card.updated_ms), ("deepseek", "DeepSeek", 5_000));
+        assert!(card.windows.is_empty() && card.note.is_empty());
+        assert!(card.empty.contains("$12.50") && card.empty.contains("topped up 10.00, granted 2.50"), "{}", card.empty);
+        assert!(card.empty.contains("¥110.00"), "{}", card.empty);
+        // An account that cannot call the API says so.
+        let empty = json!({"is_available": false, "balance_infos": [
+            {"currency": "USD", "total_balance": "0.00", "granted_balance": "0.00", "topped_up_balance": "0.00"}]});
+        assert_eq!(deepseek_live(&empty, 1).unwrap().note, "The balance is too low to call the API");
+        // An answer that is not a balance is refused, not shown as zero.
+        assert!(deepseek_live(&json!({"error": {"message": "nope"}}), 1).is_none());
+        assert!(deepseek_live(&json!({"balance_infos": [{"currency": "USD", "total_balance": "abc"}]}), 1).is_none());
+    }
+
+    /// A one-answer HTTP server on a free port: reads the request, sends `status` and `body`, hands back what was asked.
+    fn serve_once(status: &'static str, body: &'static str) -> (String, std::thread::JoinHandle<String>) {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/user/balance", listener.local_addr().unwrap());
+        let handle = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut asked = Vec::new();
+            let mut buffer = [0u8; 1024];
+            while !asked.windows(4).any(|w| w == b"\r\n\r\n") {
+                let n = stream.read(&mut buffer).unwrap();
+                if n == 0 {
+                    break;
+                }
+                asked.extend_from_slice(&buffer[..n]);
+            }
+            let reply = format!(
+                "HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            stream.write_all(reply.as_bytes()).unwrap();
+            String::from_utf8_lossy(&asked).to_string()
+        });
+        (url, handle)
+    }
+
+    #[test]
+    fn asks_deepseek_with_the_key_and_shows_the_balance() {
+        let (url, server) = serve_once(
+            "200 OK",
+            r#"{"is_available":true,"balance_infos":[{"currency":"USD","total_balance":"3.25","granted_balance":"0.00","topped_up_balance":"3.25"}]}"#,
+        );
+        let card = read_deepseek_at("sk-test-key-123", &url).expect("a balance");
+        let asked = server.join().unwrap();
+        assert!(asked.starts_with("GET /user/balance"), "{asked}");
+        assert!(asked.to_lowercase().contains("authorization: bearer sk-test-key-123"), "{asked}");
+        assert!(card.empty.contains("$3.25"), "{}", card.empty);
+    }
+
+    #[test]
+    fn deepseek_failures_are_told_apart() {
+        let (url, server) = serve_once("401 Unauthorized", r#"{"error":{"message":"Authentication Fails"}}"#);
+        assert_eq!(read_deepseek_at("sk-bad", &url).unwrap_err(), DeepseekError::BadKey);
+        server.join().unwrap();
+        let (url, server) = serve_once("500 Internal Server Error", "{}");
+        assert_eq!(read_deepseek_at("sk-x", &url).unwrap_err(), DeepseekError::Busy);
+        server.join().unwrap();
+        let (url, server) = serve_once("200 OK", "not json");
+        assert_eq!(read_deepseek_at("sk-x", &url).unwrap_err(), DeepseekError::Busy);
+        server.join().unwrap();
+        // Nothing listening: offline.
+        let closed = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            format!("http://{}/user/balance", listener.local_addr().unwrap())
+        };
+        assert_eq!(read_deepseek_at("sk-x", &closed).unwrap_err(), DeepseekError::Offline);
+    }
+
+    #[test]
+    fn deepseeks_key_never_shows_in_what_the_page_gets() {
+        let card = deepseek_shell(DeepseekError::NoKey);
+        let sent = serde_json::to_string(&card).unwrap();
+        assert!(sent.contains("API key") && !sent.contains("sk-"));
+        assert!(DeepseekError::BadKey.note().contains("key"));
+    }
 
     #[test]
     fn reads_chatgpts_plan_and_limits_as_status_does() {
