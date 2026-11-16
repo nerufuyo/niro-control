@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 157 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 158 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -165,3 +165,7 @@ Size: `icon-size` (slider, 16-128), `icon-spacing` and `dock-padding`; the dock'
 ## No top bar (the island alone)
 
 With the island on, GNOME's own top bar is taken away (island setting `hide-top-bar`, on by default; `shell/island/src/barHider.ts`): windows use the whole screen and the island stands alone at the top (`docs/images/island-active.png`). The bar is slid off the screen, not hidden, so its buttons still have a place: Quick Settings on Super+S, the calendar and other extensions' menus open as before. GNOME reserves the bar's room in the work area from its position and size without asking whether it is shown (`LayoutManager._updateRegions`), so the bar is also taken out of the struts (`trackChrome` with `affectsStruts: false`) and put back as it was. In the island's code `_barHidden` is false for a bar this setting took away, so the auto-hide mode "top-bar" does not hide the island for it.
+
+## Controls page (the island's quick settings)
+
+The island's Controls page (`shell/island/src/pages/controls.ts`, shortcut Super+Alt+K) sets what one reaches for in GNOME's Quick Settings: volume and the microphone (sliders and mute), the screen's brightness, Bluetooth (power, and the paired devices to connect and disconnect), Wi-Fi (power, networks), the sound outputs and inputs, power mode, Do Not Disturb, Night Light, dark style and airplane mode. Four views under small tabs: Quick, Bluetooth, Wi-Fi, Sound. What the computer does not have (no backlight on a desktop, no Wi-Fi, no Bluetooth) is not shown. The services are in `systemControls.ts` and use what GNOME uses, so both always agree: the shell's mixer (`audio.ts`, now with the default input), `Main.brightnessManager` (GNOME 48+) or the settings daemon, GnomeBluetooth, nmcli for NetworkManager, power-profiles-daemon over D-Bus, rfkill. Secured Wi-Fi networks NetworkManager does not know yet open GNOME's own Wi-Fi settings for the password. Not run on real hardware here: brightness (the test computer is a desktop with no backlight) and Wi-Fi (none).

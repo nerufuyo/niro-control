@@ -42,6 +42,7 @@ const TABS = {
     apps: {icon: 'island-apps', label: 'Apps'},
     devices: {icon: 'island-headphones', label: 'Devices'},
     usage: {icon: 'island-gauge', label: 'Usage'},
+    controls: {icon: 'island-settings', label: 'Controls'},
     system: {icon: 'island-bolt', label: 'System'},
     power: {icon: 'island-power', label: 'Power'},
 };

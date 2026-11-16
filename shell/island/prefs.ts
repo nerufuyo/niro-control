@@ -951,6 +951,7 @@ const PAGES = [
 const SHORTCUT_PAGES = [...PAGES.map(([name, title, iconName]) => [name, title, iconName]),
     ['apps', 'Apps', 'view-app-grid-symbolic'], ['devices', 'Devices', 'bluetooth-active-symbolic'],
     ['usage', 'AI Usage', 'power-profile-performance-symbolic'],
+    ['controls', 'Controls', 'preferences-system-symbolic'],
     ['system', 'System', 'utilities-system-monitor-symbolic'],
     ['power', 'Power', 'system-shutdown-symbolic']];
 

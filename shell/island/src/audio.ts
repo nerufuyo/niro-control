@@ -22,6 +22,9 @@ export class AudioOutputs extends Signals.EventEmitter {
         this._devices = new Map();
         this._sink = null;
         this._sinkIds = [];
+        this._source = null;
+        this._sourceIds = [];
+        this._inputs = new Map();
 
         for (let id = 0; id < MAX_DEVICE_ID; id++) {
             const device = this._mixer.lookup_output_id(id);
@@ -29,7 +32,25 @@ export class AudioOutputs extends Signals.EventEmitter {
                 this._devices.set(id, device);
         }
 
+        for (let id = 0; id < MAX_DEVICE_ID; id++) {
+            const device = this._mixer.lookup_input_id(id);
+            if (device)
+                this._inputs.set(id, device);
+        }
+
         this._mixerIds = [
+            this._mixer.connect('input-added', (_mixer, id) => {
+                const device = this._mixer.lookup_input_id(id);
+                if (device)
+                    this._inputs.set(id, device);
+                this._outputsChanged();
+            }),
+            this._mixer.connect('input-removed', (_mixer, id) => {
+                this._inputs.delete(id);
+                this._outputsChanged();
+            }),
+            this._mixer.connect('active-input-update', () => this._outputsChanged()),
+            this._mixer.connect('default-source-changed', () => this._watchSource()),
             this._mixer.connect('output-added', (_mixer, id) => {
                 const device = this._mixer.lookup_output_id(id);
                 if (device)
@@ -45,6 +66,7 @@ export class AudioOutputs extends Signals.EventEmitter {
             this._mixer.connect('state-changed', () => this._watchSink()),
         ];
         this._watchSink();
+        this._watchSource();
     }
 
     /** Volume of the default output, 0..1 (1 is 100%, not the boost limit). */
@@ -118,6 +140,64 @@ export class AudioOutputs extends Signals.EventEmitter {
         return sink ? this._mixer.lookup_device_from_stream(sink)?.get_id() ?? null : null;
     }
 
+    // ---- The microphone: the default input, as GNOME's Quick Settings has it
+
+    /** Whether there is a sound input to set at all. */
+    get hasInput() {
+        return Boolean(this._source);
+    }
+
+    /** Volume of the default input, 0..1. */
+    get micVolume() {
+        return this._source ? this._source.volume / this._mixer.get_vol_max_norm() : 0;
+    }
+
+    set micVolume(fraction) {
+        if (!this._source)
+            return;
+        const clamped = Math.min(1, Math.max(0, fraction));
+        this._source.volume = clamped * this._mixer.get_vol_max_norm();
+        if (this._source.is_muted && clamped > 0)
+            this._source.change_is_muted(false);
+        this._source.push_volume();
+    }
+
+    get micMuted() {
+        return this._source?.is_muted ?? false;
+    }
+
+    toggleMicMuted() {
+        this._source?.change_is_muted(!this.micMuted);
+    }
+
+    /** Inputs as `{id, name, detail, active}`, active first. */
+    get inputs() {
+        const source = this._mixer.get_default_source();
+        const activeId = source ? this._mixer.lookup_device_from_stream(source)?.get_id() ?? null : null;
+        return [...this._inputs.entries()]
+            .map(([id, device]) => ({id, name: device.get_description(), detail: device.get_origin(), active: id === activeId}))
+            .sort((a, b) => b.active - a.active || a.name.localeCompare(b.name));
+    }
+
+    /** Makes the input with `id` the default. */
+    activateInput(id) {
+        const device = this._inputs.get(id);
+        if (device)
+            this._mixer.change_input(device);
+    }
+
+    /** Moves the listeners to the current default source. */
+    _watchSource() {
+        this._sourceIds.forEach(id => this._source.disconnect(id));
+        this._sourceIds = [];
+        this._source = this._mixer.get_default_source();
+        if (this._source) {
+            this._sourceIds = ['notify::volume', 'notify::is-muted'].map(signal =>
+                this._source.connect(signal, () => this.emit('changed')));
+        }
+        this._outputsChanged();
+    }
+
     /** Moves the volume and mute listeners to the current default sink. */
     _watchSink() {
         this._sinkIds.forEach(id => this._sink.disconnect(id));
@@ -141,6 +221,7 @@ export class AudioOutputs extends Signals.EventEmitter {
         // Tell no one about changes made while tearing down.
         this.disconnectAll();
         this._sinkIds.forEach(id => this._sink.disconnect(id));
+        this._sourceIds.forEach(id => this._source.disconnect(id));
         this._mixerIds.forEach(id => this._mixer.disconnect(id));
     }
 }
