@@ -386,7 +386,8 @@ export function windowsPage(model: Model) {
 
 export function searchPage(model: Model) {
     const items = CATALOG.filter(i => i.menu === 'Search');
-    return page(model.section('Application Search', items, 'Finds the applications you have installed as you type. Its tone and opacity follow Look.'));
+    return page(model.section('Application Search', items.filter(i => i.group === 'Application Search'), 'Finds the applications you have installed as you type. Its tone and opacity follow Look.'),
+        model.section('Emoji Picker', items.filter(i => i.group === 'Emoji Picker'), 'Emoji, Kaomoji and text symbols, searched by name in English or Indonesian.'));
 }
 
 // ---- About

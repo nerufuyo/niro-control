@@ -324,6 +324,8 @@ export default class EmojiCopy extends Extension {
       _("Objects"),
       _("Symbols"),
       _("Flags"),
+      _("Kaomoji"),
+      _("Text symbols"),
     ];
 
     const CAT_ICONS = [
@@ -336,9 +338,11 @@ export default class EmojiCopy extends Extension {
       "emoji-objects-symbolic",
       "emoji-symbols-symbolic",
       "emoji-flags-symbolic",
+      "face-smile-big-symbolic",
+      "accessories-character-map-symbolic",
     ];
 
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < CAT_LABELS.length; i++) {
       this.emojiCategories[i] = new EmojiCategory(
         this,
         CAT_LABELS[i],
@@ -350,7 +354,7 @@ export default class EmojiCopy extends Extension {
   }
 
   _addAllCategories() {
-    for (let i = 0; i < 9; i++) {
+    for (let i = 0; i < this.emojiCategories.length; i++) {
       this.super_btn.menu.addMenuItem(this.emojiCategories[i].super_item);
     }
   }

@@ -16,7 +16,12 @@ const EMOJIS_CATEGORIES = {
   6: "Objects",
   7: "Symbols",
   8: "Flags",
+  9: "Kaomoji",
+  10: "Text Symbols",
 };
+
+// Kaomoji are text faces: wide, so fewer to a line and a smaller type
+const KAOMOJI = 9;
 
 export class EmojiCategory {
   /**
@@ -137,7 +142,7 @@ export class EmojiCategory {
   }
 
   setNbCols(nbColumns) {
-    this._nbColumns = nbColumns;
+    this._nbColumns = this.id === KAOMOJI ? Math.max(2, Math.floor(nbColumns / 4)) : nbColumns;
   }
 
   /**
@@ -221,7 +226,10 @@ export class EmojiCategory {
 
   updateStyle() {
     const emoji_size = this._settings.get_int("emojisize");
-    const style = `font-size: ${emoji_size}px;\ncolor: #FFFFFF`;
+    // a text face is wide: a button as wide as the face needs, in a text font, not an emoji's square
+    const style = this.id === KAOMOJI
+      ? `font-size: ${Math.max(14, Math.round(emoji_size * 0.55))}px;\ncolor: #FFFFFF;\nfont-family: sans-serif;\nwidth: ${Math.round(emoji_size * 7)}px;\nheight: 2em;`
+      : `font-size: ${emoji_size}px;\ncolor: #FFFFFF`;
     this.emojiButtons.forEach(function (b) {
       b.updateStyle(style);
     });

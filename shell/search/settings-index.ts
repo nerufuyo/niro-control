@@ -1861,5 +1861,115 @@ export const INDEX = [
   "key": "shortcut-swap-down",
   "kind": "shortcut",
   "managed": false
+ },
+ {
+  "id": "emoji.emoji-keybind",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Open the emoji picker",
+  "help": "Super+. and Super+; by default, as on Windows. Add or change them here.",
+  "key": "emoji-keybind",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
+  "id": "emoji.active-keybind",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Open with the shortcut",
+  "help": "Off: the picker only opens from its icon in the top bar.",
+  "key": "active-keybind",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "emoji.always-show",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Show the picker's icon",
+  "help": "The smiley in the top bar. Off: only the shortcut opens it.",
+  "key": "always-show",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "emoji.window-location",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Where it opens",
+  "help": "Under the top bar, or next to the text cursor.",
+  "key": "window-location",
+  "kind": "select",
+  "managed": false
+ },
+ {
+  "id": "emoji.position",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Order of the pieces",
+  "help": "Search and the recent row above the emoji, or below them.",
+  "key": "position",
+  "kind": "select",
+  "managed": false
+ },
+ {
+  "id": "emoji.nbcols",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Emoji per row",
+  "help": "How many emoji fit in a row of the picker.",
+  "key": "nbcols",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "emoji.emojisize",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Size of the emoji",
+  "help": "In pixels.",
+  "key": "emojisize",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "emoji.recent-rows",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Rows of recent emoji",
+  "help": "How many rows of the emoji used last are kept above the list.",
+  "key": "recent-rows",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "emoji.paste-on-select",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Paste when one is picked",
+  "help": "Off: it is only copied, and you paste it yourself.",
+  "key": "paste-on-select",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "emoji.keep-open",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Stay open after a pick",
+  "help": "Pick several in a row.",
+  "key": "keep-open",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "emoji.copy-on-close",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Copy several at once",
+  "help": "Right-click or Shift+Enter collects; the whole is copied when the picker closes.",
+  "key": "copy-on-close",
+  "kind": "switch",
+  "managed": false
  }
 ] as unknown as Item[];

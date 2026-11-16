@@ -3341,5 +3341,191 @@ export const CATALOG: Item[] = [
    "id": "tile.enabled",
    "op": "on"
   }
+ },
+ {
+  "id": "emoji.emoji-keybind",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Open the emoji picker",
+  "help": "Super+. and Super+; by default, as on Windows. Add or change them here.",
+  "detail": "Super+. and Super+; by default, as on Windows. Add or change them here.",
+  "source": "emoji",
+  "key": "emoji-keybind",
+  "type": "as",
+  "default": "['<Super>period', '<Super>semicolon']",
+  "unit": "",
+  "kind": "shortcut"
+ },
+ {
+  "id": "emoji.active-keybind",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Open with the shortcut",
+  "help": "Off: the picker only opens from its icon in the top bar.",
+  "detail": "Off: the picker only opens from its icon in the top bar.",
+  "source": "emoji",
+  "key": "active-keybind",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "emoji.always-show",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Show the picker's icon",
+  "help": "The smiley in the top bar. Off: only the shortcut opens it.",
+  "detail": "The smiley in the top bar. Off: only the shortcut opens it.",
+  "source": "emoji",
+  "key": "always-show",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "emoji.window-location",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Where it opens",
+  "help": "Under the top bar, or next to the text cursor.",
+  "detail": "Under the top bar, or next to the text cursor.",
+  "source": "emoji",
+  "key": "window-location",
+  "type": "s",
+  "default": "top-bar",
+  "unit": "",
+  "kind": "select",
+  "options": [
+   {
+    "value": "top-bar",
+    "label": "Top bar"
+   },
+   {
+    "value": "cursor",
+    "label": "At the cursor"
+   }
+  ]
+ },
+ {
+  "id": "emoji.position",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Order of the pieces",
+  "help": "Search and the recent row above the emoji, or below them.",
+  "detail": "Search and the recent row above the emoji, or below them.",
+  "source": "emoji",
+  "key": "position",
+  "type": "s",
+  "default": "top",
+  "unit": "",
+  "kind": "select",
+  "options": [
+   {
+    "value": "top",
+    "label": "Search on top"
+   },
+   {
+    "value": "bottom",
+    "label": "Search at the bottom"
+   }
+  ]
+ },
+ {
+  "id": "emoji.nbcols",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Emoji per row",
+  "help": "How many emoji fit in a row of the picker.",
+  "detail": "How many emoji fit in a row of the picker.",
+  "source": "emoji",
+  "key": "nbcols",
+  "type": "i",
+  "default": "11",
+  "unit": "",
+  "kind": "stepper",
+  "digits": 0,
+  "step": 1,
+  "min": 6,
+  "max": 16
+ },
+ {
+  "id": "emoji.emojisize",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Size of the emoji",
+  "help": "In pixels.",
+  "detail": "In pixels.",
+  "source": "emoji",
+  "key": "emojisize",
+  "type": "i",
+  "default": "30",
+  "unit": "px",
+  "kind": "stepper",
+  "digits": 0,
+  "step": 1,
+  "min": 18,
+  "max": 56
+ },
+ {
+  "id": "emoji.recent-rows",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Rows of recent emoji",
+  "help": "How many rows of the emoji used last are kept above the list.",
+  "detail": "How many rows of the emoji used last are kept above the list.",
+  "source": "emoji",
+  "key": "recent-rows",
+  "type": "i",
+  "default": "1",
+  "unit": "",
+  "kind": "stepper",
+  "digits": 0,
+  "step": 1,
+  "min": 1.0,
+  "max": 5.0
+ },
+ {
+  "id": "emoji.paste-on-select",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Paste when one is picked",
+  "help": "Off: it is only copied, and you paste it yourself.",
+  "detail": "Off: it is only copied, and you paste it yourself.",
+  "source": "emoji",
+  "key": "paste-on-select",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "emoji.keep-open",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Stay open after a pick",
+  "help": "Pick several in a row.",
+  "detail": "Pick several in a row.",
+  "source": "emoji",
+  "key": "keep-open",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "emoji.copy-on-close",
+  "menu": "Search",
+  "group": "Emoji Picker",
+  "title": "Copy several at once",
+  "help": "Right-click or Shift+Enter collects; the whole is copied when the picker closes.",
+  "detail": "Right-click or Shift+Enter collects; the whole is copied when the picker closes.",
+  "source": "emoji",
+  "key": "copy-on-close",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
  }
 ];

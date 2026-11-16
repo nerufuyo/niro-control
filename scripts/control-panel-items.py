@@ -16,6 +16,7 @@ SCHEMAS = {
     'blur': (next((EXT / 'blur/schemas').glob('*.gschema.xml')), 'org.gnome.shell.extensions.blur-my-shell.applications'),
     'corners': (next((EXT / 'corners/schemas').glob('*.gschema.xml')), 'org.gnome.shell.extensions.rounded-window-corners-reborn'),
     'tile': (next((EXT / 'tile/schemas').glob('*.gschema.xml')), 'org.gnome.shell.extensions.tile'),
+    'emoji': (next((EXT / 'emoji/schemas').glob('*.gschema.xml')), 'org.gnome.shell.extensions.emoji-copy'),
 }
 INTERNAL = {'update-shown', 'prefs-page', 'focus-dnd-owned', 'focus-dnd-declined', 'agents-announced', 'app-usage-clear',
             'event-calendar', 'clipboard-ignored-apps', 'check-updates'}
@@ -34,7 +35,7 @@ ADVANCED = {'app-rules', 'legacy-global-fade', 'custom-css', 'dock-background-co
             'voice-claude-model', 'voice-codex-model', 'voice-grok-model', 'voice-opencode-model', 'voice-agy-model',
             'voice-speech-model', 'voice-language', 'bot-glow', 'border-width', 'skip-libhandy-app', 'whitelist', 'blacklist',
             'notch-depth', 'hover-delay', 'auto-hide-delay'}
-SHORTCUT_KEYS = re.compile(r'^(shortcut-|voice-shortcut|toggle-dock|focus-app-|search-shortcut)')
+SHORTCUT_KEYS = re.compile(r'^(shortcut-|voice-shortcut|toggle-dock|focus-app-|search-shortcut|emoji-keybind)')
 # Look owns these: the island, the dock and the windows copy them from org.niro.control (niroSync.ts).
 MANAGED = {('island', 'glass-tint'): 'niro.opacity', ('dock', 'dock-opacity'): 'niro.opacity',
            ('dock', 'dock-blur-enabled'): 'niro.blur', ('dock', 'dock-background-color'): 'niro.tint',
@@ -233,11 +234,31 @@ for it in items:
     if it['id'] == 'tile.master-factor': it.update(step=0.05, digits=2)
     if it['id'] == 'tile.column-width': it.update(step=0.05, digits=2)
 
+# The emoji picker (Super+. and Super+;): its keys, with their own titles (the schema's texts are developer notes)
+def emoji_item(key, title, help, **extra):
+    it = build('emoji', 'Search', key, 'Emoji Picker', schema_keys('emoji')[key])
+    it.update(title=title, help=help, detail=help, group='Emoji Picker')
+    it.update(extra)
+    return it
+items += [
+    emoji_item('emoji-keybind', 'Open the emoji picker', 'Super+. and Super+; by default, as on Windows. Add or change them here.'),
+    emoji_item('active-keybind', 'Open with the shortcut', 'Off: the picker only opens from its icon in the top bar.'),
+    emoji_item('always-show', 'Show the picker\'s icon', 'The smiley in the top bar. Off: only the shortcut opens it.'),
+    emoji_item('window-location', 'Where it opens', 'Under the top bar, or next to the text cursor.', options=[dict(value='top-bar', label='Top bar'), dict(value='cursor', label='At the cursor')]),
+    emoji_item('position', 'Order of the pieces', 'Search and the recent row above the emoji, or below them.', options=[dict(value='top', label='Search on top'), dict(value='bottom', label='Search at the bottom')]),
+    emoji_item('nbcols', 'Emoji per row', 'How many emoji fit in a row of the picker.', min=6, max=16, unit=''),
+    emoji_item('emojisize', 'Size of the emoji', 'In pixels.', min=18, max=56, unit='px'),
+    emoji_item('recent-rows', 'Rows of recent emoji', 'How many rows of the emoji used last are kept above the list.'),
+    emoji_item('paste-on-select', 'Paste when one is picked', 'Off: it is only copied, and you paste it yourself.'),
+    emoji_item('keep-open', 'Stay open after a pick', 'Pick several in a row.'),
+    emoji_item('copy-on-close', 'Copy several at once', 'Right-click or Shift+Enter collects; the whole is copied when the picker closes.'),
+]
+
 # ---- checks
 ids = [i['id'] for i in items]
 assert len(ids) == len(set(ids)), 'duplicate ids'
 from collections import Counter; print(dict(Counter(i['menu'] for i in items)), dict(Counter((i['menu'],i['group']) for i in items if i['menu']=='Dock')))
-assert len(items) == 186, f'expected 186 items, got {len(items)}'
+assert len(items) == 197, f'expected 197 items, got {len(items)}'
 for i in items:
     assert '&' not in re.sub(r'&\s', '', i['title'] + i['help']) or '&apos;' not in i['title'], i
 

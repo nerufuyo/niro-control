@@ -6,6 +6,7 @@ import GLib from 'gi://GLib';
 const tmp = GLib.dir_make_tmp('niro-tile-XXXXXX');
 GLib.setenv('XDG_CONFIG_HOME', `${tmp}/config`, true);
 GLib.setenv('XDG_STATE_HOME', `${tmp}/state`, true);
+// (run.sh starts this with no session bus to talk to: the real session's extension, if it runs, must not answer)
 
 const {TileBackend, MANAGED, profileDir} = await import('../../control/build/tileBackend.js');
 const {Stores} = await import('../../control/build/store.js');
