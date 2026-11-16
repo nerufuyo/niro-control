@@ -16,15 +16,12 @@ import {stylesheet} from './appearanceTokens.js';
 import {compatPage} from './compatPage.js';
 import {homePage} from './homePage.js';
 import {profilesPage} from './profilesPage.js';
-import {hyprlandPage, hyprlandPresent} from './hyprlandPage.js';
 
 const MODULES = [
     ['home', 'Home', 'go-home-symbolic', (model, shared) => shared.home.widget],
     ['look', 'Look', 'preferences-desktop-appearance-symbolic', lookPage], ['island', 'Island', 'view-pin-symbolic', islandPage],
     ['dock', 'Dock', 'view-app-grid-symbolic', dockPage], ['windows', 'Windows', 'window-new-symbolic', windowsPage],
     ['search', 'Search', 'system-search-symbolic', searchPage],
-    // only where Hyprland is: the compositor's own look, written to a file of its own
-    ...(hyprlandPresent() ? [['hyprland', 'Hyprland', 'applications-system-symbolic', (model, shared) => shared.hyprland.widget]] : []),
     ['compat', 'Compatibility', 'preferences-system-symbolic', (model, shared) => shared.compat.widget],
     ['profiles', 'Profiles', 'user-bookmarks-symbolic', (model, shared) => shared.profiles.widget], ['about', 'About', 'help-about-symbolic', aboutPage],
 ];
@@ -114,7 +111,6 @@ export function buildWindow(app) {
     shared.profiles = profilesPage(model.engine, ctx);
     shared.home = homePage(model, ctx, shared.profiles, stale);
     shared.compat = compatPage(model, ctx);
-    if (hyprlandPresent()) shared.hyprland = hyprlandPage(model, ctx);
 
     const content = new Gtk.Stack({hexpand: true, vexpand: true, transition_type: Gtk.StackTransitionType.CROSSFADE, transition_duration: 120});
     // reduced motion: GNOME's animations switch also stops the panel's crossfade
