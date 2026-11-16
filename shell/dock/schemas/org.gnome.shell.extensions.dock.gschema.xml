@@ -3,7 +3,7 @@
   <schema id="org.gnome.shell.extensions.dock"
           path="/org/gnome/shell/extensions/dock/">
     <key name="icon-size" type="i">
-      <default>48</default>
+      <default>38</default>
       <summary>Icon size</summary>
       <description>Size of dock icons in pixels (16-96)</description>
     </key>
