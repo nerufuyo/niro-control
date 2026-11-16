@@ -5,3 +5,8 @@ favorite-apps=['org.gnome.Nautilus.desktop', 'google-chrome.desktop', 'org.mozil
 # Super+Space belongs to the search: the input-source switch keeps its media key only
 [org/gnome/desktop/wm/keybindings]
 switch-input-source=['XF86Keyboard']
+
+# Super+. and Super+; open Niro's emoji picker. IBus has its own emoji mode on the same keys and, in a text field, answered first (a small box under
+# the text with an "e"); without its hotkey the keys reach the picker
+[org/freedesktop/ibus/panel/emoji]
+hotkey=@as []
