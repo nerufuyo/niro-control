@@ -1659,8 +1659,8 @@ export const CATALOG: Item[] = [
   "menu": "Island",
   "group": "AI Usage",
   "title": "Show AI plan usage",
-  "help": "A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT (as Codex last saw it) and Grok, when found.",
-  "detail": "A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT (as Codex last saw it) and Grok, when found.",
+  "help": "A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT Plus or Pro (signed in with Codex, `codex login`), Grok, and the balance…",
+  "detail": "A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT Plus or Pro (signed in with Codex, `codex login`), Grok, and the balance of a DeepSeek API account (with its key).",
   "source": "island",
   "key": "usage-enabled",
   "type": "b",
@@ -1715,6 +1715,24 @@ export const CATALOG: Item[] = [
   "key": "usage-grok",
   "type": "b",
   "default": "true",
+  "unit": "",
+  "kind": "switch",
+  "depends": {
+   "id": "island.usage-enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "island.usage-deepseek",
+  "menu": "Island",
+  "group": "AI Usage",
+  "title": "Show DeepSeek's balance",
+  "help": "The money left on your DeepSeek API account, read with an API key that you add in Settings (Island, AI Usage).",
+  "detail": "The money left on your DeepSeek API account, read with an API key that you add in Settings (Island, AI Usage). The key stays in a private file of yours, never in these settings.",
+  "source": "island",
+  "key": "usage-deepseek",
+  "type": "b",
+  "default": "false",
   "unit": "",
   "kind": "switch",
   "depends": {

@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 197 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 198 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -266,3 +266,14 @@ the Unicode emoji (which are untouched): "Kaomoji" (text faces) and "Text Symbol
 are replaced); a symbol's search words are its Unicode name plus English and Indonesian words for its set. In the picker they are categories 9 and 10 (`emojiCategory.js`):
 Kaomoji are laid out two to a row, in a text font, in wide buttons. `tests/island/emojiExtras.test.js` reads the database with `node:sqlite`. The extension's code
 (categories, buttons) is loaded once per shell: a new version shows after the next login; a new database is read each time the extension is enabled.
+
+## AI usage: Claude, ChatGPT Plus/Pro, Grok, DeepSeek
+
+`crates/island-daemon/src/usage.rs` reads each provider where its own tool does: Claude with Claude Code's sign-in, ChatGPT (Plus or Pro; the 5-hour and weekly limits) with
+Codex's sign-in (`codex login`, "Sign in with ChatGPT"; the plan name comes from the answer, so Plus shows as Plus), Grok with its CLI's. **DeepSeek** has no sign-in: its
+card shows the balance left on an API account (`GET https://api.deepseek.com/user/balance`, `Authorization: Bearer <key>`; a balance in each currency, topped up and
+granted, "too low to call the API" when `is_available` is false), no bars, as there are no limits. The key is in `~/.config/niro/deepseek-api-key` (mode 600, one line, written by the
+panel's Island > AI Usage > Connections) or in `DEEPSEEK_API_KEY`; it is never in dconf, never logged and never sent to the page. `usage-deepseek` is off by default (it would be a card
+nobody asked for); saving a key turns it and `usage-enabled` on. With the switch on and no key, the card says where to put it. The balance is asked every ten minutes and when the page opens
+(at most every two). The panel's "Connections" group (`control/src/aiConnections.ts`) says, for each AI, whether its sign-in is found and how to make one. Tested by Rust tests (the
+parsing, and the HTTP request against a local server, including 401, 500, a non-JSON answer and no network) and by `tests/gjs/aiConnections.test.js`.

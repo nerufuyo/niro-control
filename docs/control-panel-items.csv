@@ -96,10 +96,11 @@ Island,Voice Assistant,The colours the island glows with while the assistant is 
 Island,Voice Assistant,How long the assistant keeps a conversation,select,Idle 30m / Idle 2h / Day,day,"Until midnight (never more than a day), or after 30 minutes or 2 hours without a word: then it starts a new one and deletes the old, here and in the…",voice-keep-chat,island.voice-keep-chat
 Island,Voice Assistant,Send the selected text to the voice assistant,switch,,false,"So it can work on it (""make this shorter"").",voice-use-selection,island.voice-use-selection
 Island,Voice Assistant,Let the voice assistant read notifications,switch,,false,"Send the last few notifications with each request, so the AI (Claude Code, Codex, Grok, opencode or Antigravity) can read them out or summarise them.",voice-read-notifications,island.voice-read-notifications
-Island,AI Usage,Show AI plan usage,switch,,true,"A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT (as Codex last saw it) and Grok, when found.",usage-enabled,island.usage-enabled
+Island,AI Usage,Show AI plan usage,switch,,true,"A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT Plus or Pro (signed in with Codex, `codex login`), Grok, and the balance…",usage-enabled,island.usage-enabled
 Island,AI Usage,Show Claude's usage,switch,,true,,usage-claude,island.usage-claude
 Island,AI Usage,Show ChatGPT's usage,switch,,true,,usage-codex,island.usage-codex
 Island,AI Usage,Show Grok's usage,switch,,true,,usage-grok,island.usage-grok
+Island,AI Usage,Show DeepSeek's balance,switch,,false,"The money left on your DeepSeek API account, read with an API key that you add in Settings (Island, AI Usage).",usage-deepseek,island.usage-deepseek
 Island,AI Usage,Warn at this share of a limit (%),slider,50–99,80,,usage-warn,island.usage-warn
 Island,AI Usage,Warn again at this share of a limit (%),slider,50–100,95,,usage-critical,island.usage-critical
 Island,Alerts,"Play a sound when a focus session or break ends, and for reminders",switch,,true,,chimes,island.chimes

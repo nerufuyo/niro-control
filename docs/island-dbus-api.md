@@ -298,7 +298,7 @@ nothing runs.
 
 | Member | Signature | |
 |---|---|---|
-| `SetConfig(s config)` | | `{enabled, claude, codex, grok, assistant, warn, critical}`, from Settings; off until set. `assistant` false: a plan seen here starts no AI to list its models. |
+| `SetConfig(s config)` | | `{enabled, claude, codex, grok, deepseek, assistant, warn, critical}`, from Settings; off until set (`deepseek` off by default: it needs an API key). `assistant` false: a plan seen here starts no AI to list its models. |
 | `Refresh()` | | Reads again now (Claude at most every two minutes). |
 | `Usage` | `s` | `{providers: [{id, name, plan, windows: [{label, percent, resets_at_ms}], updated_ms, note}]}`; a provider not signed in is left out. |
 | `Alert` (signal) | `ssdx` | `(provider, window, percent, resets_at_ms)`: a limit passed the warning or the critical share, once per window. |

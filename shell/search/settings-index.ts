@@ -977,7 +977,7 @@ export const INDEX = [
   "menu": "Island",
   "group": "AI Usage",
   "title": "Show AI plan usage",
-  "help": "A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT (as Codex last saw it) and Grok, when found.",
+  "help": "A Usage page and warnings for Claude (signed in with Claude Code), ChatGPT Plus or Pro (signed in with Codex, `codex login`), Grok, and the balance…",
   "key": "usage-enabled",
   "kind": "switch",
   "managed": false
@@ -1009,6 +1009,16 @@ export const INDEX = [
   "title": "Show Grok's usage",
   "help": "",
   "key": "usage-grok",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "island.usage-deepseek",
+  "menu": "Island",
+  "group": "AI Usage",
+  "title": "Show DeepSeek's balance",
+  "help": "The money left on your DeepSeek API account, read with an API key that you add in Settings (Island, AI Usage).",
+  "key": "usage-deepseek",
   "kind": "switch",
   "managed": false
  },

@@ -15,3 +15,4 @@ GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m t
 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/tileBackend.test.js
 # no shell on the bus: the real session's extension (if it runs) must not answer
 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/tilingPage.test.js
+DEEPSEEK_API_KEY= GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/aiConnections.test.js
