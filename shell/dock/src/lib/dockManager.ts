@@ -50,6 +50,7 @@ export class DockManager {
   private _lastFocusedApp: Shell.App | null = null;
   private _recentlyLaunched: Set<string> = new Set();
   private _debounceSourceId: number | null = null;
+  private _repositionSourceId: number | null = null;
   private _originalDashVisible?: boolean;
   private _dockPosition: number = POSITIONS.BOTTOM;
   private _blurEffect: Shell.BlurEffect | null = null;
@@ -521,6 +522,10 @@ export class DockManager {
       GLib.source_remove(this._debounceSourceId);
       this._debounceSourceId = null;
     }
+    if (this._repositionSourceId !== null) {
+      GLib.source_remove(this._repositionSourceId);
+      this._repositionSourceId = null;
+    }
 
     if (this._launchBounceId) {
       GLib.source_remove(this._launchBounceId);
@@ -777,10 +782,18 @@ export class DockManager {
   private _updatePosition(): void {
     if (!this._container) return;
 
-    // Skip position recalculation while the dock is shown or a visibility
-    // animation is running. The show/hide animation owns the container's
-    // translation and a layout update here would conflict with it.
-    if (this._visibility && (this._visibility.isShown() || this._visibility.isAnimating())) {
+    // The show/hide animation owns the container's translation, so a layout
+    // update mid-animation would conflict with it: try again once it is done.
+    // A dock that is simply shown must still be re-centred (icon size, icons
+    // added or removed), so only the animation holds this back.
+    if (this._visibility?.isAnimating()) {
+      if (this._repositionSourceId === null) {
+        this._repositionSourceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 100, () => {
+          this._repositionSourceId = null;
+          this._updatePosition();
+          return GLib.SOURCE_REMOVE;
+        });
+      }
       return;
     }
 
