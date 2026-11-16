@@ -53,7 +53,7 @@
       <description>Window classes (the app id, like org.gnome.Calculator) that stay as they are: calculators, pickers and the like.</description>
     </key>
     <key name="shortcut-toggle" type="as">
-      <default>["&lt;Super&gt;&lt;Alt&gt;t"]</default>
+      <default>["&lt;Super&gt;&lt;Alt&gt;g"]</default>
       <summary>Tiling on or off</summary>
       <description>Turns the tiling of windows on and off.</description>
     </key>
