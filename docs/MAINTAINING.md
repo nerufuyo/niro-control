@@ -192,19 +192,6 @@ leaves. `Intellihide` looks again on `size-changed`, `minimize`, `unminimize`, `
 changes: maximizing restacks nothing, so `restacked` alone missed it. A headless test that checks the dock must keep the
 Overview closed (an empty headless shell opens it, and the dock rightly leaves with it).
 
-## Hyprland page (the panel only)
-
-The island, dock, search, blur and corners are GNOME Shell extensions and stay that. Only the control panel knows Hyprland: a
-"Hyprland" module (`control/src/hyprlandPage.ts`, logic in `control/src/hyprland.ts`) that shows where Hyprland is (`hyprctl` in
-the PATH, `~/.config/hypr/`, or `HYPRLAND_INSTANCE_SIGNATURE`; `NIRO_HYPRLAND=1` forces it) and nowhere else. Gaps, border,
-corners, blur, shadow, opacity, animations and a few input settings are written to `~/.config/hypr/niro.conf`, only the ones that
-differ from Hyprland's default, and applied at once with `hyprctl keyword`. `hyprland.conf` gets one marked line
-(`source = …/niro.conf # niro-control`) that "Connect" adds and "Disconnect" removes; nothing else of it is ever written. The option
-layouts are the four Hyprland names itself lists (dwindle, master, scrolling, monocle) with the options of each (`dwindle:*`, `master:*`, `scrolling:*`); a layout an older Hyprland does not know is refused by `hyprctl keyword`, which the page reads and then puts the old value back with a message. An "Arrangement" row applies ten ready arrangements (`ARRANGEMENTS` in `hyprland.ts`): Dwindle, Master left/right, Center master, Scrolling and Monocle are Hyprland's own; Grid, Three columns and the two splits are not layouts of Hyprland and are the nearest its options reach (Dwindle with `split_width_multiplier` for the splits, Centre master for three columns, balanced Dwindle for a grid), said so in the row's note. An exact grid needs a plugin. Every arrangement sets all of `ARRANGE_KEYS`, so none leaves settings behind; changing one of them by hand shows "Custom". The option
-names are those of current Hyprland (`decoration:shadow:*`, not the old `drop_shadow`); an older Hyprland ignores what it does not
-know. `NIRO_HYPR_DIR` moves the folder for tests. Not tested against a running Hyprland (none is installed here): the file and the
-line are, by `tests/island/hyprland.test.js` and `tests/gjs/hyprland.test.js`.
-
 ## Rounded corners on GNOME 51 (Wayland windows)
 
 On GNOME 51 the corners extension did nothing for a native Wayland window (Chrome, GTK apps): `Meta.Window.get_wm_class_instance()` is
