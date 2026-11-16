@@ -2,6 +2,7 @@
 // Tile: arranges the windows of each monitor in the chosen layout (see layouts.js), and keeps them so as windows come and go.
 // Off until switched on (`enabled`): nothing is moved before that. Dialogs, full-screen, maximized, minimized and floated windows
 // are left as they are.
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
@@ -12,11 +13,13 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {PACKAGE_VERSION} from 'resource:///org/gnome/shell/misc/config.js';
 
-import {arrange, LAYOUT_IDS, LAYOUTS} from './layouts.js';
+import {arrange, dwindleSplits, inner, LAYOUT_IDS, LAYOUTS} from './layouts.js';
 
 const RETILE_MS = 60;
 const SHELL_MAJOR = parseInt(PACKAGE_VERSION.split('.')[0], 10);
 const unmaximize = win => (SHELL_MAJOR >= 49 ? win.unmaximize() : win.unmaximize(Meta.MaximizeFlags.BOTH));
+// the grab operations that pull a window's edge or corner
+const RESIZING = new Set(Object.entries(Meta.GrabOp).filter(([name]) => /^RESIZING/.test(name)).map(([, v]) => v));
 const isMaximized = win => Boolean(win.maximized_horizontally && win.maximized_vertically);
 const KEYS = ['toggle', 'layout', 'promote', 'float', 'grow', 'shrink'];
 
@@ -33,6 +36,10 @@ export default class Tile extends Extension {
         this._ghosts = [];                // the preview of the layout shown while a window is carried
         this._ghostTimer = 0;
         this._ghostCell = null;           // {monitor, index}: the tile the carried window would take
+        this._resizing = null;            // the tiled window whose edge is being pulled
+        this._ratios = new Map();         // monitor: Dwindle's split shares, made by resizing
+        this._weights = new Map();        // monitor: the sizes of Horizontal and Vertical's tiles, made by resizing
+        this._shape = new Map();          // monitor: which layout and count those belong to; another and they are forgotten
         this._placed = new WeakSet();     // windows the tiling has put in a tile: one of them maximized afterwards stays maximized
 
         const wm = global.window_manager;
@@ -84,6 +91,7 @@ export default class Tile extends Extension {
         this._floating = null;
         this._state = null;
         this._stopGhost();
+        this._ratios = this._weights = this._shape = null;
         this._placed = null;
         this._settings = null;
     }
@@ -141,7 +149,7 @@ export default class Tile extends Extension {
 
     _schedule() {
         // not while a window is carried: it would be put back under the pointer
-        if (this._retileId || !this._settings || this._dragging)
+        if (this._retileId || !this._settings || this._dragging || this._resizing)
             return;
         this._retileId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, RETILE_MS, () => {
             this._retileId = 0;
@@ -168,13 +176,8 @@ export default class Tile extends Extension {
             if (!windows.length)
                 continue;
             const area = Main.layoutManager.getWorkAreaForMonitor(monitor);
-            const rects = arrange(layout, windows.length, {x: area.x, y: area.y, width: area.width, height: area.height}, {
-                gapInner: this._settings.get_int('gap-inner'),
-                gapOuter: this._settings.get_int('gap-outer'),
-                masterFactor: this._settings.get_double('master-factor'),
-                columnWidth: this._settings.get_double('column-width'),
-                focus: Math.max(0, windows.indexOf(focus)),
-            });
+            const rects = arrange(layout, windows.length, {x: area.x, y: area.y, width: area.width, height: area.height},
+                this._options(Math.max(0, windows.indexOf(focus)), monitor, windows.length));
             windows.forEach((w, i) => this._place(w, rects[i]));
             if (layout === 'monocle' && focus && windows.includes(focus))
                 focus.raise();
@@ -189,6 +192,21 @@ export default class Tile extends Extension {
         if (now.x === r.x && now.y === r.y && now.width === r.width && now.height === r.height)
             return;
         win.move_resize_frame(true, r.x, r.y, r.width, r.height);
+        this._glide(win, now, r);
+    }
+
+    /** The window glides from where it was to where it went, rather than jumping: its picture is moved back and let go. */
+    _glide(win, from, to) {
+        const actor = win.get_compositor_private();
+        if (!actor || !this._settings.get_boolean('animate') || !St.Settings.get().enable_animations)
+            return;
+        const dx = from.x - to.x, dy = from.y - to.y;
+        if (!dx && !dy)
+            return;
+        actor.remove_all_transitions();
+        actor.translation_x = dx;
+        actor.translation_y = dy;
+        actor.ease({translation_x: 0, translation_y: 0, duration: 200, mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
     }
 
     // ---- Drag and drop, with a preview of the layout
@@ -197,13 +215,27 @@ export default class Tile extends Extension {
     // window included), the cell under the pointer lit. Letting go puts the window in that cell and the others move over for it.
 
     _beginDrag(win, op) {
-        if (!this._settings?.get_boolean('enabled') || op !== Meta.GrabOp.MOVING || !this._order.includes(win) || !this._eligible(win))
+        if (!this._settings?.get_boolean('enabled') || !this._order.includes(win) || !this._eligible(win))
             return;
-        this._dragging = win;
-        this._startGhost();
+        if (op === Meta.GrabOp.MOVING) {
+            this._dragging = win;
+            this._startGhost();
+        } else if (RESIZING.has(op)) {
+            this._resizing = win;   // the tiling waits; the new size is taken in when the edge is let go
+        }
     }
 
     _endDrag(win) {
+        if (this._resizing && this._resizing === win) {
+            this._resizing = null;
+            try {
+                this._resized(win);
+            } catch (e) {
+                console.warn(`Tile: ${e.message}`);
+            }
+            this._schedule();
+            return;
+        }
         if (!this._dragging || this._dragging !== win)
             return;
         this._dragging = null;
@@ -220,13 +252,18 @@ export default class Tile extends Extension {
         return this._order.filter(w => w !== except && this._eligible(w) && w.get_workspace() === workspace && w.get_monitor() === monitor);
     }
 
-    _options(focus = 0) {
+    _options(focus = 0, monitor = -1, count = 0) {
+        // what resizing made belongs to one layout and one number of windows on a monitor: another, and it starts over
+        const key = `${this._settings.get_string('layout')}:${count}`;
+        const mine = this._shape.get(monitor) === key;
         return {
             gapInner: this._settings.get_int('gap-inner'),
             gapOuter: this._settings.get_int('gap-outer'),
             masterFactor: this._settings.get_double('master-factor'),
             columnWidth: this._settings.get_double('column-width'),
             focus,
+            ratios: mine ? this._ratios.get(monitor) : undefined,
+            weights: mine ? this._weights.get(monitor) : undefined,
         };
     }
 
@@ -277,7 +314,7 @@ export default class Tile extends Extension {
         const monitor = this._monitorAt(x, y);
         const others = this._tiledOn(monitor, win);
         const area = Main.layoutManager.getWorkAreaForMonitor(monitor);
-        const rects = arrange(this._settings.get_string('layout'), others.length + 1, {x: area.x, y: area.y, width: area.width, height: area.height}, this._options());
+        const rects = arrange(this._settings.get_string('layout'), others.length + 1, {x: area.x, y: area.y, width: area.width, height: area.height}, this._options(0, -1, others.length + 1));
         const shown = rects.filter(r => !r.hidden);
         const index = this._cellAt(shown, x, y);
         this._ghostCell = {monitor, index};
@@ -297,6 +334,86 @@ export default class Tile extends Extension {
             else
                 g.remove_style_pseudo_class('active');
         });
+    }
+
+    /**
+     * `win` was resized by hand: what the new size says about the layout is kept, so the others follow. The main window of the Master
+     * layouts sets the master size, the columns of Scrolling set their width, and Dwindle, Horizontal and Vertical keep the shares.
+     * Grid, Three columns and Monocle have no sizes to set: the window goes back.
+     */
+    _resized(win) {
+        const monitor = win.get_monitor();
+        const windows = this._tiledOn(monitor);
+        const i = windows.indexOf(win);
+        const n = windows.length;
+        if (i < 0)
+            return;
+        const layout = this._settings.get_string('layout');
+        const area = Main.layoutManager.getWorkAreaForMonitor(monitor);
+        const opts = this._options(0, monitor, n);
+        const a = inner({x: area.x, y: area.y, width: area.width, height: area.height}, opts.gapOuter);
+        const rects = arrange(layout, n, {x: area.x, y: area.y, width: area.width, height: area.height}, opts);
+        const f = win.get_frame_rect();
+        const dw = Math.abs(f.width - rects[i].width) >= 4;
+        const dh = Math.abs(f.height - rects[i].height) >= 4;
+        if (!dw && !dh)
+            return;
+        const gap = opts.gapInner;
+        const keep = (field, value, lo, hi) => this._settings.set_double(field, Math.round(Math.max(lo, Math.min(hi, value)) * 100) / 100);
+        const remember = (ratios, weights) => {
+            this._shape.set(monitor, `${layout}:${n}`);
+            if (ratios) this._ratios.set(monitor, ratios);
+            if (weights) this._weights.set(monitor, weights);
+        };
+        switch (layout) {
+        case 'master-left':
+        case 'master-right':
+        case 'center-master': {
+            if (n < 2 || !dw)
+                break;
+            const centre = layout === 'center-master' && n >= 3;
+            const room = a.width - (centre ? 2 : 1) * gap;
+            keep('master-factor', i === 0 ? f.width / room : 1 - (centre ? 2 : 1) * f.width / room, 0.1, 0.9);
+            break;
+        }
+        case 'scrolling':
+            if (dw)
+                keep('column-width', f.width / a.width, 0.2, 1);
+            break;
+        case 'horizontal':
+            if (dw)
+                remember(null, rects.map((r, k) => (k === i ? f.width : r.width)));
+            break;
+        case 'vertical':
+            if (dh)
+                remember(null, rects.map((r, k) => (k === i ? f.height : r.height)));
+            break;
+        case 'dwindle': {
+            if (n < 2)
+                break;
+            const splits = dwindleSplits(n, a, gap, opts.ratios);
+            const ratios = splits.map(sp => sp.share);
+            if (i < n - 1) {   // the window is the first half of its own split
+                const sp = splits[i];
+                if (sp.wide && dw)
+                    ratios[i] = f.width / (sp.rest.width - gap);
+                else if (!sp.wide && dh)
+                    ratios[i] = f.height / (sp.rest.height - gap);
+            }
+            if (i >= 1) {   // and the second half of the one before: it gives the space the window has left, when its size says so
+                const sp = splits[i - 1];
+                const ownWide = i < n - 1 ? splits[i].wide : null;
+                if (sp.wide && dw && (ownWide === null || !ownWide))
+                    ratios[i - 1] = 1 - f.width / (sp.rest.width - gap);
+                else if (!sp.wide && dh && (ownWide === null || ownWide))
+                    ratios[i - 1] = 1 - f.height / (sp.rest.height - gap);
+            }
+            remember(ratios.map(r => Math.max(0.1, Math.min(0.9, r))), null);
+            break;
+        }
+        default:
+            break;   // no sizes to keep: it goes back to its tile
+        }
     }
 
     /** `win` goes to place `index` among the tiled windows of `monitor`; the others move over. */

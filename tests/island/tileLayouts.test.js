@@ -83,3 +83,30 @@ test('a nonsense count gives nothing, an unknown layout is Dwindle', () => {
     assert.deepEqual(arrange('grid', 0, AREA, OPT), []);
     assert.deepEqual(arrange('nope', 3, AREA, OPT), arrange('dwindle', 3, AREA, OPT));
 });
+
+test('dwindle ratios move the splits, the windows still do not overlap or leave the area', async () => {
+    const {dwindleSplits} = await import('../../shell/tile/layouts.js');
+    const even = arrange('dwindle', 3, AREA, OPT);
+    const wide = arrange('dwindle', 3, AREA, {...OPT, ratios: [0.7]});
+    assert.ok(wide[0].width > even[0].width && wide[1].x > even[1].x);
+    for (let n = 2; n <= 8; n++) {
+        const rects = arrange('dwindle', n, AREA, {...OPT, ratios: [0.3, 0.8, 0.5, 0.2]});
+        for (let i = 0; i < n; i++) {
+            assert.ok(rects[i].x >= 12 && rects[i].x + rects[i].width <= 2548 + 1 && rects[i].y + rects[i].height <= 1068 + 1);
+            for (let j = i + 1; j < n; j++) assert.ok(!hit(rects[i], rects[j]), `${n}: ${i} ${j}`);
+        }
+    }
+    const splits = dwindleSplits(3, {x: 12, y: 44, width: 2536, height: 1024}, 10, [0.3]);
+    assert.equal(splits.length, 2);
+    assert.ok(splits[0].wide && splits[0].share === 0.3);
+});
+
+test('horizontal and vertical weights size the columns and rows in proportion', () => {
+    const [a, b] = arrange('horizontal', 2, AREA, {...OPT, weights: [3, 1]});
+    assert.ok(Math.abs(a.width / b.width - 3) < 0.02);
+    assert.equal(b.x - (a.x + a.width), 10);
+    const [c, d] = arrange('vertical', 2, AREA, {...OPT, weights: [1, 3]});
+    assert.ok(Math.abs(d.height / c.height - 3) < 0.02);
+    // weights for another number of windows are ignored: equal parts
+    assert.deepEqual(arrange('horizontal', 3, AREA, {...OPT, weights: [3, 1]}), arrange('horizontal', 3, AREA, OPT));
+});

@@ -47,6 +47,11 @@
       <summary>Width of a column in Scrolling</summary>
       <description>The share of the screen one column takes in the Scrolling layout (0.2-1).</description>
     </key>
+    <key name="animate" type="b">
+      <default>true</default>
+      <summary>Slide windows into their tiles</summary>
+      <description>A window that goes to its tile glides there instead of jumping. Follows the system's animations switch.</description>
+    </key>
     <key name="floating-apps" type="as">
       <default>[]</default>
       <summary>Applications never tiled</summary>
