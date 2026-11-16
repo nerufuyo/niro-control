@@ -34,6 +34,16 @@ rounding.set_value(0);   // the default: not worth a line
 if (/rounding/.test(text('niro.conf'))) fail('a default was written');
 if (page.values()['decoration:blur:enabled'] !== false) fail('value lost');
 
+// an arrangement sets its layout and options at once; changing one option by hand makes it Custom
+const arrangement = find(page.widget, 'Arrangement') ?? fail('no arrangement row');
+arrangement.set_selected(3);   // Center master
+if (!/general:layout = master/.test(text('niro.conf')) || !/master:orientation = center/.test(text('niro.conf'))) fail(`arrangement not written: ${text('niro.conf')}`);
+const mfact = find(page.widget, 'Master: size of the large window') ?? fail('no mfact row');
+mfact.set_value(0.8);
+if (arrangement.get_selected() !== 10) fail(`not Custom after a change: ${arrangement.get_selected()}`);
+arrangement.set_selected(0);   // Dwindle: nothing of the others left behind
+if (/master:/.test(text('niro.conf'))) fail(`Dwindle left master settings: ${text('niro.conf')}`);
+
 // connect: one line is added; disconnect: hyprland.conf is as it was
 let connect; const walk = w => { for (let c = w.get_first_child(); c; c = c.get_next_sibling()) { if (c instanceof Gtk.Button && c.label === 'Connect') connect = c; walk(c); } }; walk(page.widget);
 connect ?? fail('no Connect button');

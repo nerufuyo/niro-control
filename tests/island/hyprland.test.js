@@ -51,3 +51,23 @@ test('hyprctl is given the option and the value as Hyprland writes them', () => 
     assert.deepEqual(keywordArgs(BY_KEY.get('decoration:blur:enabled'), true), ['keyword', 'decoration:blur:enabled', 'true']);
     assert.deepEqual(keywordArgs(BY_KEY.get('decoration:active_opacity'), 0.8500001), ['keyword', 'decoration:active_opacity', '0.85']);
 });
+
+test('all four layouts are offered, and every layout has its own options', () => {
+    const layout = BY_KEY.get('general:layout');
+    assert.deepEqual(layout.options.map(o => o[0]), ['dwindle', 'master', 'scrolling', 'monocle']);
+    for (const prefix of ['dwindle:', 'master:', 'scrolling:']) assert.ok(DEFS.some(d => d.key.startsWith(prefix) && d.group === 'Layout'), prefix);
+    assert.deepEqual(parse(serialize({'general:layout': 'scrolling', 'master:orientation': 'center'})), {'general:layout': 'scrolling', 'master:orientation': 'center'});
+});
+
+test('the ten arrangements name real settings, are told apart, and a changed option makes them Custom', async () => {
+    const {ARRANGEMENTS, ARRANGE_KEYS, currentArrangement} = await import('../../control/build/hyprland.js');
+    assert.equal(ARRANGEMENTS.length, 10);
+    assert.equal(new Set(ARRANGEMENTS.map(a => a.id)).size, 10);
+    for (const a of ARRANGEMENTS) {
+        for (const k of ARRANGE_KEYS) assert.ok(k in a.values, `${a.id} sets ${k}`);
+        assert.equal(currentArrangement(a.values), a.id);
+        assert.deepEqual(parse(serialize(changed(a.values))), changed(a.values));
+    }
+    assert.equal(currentArrangement({}), 'dwindle');   // Hyprland's own defaults are Dwindle
+    assert.equal(currentArrangement({'general:layout': 'master', 'master:orientation': 'left', 'master:mfact': 0.8}), undefined);
+});
