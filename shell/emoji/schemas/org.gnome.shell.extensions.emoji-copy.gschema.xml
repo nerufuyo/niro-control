@@ -40,7 +40,7 @@
         <choice value="top-bar"/>
         <choice value="cursor"/>
       </choices>
-      <default>'top-bar'</default>
+      <default>'cursor'</default>
       <summary>Window location mode</summary>
       <description>Where to display the emoji window: 'Top bar', 'Cursor'.</description>
     </key>
