@@ -226,3 +226,15 @@ the command line and the panel talk to that and to the settings. Per-workspace a
 (`{"workspaces": {"2": "grid"}, "monitors": {"1": "monocle"}}`, a workspace's wins over its monitor's, which wins over `layout`).
 Rules: `window-rules` (`float`, `tile`, or `workspace` to send an app's windows there). Directional focus and swap: `Super+Ctrl+arrows`,
 with Shift to swap (`neighbor()` in config.js picks the window nearest that way).
+
+### `niro-tile` (the command line) and the backend
+
+`control/src/tileBackend.ts` is what both `niro-tile` (`control/src/tileCli.ts`, launcher `control/niro-tile`, installed to `/usr/bin`) and the panel's Tiling
+pages use. It reads the settings and asks the extension over D-Bus (`org.niro.Tile`) for the live state; with no extension running, `apply`
+writes the settings and the extension reads them when it starts. `change()` is the only way several settings are written: checked
+(`validate`), the old values saved as a backup (`~/.local/state/niro/tile-backups`, newest 20), written, read back, and put back if
+anything differs or throws. `niro-tile undo` restores the newest backup. Profiles are JSON files (`version` 1) in
+`~/.config/niro/tile-profiles`; a file with another version or bad values is refused with a sentence, never half-applied. `layouts.js` and
+`config.js` are copied into `control/build/tile/` by `npm run build` so the panel and the command line use the same pure code.
+Commands: `state`, `layouts`, `apply <layout> [--workspace N] [--monitor N]`, `clear`, `on|off|toggle`, `profile list|save|load|delete|export|import`,
+`validate [file]`, `reset [--yes]`, `undo`, `doctor` (`--json` for the ones that print data). Tested by `tests/gjs/tileBackend.test.js`.

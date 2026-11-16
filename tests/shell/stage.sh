@@ -15,7 +15,7 @@ for e in blur corners emoji tile; do cp -r "shell/$e" "$X/$e@niro.local"; done
 cp shell/emulator/build/extension.js shell/emulator/metadata.json "$X/emulator@niro.local/"
 for d in "$X"/*/schemas; do rm -f "$d/gschemas.compiled"; glib-compile-schemas "$d"; done
 cp control/org.niro.control.gschema.xml "$P/share/glib-2.0/schemas/"; glib-compile-schemas "$P/share/glib-2.0/schemas"
-cp control/build/*.js "$P/share/niro-control/"; cp -r control/profiles "$P/share/niro-control/"; cp control/gtk3-probe.js "$P/share/niro-control/"
+cp control/build/*.js "$P/share/niro-control/"; mkdir -p "$P/share/niro-control/tile"; cp control/build/tile/*.js "$P/share/niro-control/tile/"; cp -r control/profiles "$P/share/niro-control/"; cp control/gtk3-probe.js "$P/share/niro-control/"
 D="${DAEMON:-$PWD/target/release/island-daemon}"
 for u in org.niro.island.Daemon.service; do sed "s|@BINDIR@|$(dirname "$D")|" "data/$u" > "$P/share/dbus-1/services/$u"; done
 mkdir -p "$P/bin"; printf '#!/bin/sh\nexec gjs -m %s/share/niro-control/niro-control.js "$@"\n' "$P" > "$P/bin/niro-control"; chmod +x "$P/bin/niro-control"
