@@ -238,3 +238,12 @@ anything differs or throws. `niro-tile undo` restores the newest backup. Profile
 `config.js` are copied into `control/build/tile/` by `npm run build` so the panel and the command line use the same pure code.
 Commands: `state`, `layouts`, `apply <layout> [--workspace N] [--monitor N]`, `clear`, `on|off|toggle`, `profile list|save|load|delete|export|import`,
 `validate [file]`, `reset [--yes]`, `undo`, `doctor` (`--json` for the ones that print data). Tested by `tests/gjs/tileBackend.test.js`.
+
+### The panel's Tiling module
+
+`control/src/tilingPage.ts`, in the sidebar as "Tiling": Overview (switch, layout, workspace, monitors, windows, session; a banner when the session is not GNOME),
+Layouts (ten cards, each with a diagram drawn from `arrange()`, and "Apply to": all workspaces, the active one, or a monitor), Workspaces and Monitors
+(a layout for each, "Default" clears it; both follow the shell every 1.5 s while shown, so a hotplug shows), Window Rules (list, add form with a picker of the open windows'
+classes), Appearance (gaps, animation, corner radius, opacity, shadow; there is no border setting because GNOME draws none and the tiling adds none), Shortcuts (the
+recorder with clash detection), Profiles (save, load, export, import, delete, undo, reset) and Advanced (checks, the two JSON documents with check-then-save, the log, the live
+state). A failure is a toast with the reason. Tested with a display by `tests/gjs/tilingPage.test.js`; without the extension running every page says so.

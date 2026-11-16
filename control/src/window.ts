@@ -16,12 +16,14 @@ import {stylesheet} from './appearanceTokens.js';
 import {compatPage} from './compatPage.js';
 import {homePage} from './homePage.js';
 import {profilesPage} from './profilesPage.js';
+import {tilingPage} from './tilingPage.js';
 
 const MODULES = [
     ['home', 'Home', 'go-home-symbolic', (model, shared) => shared.home.widget],
     ['look', 'Look', 'preferences-desktop-appearance-symbolic', lookPage], ['island', 'Island', 'view-pin-symbolic', islandPage],
     ['dock', 'Dock', 'view-app-grid-symbolic', dockPage], ['windows', 'Windows', 'window-new-symbolic', windowsPage],
     ['search', 'Search', 'system-search-symbolic', searchPage],
+    ['tiling', 'Tiling', 'view-grid-symbolic', (model) => tilingPage(model, model.ctx)],
     ['compat', 'Compatibility', 'preferences-system-symbolic', (model, shared) => shared.compat.widget],
     ['profiles', 'Profiles', 'user-bookmarks-symbolic', (model, shared) => shared.profiles.widget], ['about', 'About', 'help-about-symbolic', aboutPage],
 ];
