@@ -7,7 +7,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
-import {addSource, BY_KEY, changed, DEFS, format, GROUPS, hasSource, keywordArgs, parse, PRESETS, removeSource, serialize} from './hyprland.js';
+import {addSource, ARRANGE_KEYS, ARRANGEMENTS, BY_KEY, changed, currentArrangement, DEFS, format, GROUPS, hasSource, keywordArgs, parse, PRESETS, removeSource, serialize} from './hyprland.js';
 import type {Def, Overrides, Value} from './hyprland.js';
 
 /** Hypr's config directory; `NIRO_HYPR_DIR` lets a test use another. */
@@ -59,6 +59,7 @@ export function hyprlandPage(_model, ctx) {
         if (value === undefined) delete values[def.key]; else values[def.key] = value;
         save();
         rows.get(def.key)?.sync();
+        if (ARRANGE_KEYS.includes(def.key)) rows.get('arrangement')?.sync();
         applyNow(def, value ?? def.default, (ok, message) => {
             // a value this Hyprland does not take (Scrolling on an older one): put the old value back and say why
             if (ok || def.kind !== 'select') return;
@@ -114,6 +115,28 @@ export function hyprlandPage(_model, ctx) {
     // ---- Settings
     for (const group of GROUPS) {
         const g = new Adw.PreferencesGroup({title: group});
+        if (group === 'Layout') {
+            const arr = new Adw.ComboRow({title: 'Arrangement', model: Gtk.StringList.new([...ARRANGEMENTS.map(a => a.title), 'Custom'])});
+            const arrSync = () => {
+                syncing = true;
+                try {
+                    const id = currentArrangement(values);
+                    const i = id ? ARRANGEMENTS.findIndex(a => a.id === id) : ARRANGEMENTS.length;
+                    arr.set_selected(i);
+                    arr.set_subtitle(ARRANGEMENTS[i]?.note ?? 'Your own mix of the options below');
+                } finally { syncing = false; }
+            };
+            arr.connect('notify::selected', () => {
+                const a = ARRANGEMENTS[arr.selected];
+                if (!a || syncing) return;
+                syncing = true;
+                try { for (const k of ARRANGE_KEYS) set(BY_KEY.get(k), a.values[k]); } finally { syncing = false; }
+                arrSync();
+            });
+            rows.set('arrangement', {sync: arrSync});
+            arrSync();
+            g.add(arr);
+        }
         for (const def of DEFS.filter(d => d.group === group)) {
             let row, get, put;
             if (def.kind === 'switch') {

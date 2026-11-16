@@ -38,6 +38,7 @@ export const DEFS: Def[] = [
     {key: 'dwindle:pseudotile', group: 'Layout', title: 'Dwindle: pseudotile', subtitle: 'A window keeps the size it asks for inside its tile', kind: 'switch', default: false},
     {key: 'dwindle:preserve_split', group: 'Layout', title: 'Dwindle: keep the split direction', kind: 'switch', default: false},
     {key: 'dwindle:smart_split', group: 'Layout', title: 'Dwindle: split towards the pointer', kind: 'switch', default: false},
+    {key: 'dwindle:split_width_multiplier', group: 'Layout', title: 'Dwindle: side by side or stacked', subtitle: 'Above 1 a new window goes beside; below 1 it goes under', kind: 'float', default: 1, min: 0.1, max: 5, step: 0.1},
     {key: 'dwindle:force_split', group: 'Layout', title: 'Dwindle: where a new window goes', kind: 'select', default: '0',
         options: [['0', 'By the pointer'], ['1', 'Left or up'], ['2', 'Right or down']]},
     {key: 'master:orientation', group: 'Layout', title: 'Master: where the large window is', kind: 'select', default: 'left',
@@ -90,6 +91,49 @@ export const PRESETS: Record<string, {title: string; values: Overrides}> = {
         'general:gaps_in': 3, 'general:gaps_out': 6, 'general:border_size': 1, 'decoration:rounding': 6,
         'decoration:blur:enabled': false, 'decoration:shadow:enabled': false, 'animations:enabled': false}},
 };
+
+// ---- Arrangements
+
+export interface Arrangement {
+    id: string;
+    title: string;
+    /** What it is, and where it is only close to the name. */
+    note: string;
+    values: Overrides;
+}
+
+/** The settings an arrangement decides; every arrangement sets all of them, so changing from one to another leaves nothing behind. */
+export const ARRANGE_KEYS = ['general:layout', 'master:orientation', 'master:mfact', 'dwindle:split_width_multiplier', 'dwindle:preserve_split', 'scrolling:column_width'];
+
+const base = (values: Overrides): Overrides => ({'general:layout': 'dwindle', 'master:orientation': 'left', 'master:mfact': 0.55, 'dwindle:split_width_multiplier': 1,
+    'dwindle:preserve_split': false, 'scrolling:column_width': 0.5, ...values});
+
+/**
+ * The window arrangements people ask for, made from what Hyprland has: four layouts of its own (Dwindle, Master, Scrolling, Monocle)
+ * and their options. Grid, Three columns and the two splits are not layouts of Hyprland; each is the nearest the options reach, and
+ * the note says how near. An exact grid needs a plugin.
+ */
+export const ARRANGEMENTS: Arrangement[] = [
+    {id: 'dwindle', title: 'Dwindle (BSP)', note: 'Recursive binary splitting. General multitasking.', values: base({})},
+    {id: 'master-left', title: 'Master left', note: 'Large window on the left, the rest stacked on the right. Development.', values: base({'general:layout': 'master', 'master:orientation': 'left'})},
+    {id: 'master-right', title: 'Master right', note: 'Large window on the right, the rest on the left. Research, writing.', values: base({'general:layout': 'master', 'master:orientation': 'right'})},
+    {id: 'center-master', title: 'Center master', note: 'Main window in the middle, the others on both sides. Ultrawide screens.', values: base({'general:layout': 'master', 'master:orientation': 'center', 'master:mfact': 0.5})},
+    {id: 'grid', title: 'Grid (approximate)', note: 'Not a Hyprland layout: balanced Dwindle gives cells of different sizes. An exact grid needs a plugin.', values: base({'dwindle:preserve_split': true})},
+    {id: 'three-columns', title: 'Three columns (approximate)', note: 'Centre master with a narrow centre: three columns with three windows; with more, the sides stack.', values: base({'general:layout': 'master', 'master:orientation': 'center', 'master:mfact': 0.34})},
+    {id: 'horizontal', title: 'Horizontal split', note: 'Windows side by side: Dwindle that always splits across. Comparing documents.', values: base({'dwindle:split_width_multiplier': 5, 'dwindle:preserve_split': true})},
+    {id: 'vertical', title: 'Vertical split', note: 'Windows top and bottom: Dwindle that always splits down. Monitoring, terminals.', values: base({'dwindle:split_width_multiplier': 0.1, 'dwindle:preserve_split': true})},
+    {id: 'scrolling', title: 'Scrolling', note: 'Windows in a strip you scroll along. Many windows.', values: base({'general:layout': 'scrolling'})},
+    {id: 'monocle', title: 'Monocle', note: 'One window at a time fills the area. Focused work.', values: base({'general:layout': 'monocle'})},
+];
+
+/** Which arrangement the values are (what is not set counts as Hyprland's default), or undefined for a mix of one's own. */
+export function currentArrangement(values: Overrides): string | undefined {
+    const same = (a: Overrides) => ARRANGE_KEYS.every(k => {
+        const def = BY_KEY.get(k)!;
+        return format(def, values[k] ?? def.default) === format(def, a[k]!);
+    });
+    return ARRANGEMENTS.find(a => same(a.values))?.id;
+}
 
 // ---- Text of a value
 
