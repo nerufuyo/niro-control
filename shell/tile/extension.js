@@ -140,7 +140,11 @@ export default class Tile extends Extension {
         // A window maximized before the tiling took it is brought into a tile; one the person maximized afterwards is left maximized
         if (isMaximized(win) && this._placed.has(win))
             return false;
-        if (this._floating.has(win) || win.get_transient_for() || win.is_on_all_workspaces())
+        if (this._floating.has(win) || win.get_transient_for())
+            return false;
+        // With workspaces only on the primary monitor (GNOME's default) a window on another monitor belongs to every workspace: it is tiled there. A window
+        // the person put on all workspaces on the primary monitor is not.
+        if (win.is_on_all_workspaces() && !(this._otherMonitorsSticky() && win.get_monitor() !== global.display.get_primary_monitor()))
             return false;
         // allows_move()/allows_resize() are false while a window is maximized: a window that can be resized at all is meant
         if (!win.resizeable || (!isMaximized(win) && (!win.allows_move() || !win.allows_resize())))
@@ -152,6 +156,14 @@ export default class Tile extends Extension {
             return true;
         const floating = this._settings.get_strv('floating-apps');
         return !this._classes(win).some(c => c && floating.includes(c));
+    }
+
+    _otherMonitorsSticky() {
+        try {
+            return new Gio.Settings({schema_id: 'org.gnome.mutter'}).get_boolean('workspaces-only-on-primary');
+        } catch (_e) {
+            return true;
+        }
     }
 
     /** The names a window is known by: the X11 instance, the class (the Wayland app id) and the desktop id. */
@@ -220,7 +232,7 @@ export default class Tile extends Extension {
         const focus = global.display.focus_window;
         for (let monitor = 0; monitor < global.display.get_n_monitors(); monitor++) {
             const layout = this._layoutAt(monitor);
-            const windows = this._order.filter(w => this._eligible(w) && w.get_workspace() === workspace && w.get_monitor() === monitor);
+            const windows = this._order.filter(w => this._eligible(w) && (w.is_on_all_workspaces() || w.get_workspace() === workspace) && w.get_monitor() === monitor);
             if (!windows.length)
                 continue;
             const area = Main.layoutManager.getWorkAreaForMonitor(monitor);
@@ -315,7 +327,7 @@ export default class Tile extends Extension {
     /** The tiled windows of a monitor on the active workspace, but for `except`, in tile order. */
     _tiledOn(monitor, except) {
         const workspace = global.workspace_manager.get_active_workspace();
-        return this._order.filter(w => w !== except && this._eligible(w) && w.get_workspace() === workspace && w.get_monitor() === monitor);
+        return this._order.filter(w => w !== except && this._eligible(w) && (w.is_on_all_workspaces() || w.get_workspace() === workspace) && w.get_monitor() === monitor);
     }
 
     /** The layout of a monitor on the active workspace: the workspace's own, else the monitor's, else the general one. */
