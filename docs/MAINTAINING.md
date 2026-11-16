@@ -226,4 +226,4 @@ Tiled: normal, resizable windows, not minimized, maximized, full-screen, transie
 or in `floating-apps`. The order is the order the windows came in; `Super+Alt+Return` moves the focused one first. The windows are looked at
 again 60 ms after a window comes, goes, is minimized, maximized or moved, the workspace or the work area changes. It is the Windows menu of the
 panel ("Tiling"). The GNOME shortcuts `Super+Alt+Left/Right` are workspace switches, so the master size is on `Super+Alt+=` and `-`.
-Tested in a headless shell with three windows through every layout (`/tmp`-style script: enable the extension, set `enabled`, read the frame rects).
+Drag and drop: carrying a tiled window by its title (`grab-op-begin` with `MOVING`) pauses the tiling; on `grab-op-end` it swaps places with the tiled window under the pointer, or goes back to its own tile when it is let go over nothing (`_beginDrag`, `_endDrag`, `_dropOn`). Resizing a tile by its border is not tiling-aware yet (it is put back at the next look). Tested in a headless shell with three windows through every layout (`/tmp`-style script: enable the extension, set `enabled`, read the frame rects).
