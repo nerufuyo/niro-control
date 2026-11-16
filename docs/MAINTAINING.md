@@ -142,7 +142,11 @@ The dock and the closed island step out of the Overview: the dock slides off its
 
 ## Full-screen apps
 
-GNOME hides chrome under a full-screen window and gives it no way back; both parts leave that rule on their own terms (setting `fullscreen-reveal`, on by default, in the island's and the dock's schemas). The dock auto-hides there whatever its setting and its bottom (or side) edge brings it back (`DockManager._syncFullscreen`; `DockVisibility` polls the pointer while it is up, as no motion event reaches the stage over a full-screen window). The island stays hidden, its alerts waiting as before, and a strip at the display's top edge (`Controller._syncFullscreenReveal`) brings it in for as long as the pointer is on it or it is open (`_revealOverFullscreen`, `_scheduleRevealEnd`). While revealed it counts as visible, so the queued alerts show.
+GNOME hides chrome under a full-screen window and gives it no way back; both parts leave that rule on their own terms (setting `fullscreen-reveal`, on by default, in the island's and the dock's schemas).
+
+- **Dock:** auto-hides there whatever its setting; the whole bottom (or side) edge of the screen brings it back, not only the stretch in front of it (`DockManager._syncFullscreen`, `DockVisibility.setFullEdge`). `DockVisibility` polls the pointer while it is up, as no motion event reaches the stage over a full-screen window.
+- **Island:** a strip along the whole top edge (`Controller._syncFullscreenReveal`) brings it in; it stays while the pointer is parked at the top edge anywhere, over it, or while it is open. (A strip as wide as the island once flickered: the island went, the strip came back under the still pointer and brought the island again.) The same works from the keyboard: the shortcuts for the clipboard/calendar pages and for the voice assistant bring it in too.
+- **What shows over a full-screen app** is the island setting `fullscreen-alerts`: `all` (the default: notifications, music, calls, timers, volume...), `important` (notifications, calls, timers, reminders, meetings, questions from AIs; `_fullscreenImportant`), or `off` (everything waits until the app leaves full screen). What waits is shown when it does. The old `alerts-over-fullscreen` is deprecated and not read.
 
 ## Minimized windows in the dock
 

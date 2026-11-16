@@ -80,7 +80,7 @@ def island_group(k):
     if re.match(r'(voice-|bot-)', k): return 'Voice Assistant'
     if re.match(r'usage-', k): return 'AI Usage'
     if re.match(r'agent-alerts', k): return 'AI Agents'
-    if re.match(r'(alert-|system-alerts|event-|world-clocks|privacy-|call-|gnome-banners|replace-osd|alerts-over-fullscreen|chimes)', k): return 'Alerts'
+    if re.match(r'(alert-|system-alerts|event-|world-clocks|privacy-|call-|gnome-banners|replace-osd|fullscreen-alerts|fullscreen-reveal|chimes)', k): return 'Alerts'
     if re.match(r'(island-|open-|notch-|hover-|auto-hide|top-bar|compact|glass|clock-)', k): return 'Appearance and Behavior'
     if re.match(r'(lyrics|track-peek)', k): return 'Music'
     if k.startswith('clipboard'): return 'Clipboard'

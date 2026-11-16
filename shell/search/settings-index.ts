@@ -363,19 +363,19 @@ export const INDEX = [
   "managed": false
  },
  {
-  "id": "island.alerts-over-fullscreen",
+  "id": "island.fullscreen-alerts",
   "menu": "Island",
   "group": "Alerts",
   "title": "Alerts over full-screen apps",
-  "help": "When on, alerts (notifications, calls, timers…) show over a full-screen app (a video, a game), the island hidden again between them.",
-  "key": "alerts-over-fullscreen",
-  "kind": "switch",
+  "help": "What the island shows over a full-screen app (a video, a game): all (notifications, music, calls, timers, volume...), important ones only…",
+  "key": "fullscreen-alerts",
+  "kind": "select",
   "managed": false
  },
  {
   "id": "island.fullscreen-reveal",
   "menu": "Island",
-  "group": "Pages and Features",
+  "group": "Alerts",
   "title": "Show the island at the top edge over full-screen apps",
   "help": "Over a full-screen app (a video, a game) the island stays away, and the top edge of the screen brings it back while the pointer is on it.",
   "key": "fullscreen-reveal",

@@ -563,7 +563,7 @@ export class Controller {
             this._syncFullscreenReveal();
             this._syncAutoHide(true);
         }));
-        this._settingsChanged.push(this._settings.connect('changed::alerts-over-fullscreen', () => {
+        this._settingsChanged.push(this._settings.connect('changed::fullscreen-alerts', () => {
             this._trackIsland();
             this._syncFullscreen();
             this._syncAutoHide(true);
@@ -587,6 +587,9 @@ export class Controller {
         this._fullscreenChanged = global.display.connect('in-fullscreen-changed', () => {
             this._syncMonitor();
             this._syncFullscreenReveal();
+            // What waited for the app to leave full screen shows now.
+            if (!this._fullscreenHere() && !this._alert)
+                this._nextAlert();
         });
         this._settingsChanged.push(this._settings.connect('changed::voice-assistant', () => {
             this._syncVoiceEnabled();
@@ -975,7 +978,7 @@ export class Controller {
     // GNOME hides the island under a fullscreen window only when fullscreen changes, not when it moves
     // to another display: its rule (layout.js `_updateActorVisibility`), here.
     _syncFullscreen() {
-        this._island.visible = this._settings.get_boolean('alerts-over-fullscreen') || this._revealed ||
+        this._island.visible = this._fsAlerts() !== 'off' || this._revealed ||
             !(global.window_group.visible && this._monitor?.inFullscreen);
         this._syncFullscreenReveal();
     }
@@ -985,8 +988,7 @@ export class Controller {
 
     /** Puts the strip at the display's top edge while it is wanted (full screen, Settings allow it), or ends a reveal that is not. */
     _syncFullscreenReveal() {
-        const wanted = !this._destroying && this._settings.get_boolean('fullscreen-reveal') &&
-            !this._settings.get_boolean('alerts-over-fullscreen') && global.window_group.visible && Boolean(this._monitor?.inFullscreen);
+        const wanted = !this._destroying && this._settings.get_boolean('fullscreen-reveal') && this._fullscreenHere();
         const holdScanout = wanted && !isWayland();
         if (holdScanout !== this._fsScanout) {
             this._fsScanout = holdScanout;
@@ -1012,10 +1014,10 @@ export class Controller {
                 return Clutter.EVENT_PROPAGATE;
             });
         }
+        // The whole top edge, as the menu bar is on a Mac: the pointer needs no aim at the island.
         const monitor = this._monitor;
-        const width = Math.min(monitor.width, px(640));
-        this._strip.set_position(monitor.x + Math.round((monitor.width - width) / 2), monitor.y);
-        this._strip.set_size(width, px(REVEAL_EDGE_PX + 2));
+        this._strip.set_position(monitor.x, monitor.y);
+        this._strip.set_size(monitor.width, px(REVEAL_EDGE_PX + 2));
         this._strip.visible = !this._revealed;
     }
 
@@ -1040,7 +1042,11 @@ export class Controller {
         this._later('fs-reveal-end', 500, () => {
             if (!this._revealed)
                 return;
-            if (this._island.hovered || this._presentation !== 'compact' || this._expandWanted || this._voiceOpen || this._alert) {
+            // Parked at the top edge (anywhere along it) counts as staying: else the island would go, the strip come back under the
+            // still pointer, and the island return: a flicker.
+            const [, pointerY] = global.get_pointer();
+            const atTopEdge = pointerY <= this._monitor.y + px(REVEAL_EDGE_PX + 8);
+            if (atTopEdge || this._island.hovered || this._presentation !== 'compact' || this._expandWanted || this._voiceOpen || this._alert) {
                 this._scheduleRevealEnd();
                 return;
             }
@@ -1060,6 +1066,28 @@ export class Controller {
 
     // Auto-hide
 
+    /** What the island shows over a full-screen app: 'all', 'important' or 'off' (Settings). */
+    _fsAlerts() {
+        return this._settings.get_string('fullscreen-alerts');
+    }
+
+    /** Whether the display the island is on has a full-screen app in front. */
+    _fullscreenHere() {
+        return global.window_group.visible && Boolean(this._monitor?.inFullscreen);
+    }
+
+    /** The alerts that are worth showing over a full-screen app when Settings say 'important': what asks for the person (a
+     * notification, a call, a timer or reminder, a meeting, an AI's question), not what only informs (music, volume, devices). */
+    _fullscreenImportant(alert) {
+        const key = String(alert?.key ?? '');
+        return alert?.kind === 'notification' || /^(notification|pomodoro|reminder|meeting|agent-ask|task-ask|phone-ask|assistant|recording|power)/.test(key);
+    }
+
+    /** Whether `alert` waits until the full-screen app is gone (see `fullscreen-alerts`). */
+    _heldByFullscreen(alert) {
+        return this._fullscreenHere() && this._fsAlerts() === 'important' && !this._fullscreenImportant(alert);
+    }
+
     /** Over a full-screen app with Settings' alerts over it: the island stays there, hidden but for them. */
     get _overFullscreen() {
         return this._overFullscreenOn(this._monitor);
@@ -1067,7 +1095,7 @@ export class Controller {
 
     /** Whether `monitor` has a full-screen app that Settings show alerts over. */
     _overFullscreenOn(monitor) {
-        return this._settings.get_boolean('alerts-over-fullscreen') && global.window_group.visible &&
+        return this._fsAlerts() !== 'off' && global.window_group.visible &&
             Boolean(monitor?.inFullscreen);
     }
 
@@ -1096,12 +1124,10 @@ export class Controller {
             barHidden: mode === 'top-bar' && this._barHidden(monitor),
             windowAtTop: mode === 'windows' && this._windowAtTop(monitor, island),
             overview: this._inOverview(),
-            fullscreenReveal: this._settings.get_boolean('fullscreen-reveal'),
         });
         // A bar another extension hid is not there to point at.
         const barHeight = this._isOnBar(monitor) && !this._barHidden(monitor) ? this._topBar.height : 0;
-        const band = revealBand({mode, fullscreen, barHeight, edge: px(REVEAL_EDGE_PX), overview: this._inOverview(),
-            fullscreenReveal: this._settings.get_boolean('fullscreen-reveal')});
+        const band = revealBand({mode, fullscreen, barHeight, edge: px(REVEAL_EDGE_PX), overview: this._inOverview()});
         return {when, band};
     }
 
@@ -1160,7 +1186,7 @@ export class Controller {
     /** As chrome: over a full-screen app only for alerts (Settings). On X11 (GNOME 49 and older) hidden in the bar,
      * out of the input region, so clicks below reach the windows; the band stays in the bar's own. */
     _chromeParams() {
-        const params = {trackFullscreen: !(this._settings.get_boolean('alerts-over-fullscreen') || this._revealed)};
+        const params = {trackFullscreen: !(this._fsAlerts() !== 'off' || this._revealed)};
         if (!isWayland())
             params.affectsInputRegion = !this._autoHidden || !this._onBar;
         return params;
@@ -1207,7 +1233,7 @@ export class Controller {
         const inUse = monitors[index] ?? primaryMonitor;
         // On every display, it shows its alerts on another while a fullscreen window hides it on the one in use
         // (unless Settings show alerts over full-screen apps: then it stays, as do the copies).
-        if (where === 'all' && inUse.inFullscreen && !this._settings.get_boolean('alerts-over-fullscreen'))
+        if (where === 'all' && inUse.inFullscreen && this._fsAlerts() === 'off')
             return monitors.find(monitor => !monitor.inFullscreen) ?? inUse;
         return inUse;
     }
@@ -2173,7 +2199,9 @@ export class Controller {
     // page (Settings), and holds the island open without the pointer; Super+V again, Esc or a click elsewhere
     // closes it.
     _toggleFromKeyboard(page = 'clipboard') {
-        // Hidden by a fullscreen window, it would take the keyboard unseen.
+        // Over a full-screen app the island comes in for the shortcut (no pointer needed); else it would take the keyboard unseen.
+        if (!this._island.visible && this._settings.get_boolean('fullscreen-reveal') && this._fullscreenHere())
+            this._revealOverFullscreen();
         if (!this._island.visible)
             return;
         const pageName = page === 'clipboard' ? 'shelf' : page;
@@ -2292,7 +2320,8 @@ export class Controller {
         if (!alert)
             return;
         // Hidden by a fullscreen window: shown once it is gone, but a volume or Caps Lock change is stale by then.
-        if (!this._island.visible) {
+        // The same for what Settings keep from a full-screen app (only the important ones show: `fullscreen-alerts`).
+        if (!this._island.visible || this._heldByFullscreen(alert)) {
             if (!alert.transient)
                 this._enqueue(alert);
             return;
@@ -2464,8 +2493,13 @@ export class Controller {
             return;
         }
         // What waited may have been read, withdrawn or become private meanwhile.
-        while (this._queue.length) {
-            const queued = this._queue.shift();
+        for (let i = 0; i < this._queue.length;) {
+            // Kept for after the full-screen app, when only the important ones show over it.
+            if (this._heldByFullscreen(this._queue[i])) {
+                i++;
+                continue;
+            }
+            const queued = this._queue.splice(i, 1)[0];
             const alert = queued.fresh ? queued.fresh(this._sharing) : queued;
             if (alert) {
                 this._showAlert(alert);
@@ -2637,7 +2671,9 @@ export class Controller {
     // The shortcut (or the face) opens the assistant listening; while listening it finishes,
     // and once answered it listens again for a follow-up.
     _onVoiceKey() {
-        // Hidden by a fullscreen window: it would listen unseen.
+        // Over a full-screen app the island comes in for the shortcut; else it would listen unseen.
+        if (!this._island.visible && this._settings.get_boolean('fullscreen-reveal') && this._fullscreenHere())
+            this._revealOverFullscreen();
         if (!this._island.visible)
             return;
         if (!this._voiceOpen) {

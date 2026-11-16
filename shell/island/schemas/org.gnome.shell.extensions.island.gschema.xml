@@ -129,9 +129,19 @@
       <summary>How long the closed island waits before hiding, in seconds</summary>
     </key>
     <key name="alerts-over-fullscreen" type="b">
-      <default>false</default>
+      <default>true</default>
+      <summary>Deprecated: replaced by fullscreen-alerts</summary>
+      <description>Not read any more: see the key fullscreen-alerts.</description>
+    </key>
+    <key name="fullscreen-alerts" type="s">
+      <choices>
+        <choice value="all"/>
+        <choice value="important"/>
+        <choice value="off"/>
+      </choices>
+      <default>'all'</default>
       <summary>Alerts over full-screen apps</summary>
-      <description>When on, alerts (notifications, calls, timers…) show over a full-screen app (a video, a game), the island hidden again between them. Off, they wait until the app leaves full screen, as GNOME's own.</description>
+      <description>What the island shows over a full-screen app (a video, a game): all (notifications, music, calls, timers, volume...), important ones only (notifications, calls, timers, reminders, meetings, questions from AIs), or none: they then wait until the app leaves full screen. The island itself stays out of the way and comes back at the top edge.</description>
     </key>
     <key name="fullscreen-reveal" type="b">
       <default>true</default>
