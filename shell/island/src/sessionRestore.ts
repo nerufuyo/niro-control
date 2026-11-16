@@ -10,7 +10,7 @@
 // session ends the applications close one by one, which is a flurry that never settles before the shell is gone, so the
 // last settled state stays.
 //
-// Restoring: once per login (a marker in the runtime directory, which goes with the login: so not when the shell or this
+// Restoring: once per login (a marker file that names the shell process, so not when this
 // extension starts again, or the screen unlocks), a few seconds after the session is up, applications not running are
 // started a little apart. Saving waits until that is over, so a half-restored desktop is not taken for the desktop one wanted.
 
@@ -34,10 +34,23 @@ function stateFile() {
     return GLib.build_filenamev([GLib.get_user_state_dir(), 'niro', 'session.json']);
 }
 
-/** The file that says this login restored already; goes with the login (the runtime directory is removed when the user's last
- * session ends). `NIRO_RESTORE_MARKER` lets a test choose it. */
+/** The file that says a login restored already. It holds the shell process it was made for: the runtime directory outlives a logout when
+ * the user's manager stays up, so the file alone cannot tell this login from the one before. `NIRO_RESTORE_MARKER` lets a test choose it. */
 function markerFile() {
     return GLib.getenv('NIRO_RESTORE_MARKER') ?? GLib.build_filenamev([GLib.get_user_runtime_dir(), 'niro-session-restored']);
+}
+
+/** Names this shell process: its pid and start time. On Wayland the shell is the session, so a new login is a new shell, and the
+ * extension starting again inside the same shell (or the screen unlocking) is not. (The session id of logind cannot say: the
+ * shell does not get it here, and the audit session id is the user manager's, which outlives a logout.) */
+function shellId() {
+    try {
+        const stat = new TextDecoder().decode(Gio.File.new_for_path('/proc/self/stat').load_contents(null)[1]);
+        const fields = stat.slice(stat.lastIndexOf(')') + 2).split(' ');
+        return `${stat.slice(0, stat.indexOf(' '))}-${fields[19]}`;
+    } catch (_e) {
+        return 'unknown';
+    }
 }
 
 export class SessionRestore {
@@ -161,13 +174,18 @@ export class SessionRestore {
 
     _beginRestore() {
         const marker = Gio.File.new_for_path(markerFile());
-        // Once per login: the marker is there already when the shell (or this extension) starts again within one.
-        if (marker.query_exists(null)) {
+        const login = shellId();
+        // Once per login: the marker names this login's session when the shell (or this extension) starts again within one.
+        let marked = null;
+        try {
+            marked = new TextDecoder().decode(marker.load_contents(null)[1]).trim();
+        } catch (_e) { /* none yet */ }
+        if (marked === login) {
             this._scheduleSave();
             return;
         }
         try {
-            marker.replace_contents(new TextEncoder().encode(String(Date.now())), null, false, Gio.FileCreateFlags.NONE, null);
+            marker.replace_contents(new TextEncoder().encode(login), null, false, Gio.FileCreateFlags.NONE, null);
         } catch (e) {
             console.warn(`Island: could not mark the session as restored: ${e.message}`);
         }
