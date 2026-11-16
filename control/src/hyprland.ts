@@ -24,15 +24,30 @@ export interface Def {
     options?: [string, string][];
 }
 
-export const GROUPS = ['Windows', 'Blur', 'Shadow and opacity', 'Animations', 'Input', 'Miscellaneous'] as const;
+export const GROUPS = ['Windows', 'Layout', 'Blur', 'Shadow and opacity', 'Animations', 'Input', 'Miscellaneous'] as const;
 
 export const DEFS: Def[] = [
     {key: 'general:gaps_in', group: 'Windows', title: 'Gap between windows', kind: 'int', default: 5, min: 0, max: 50, step: 1},
     {key: 'general:gaps_out', group: 'Windows', title: 'Gap to the screen edge', kind: 'int', default: 20, min: 0, max: 100, step: 1},
     {key: 'general:border_size', group: 'Windows', title: 'Border width', kind: 'int', default: 1, min: 0, max: 10, step: 1},
     {key: 'decoration:rounding', group: 'Windows', title: 'Rounded corners', subtitle: 'Radius in pixels', kind: 'int', default: 0, min: 0, max: 40, step: 1},
-    {key: 'general:layout', group: 'Windows', title: 'Layout', kind: 'select', default: 'dwindle', options: [['dwindle', 'Dwindle'], ['master', 'Master']]},
     {key: 'general:resize_on_border', group: 'Windows', title: 'Resize by dragging a border', kind: 'switch', default: false},
+
+    {key: 'general:layout', group: 'Layout', title: 'Layout', subtitle: 'Scrolling and Monocle need a recent Hyprland; an older one refuses them and the panel says so',
+        kind: 'select', default: 'dwindle', options: [['dwindle', 'Dwindle: splits the screen in two, again and again'], ['master', 'Master: one large window, the rest in a stack'], ['scrolling', 'Scrolling: windows in a strip you scroll along'], ['monocle', 'Monocle: one window fills the area']]},
+    {key: 'dwindle:pseudotile', group: 'Layout', title: 'Dwindle: pseudotile', subtitle: 'A window keeps the size it asks for inside its tile', kind: 'switch', default: false},
+    {key: 'dwindle:preserve_split', group: 'Layout', title: 'Dwindle: keep the split direction', kind: 'switch', default: false},
+    {key: 'dwindle:smart_split', group: 'Layout', title: 'Dwindle: split towards the pointer', kind: 'switch', default: false},
+    {key: 'dwindle:force_split', group: 'Layout', title: 'Dwindle: where a new window goes', kind: 'select', default: '0',
+        options: [['0', 'By the pointer'], ['1', 'Left or up'], ['2', 'Right or down']]},
+    {key: 'master:orientation', group: 'Layout', title: 'Master: where the large window is', kind: 'select', default: 'left',
+        options: [['left', 'Left'], ['right', 'Right'], ['top', 'Top'], ['bottom', 'Bottom'], ['center', 'Centre']]},
+    {key: 'master:mfact', group: 'Layout', title: 'Master: size of the large window', subtitle: 'Share of the screen', kind: 'float', default: 0.55, min: 0.1, max: 0.9, step: 0.05},
+    {key: 'master:new_status', group: 'Layout', title: 'Master: a new window becomes', kind: 'select', default: 'slave',
+        options: [['master', 'The large window'], ['slave', 'Part of the stack'], ['inherit', 'Like the focused one']]},
+    {key: 'master:new_on_top', group: 'Layout', title: 'Master: new windows go on top of the stack', kind: 'switch', default: false},
+    {key: 'scrolling:column_width', group: 'Layout', title: 'Scrolling: width of a column', subtitle: 'Share of the screen', kind: 'float', default: 0.5, min: 0.1, max: 1, step: 0.05},
+    {key: 'scrolling:follow_focus', group: 'Layout', title: 'Scrolling: the strip follows the focus', kind: 'switch', default: true},
 
     {key: 'decoration:blur:enabled', group: 'Blur', title: 'Blur behind windows', kind: 'switch', default: true},
     {key: 'decoration:blur:size', group: 'Blur', title: 'Blur radius', kind: 'int', default: 8, min: 1, max: 30, step: 1},

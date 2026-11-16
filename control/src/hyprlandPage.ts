@@ -29,10 +29,21 @@ const write = (path: string, text: string) => {
     Gio.File.new_for_path(path).replace_contents(new TextEncoder().encode(text), null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
 };
 
-/** `hyprctl keyword`, when there is a running Hyprland: the change shows now, no reload. Nothing happens, quietly, elsewhere. */
-function applyNow(def: Def, value: Value) {
+/**
+ * `hyprctl keyword`, when there is a running Hyprland: the change shows now, no reload. Nothing happens, quietly, elsewhere.
+ * `done` is told how it went: Hyprland answers "ok", or says why not (a layout an older version does not have).
+ */
+function applyNow(def: Def, value: Value, done?: (ok: boolean, message: string) => void) {
     if (!GLib.getenv('HYPRLAND_INSTANCE_SIGNATURE') || !GLib.find_program_in_path('hyprctl')) return;
-    try { Gio.Subprocess.new(['hyprctl', ...keywordArgs(def, value)], Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE); } catch (_e) { /* the file has it */ }
+    try {
+        const p = Gio.Subprocess.new(['hyprctl', ...keywordArgs(def, value)], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
+        p.communicate_utf8_async(null, null, (_p, res) => {
+            try {
+                const out = (p.communicate_utf8_finish(res)[1] ?? '').trim();
+                done?.(out === 'ok' || out === '', out);
+            } catch (_e) { /* the file has it */ }
+        });
+    } catch (_e) { /* the file has it */ }
 }
 
 export function hyprlandPage(_model, ctx) {
@@ -47,8 +58,14 @@ export function hyprlandPage(_model, ctx) {
     const set = (def: Def, value: Value | undefined) => {
         if (value === undefined) delete values[def.key]; else values[def.key] = value;
         save();
-        applyNow(def, value ?? def.default);
         rows.get(def.key)?.sync();
+        applyNow(def, value ?? def.default, (ok, message) => {
+            // a value this Hyprland does not take (Scrolling on an older one): put the old value back and say why
+            if (ok || def.kind !== 'select') return;
+            delete values[def.key]; save(); rows.get(def.key)?.sync();
+            const d = Adw.AlertDialog.new(`${def.title}: not accepted`, `This Hyprland answered: ${message}. The setting is back at its default.`);
+            d.add_response('ok', 'OK'); d.present(ctx?.window);
+        });
     };
 
     // ---- Connection to hyprland.conf

@@ -51,3 +51,10 @@ test('hyprctl is given the option and the value as Hyprland writes them', () => 
     assert.deepEqual(keywordArgs(BY_KEY.get('decoration:blur:enabled'), true), ['keyword', 'decoration:blur:enabled', 'true']);
     assert.deepEqual(keywordArgs(BY_KEY.get('decoration:active_opacity'), 0.8500001), ['keyword', 'decoration:active_opacity', '0.85']);
 });
+
+test('all four layouts are offered, and every layout has its own options', () => {
+    const layout = BY_KEY.get('general:layout');
+    assert.deepEqual(layout.options.map(o => o[0]), ['dwindle', 'master', 'scrolling', 'monocle']);
+    for (const prefix of ['dwindle:', 'master:', 'scrolling:']) assert.ok(DEFS.some(d => d.key.startsWith(prefix) && d.group === 'Layout'), prefix);
+    assert.deepEqual(parse(serialize({'general:layout': 'scrolling', 'master:orientation': 'center'})), {'general:layout': 'scrolling', 'master:orientation': 'center'});
+});
