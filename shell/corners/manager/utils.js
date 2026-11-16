@@ -26,10 +26,17 @@ export function unwrapActor(actor) {
  * @param win - The window to get the settings for.
  * @returns The matching settings object.
  */
+/**
+ * The class a window is known by: the X11 instance, else the Wayland app id. On GNOME 51 `get_wm_class_instance()` is null for a
+ * Wayland window, which made the effect skip every native Wayland window (Chrome, GTK 3 and 4 apps); the class is the app id there.
+ */
+export function windowClass(win) {
+    return win.get_wm_class_instance() ?? win.get_wm_class() ?? win.get_gtk_application_id?.() ?? null;
+}
 export function getRoundedCornersCfg(win) {
     const globalCfg = getPref('global-rounded-corner-settings');
     const customCfgList = getPref('custom-rounded-corner-settings');
-    const wmClass = win.get_wm_class_instance();
+    const wmClass = windowClass(win);
     if (wmClass == null ||
         !customCfgList[wmClass] ||
         !customCfgList[wmClass].enabled) {
@@ -60,11 +67,17 @@ export function getRoundedCornersEffect(actor) {
  * @returns The scaling factor of the window.
  */
 export function windowScaleFactor(win) {
-    // When fractional scaling is enabled, always return 1
-    const features = Gio.Settings.new('org.gnome.mutter').get_strv('experimental-features');
-    if (Meta.is_wayland_compositor() &&
-        features.includes('scale-monitor-framebuffer')) {
-        return 1;
+    // Wayland draws in logical pixels when the compositor scales the framebuffer. GNOME 51 does so always, and its schema no longer has
+    // the `experimental-features` key to ask (reading it threw, and with it every update of the shader's values: the window was
+    // clipped to nothing); before that the key says. Then the scale is 1.
+    if (Meta.is_wayland_compositor?.() ?? true) {
+        const source = Gio.SettingsSchemaSource.get_default();
+        const schema = source?.lookup('org.gnome.mutter', true);
+        if (!schema?.has_key('experimental-features'))
+            return 1;
+        const features = Gio.Settings.new('org.gnome.mutter').get_strv('experimental-features');
+        if (features.includes('scale-monitor-framebuffer'))
+            return 1;
     }
     const monitorIndex = win.get_monitor();
     return global.display.get_monitor_scale(monitorIndex);
@@ -85,7 +98,7 @@ export function computeBounds(actor, [x, y, width, height]) {
     // clip its shadow and recompute the outer bounds for it.
     if (getPref('tweak-kitty-terminal') &&
         actor.metaWindow.get_client_type() === Meta.WindowClientType.WAYLAND &&
-        actor.metaWindow.get_wm_class_instance() === 'kitty') {
+        windowClass(actor.metaWindow) === 'kitty') {
         const [x1, y1, x2, y2] = APP_SHADOWS.kitty;
         const scale = windowScaleFactor(actor.metaWindow);
         bounds.x1 += x1 * scale;
@@ -176,9 +189,9 @@ export function shouldEnableEffect(win) {
         return false;
     }
     // Skip blacklisted applications.
-    const wmClass = win.get_wm_class_instance();
+    const wmClass = windowClass(win);
     if (wmClass == null) {
-        logDebug(`Warning: wm_class_instance of ${win}: ${win.title} is null`);
+        logDebug(`Warning: the class of ${win}: ${win.title} is null`);
         return false;
     }
     if (getPref('blacklist').includes(wmClass)) {
