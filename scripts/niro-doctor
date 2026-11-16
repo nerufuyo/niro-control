@@ -7,6 +7,7 @@
 #   niro-doctor --relogin --yes     the same without the countdown
 #   niro-doctor --relogin --dry-run say what it would do, change nothing
 #   niro-doctor --relogin --force   log out even if Niro is already loaded (to try the whole round)
+#   niro-doctor --relogin --no-gdm-restart   log out only (the login screen will ask for the password)
 #   niro-doctor --pin        pin Niro Control to the dock
 #
 # GNOME Shell on Wayland reads its extensions only at login, so a new install needs one login. That is all this does for you.
@@ -14,11 +15,11 @@ set -u
 EXTS=(island dock search blur corners emoji emulator)
 STATE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/niro"; LOG="$STATE_DIR/doctor.log"
 AUTOSTART="${XDG_CONFIG_HOME:-$HOME/.config}/autostart/niro-verify.desktop"
-RELOGIN=0; YES=0; DRY=0; AFTER=0; PIN=0; FORCE=0
+RELOGIN=0; YES=0; DRY=0; AFTER=0; PIN=0; FORCE=0; GDM=1
 for a in "$@"; do
   case "$a" in
-    --relogin) RELOGIN=1 ;; --yes|-y) YES=1 ;; --dry-run|-n) DRY=1 ;; --after-login) AFTER=1 ;; --pin) PIN=1 ;; --force|-f) FORCE=1 ;;
-    -h|--help) sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --relogin) RELOGIN=1 ;; --yes|-y) YES=1 ;; --dry-run|-n) DRY=1 ;; --after-login) AFTER=1 ;; --pin) PIN=1 ;; --force|-f) FORCE=1 ;; --no-gdm-restart) GDM=0 ;;
+    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $a (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -74,6 +75,20 @@ if [ "$PIN" = 1 ]; then
   exit 0
 fi
 
+# GDM logs a user in by itself only when it starts (AutomaticLogin), not after a logout (its timed login did not
+# do it here: every login after a logout came up through the password service). So after a clean logout GDM is restarted,
+# which makes it "start" again and log the configured user in. Only when that is safe and possible: this user is
+# the only one with a session, passwordless sudo is there, and GDM is set to log this user in.
+gdm_restart_ok() {
+  [ "$GDM" = 1 ] || return 1
+  grep -qiE '^AutomaticLoginEnable=true' /etc/gdm/custom.conf 2>/dev/null || return 1
+  grep -qE "^AutomaticLogin=$(id -un)\$" /etc/gdm/custom.conf 2>/dev/null || return 1
+  sudo -n true 2>/dev/null || return 1
+  # Only sessions on the seat (the ones GDM runs) count: a root shell or an ssh login is not touched by restarting it.
+  [ "$(loginctl list-sessions --no-legend 2>/dev/null | awk '$4 == "seat0" {print $3}' | sort -u | grep -vc "^$(id -un)\$")" = 0 ] || return 1
+  return 0
+}
+
 check
 [ "$RELOGIN" = 0 ] && exit $((PROBLEMS > 0 ? 1 : 0))
 
@@ -83,7 +98,10 @@ if ! rpm -q niro-control >/dev/null 2>&1 && ! dpkg -s niro-control >/dev/null 2>
 echo
 if [ "$FORCE" = 1 ] && [ "$LOADED" = "${#EXTS[@]}" ]; then echo "Niro is already loaded, but --force was given. This logs you out, closing every open application."; else echo "The shell has not loaded Niro yet: it does at login. This logs you out, closing every open application."; fi
 if [ "$DRY" = 1 ]; then
-  echo "(dry run) would write $AUTOSTART, wait, then run: gnome-session-quit --logout --no-prompt"; exit 0
+  echo "(dry run) would write $AUTOSTART, wait, then run: gnome-session-quit --logout --no-prompt"
+  if gdm_restart_ok; then echo "(dry run) and restart GDM 4 s later, so it logs $(id -un) in by itself (AutomaticLogin): no password"
+  else echo "(dry run) GDM would not be restarted (see --help): the login screen would ask for the password"; fi
+  exit 0
 fi
 if [ "$YES" = 0 ]; then
   for i in 10 9 8 7 6 5 4 3 2 1; do printf '\r  logging out in %2d s: Ctrl+C to cancel, save your work now ' "$i"; sleep 1; done; echo
@@ -99,4 +117,10 @@ Exec=$(command -v niro-doctor || echo "$(cd "$(dirname "$0")" && pwd)/niro-docto
 X-GNOME-Autostart-enabled=true
 NoDisplay=true
 DESK
+if gdm_restart_ok; then
+  # After the logout has had a moment to close the applications: a new GDM, which logs this user in at once.
+  sudo -n systemd-run --no-block --on-active=4s --unit=niro-gdm-restart /usr/bin/systemctl restart gdm >/dev/null 2>&1 || true
+else
+  echo "GDM will not be restarted: the login screen asks for the password (--help)."
+fi
 exec gnome-session-quit --logout --no-prompt
