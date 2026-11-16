@@ -19,6 +19,15 @@ export const LAYOUTS = [
 ];
 export const LAYOUT_IDS = LAYOUTS.map(l => l[0]);
 
+/** The layouts whose id, name or description hold every word of `query` (case does not matter); all of them for an empty one. */
+export function searchLayouts(query) {
+    const words = String(query ?? '').toLowerCase().split(/\s+/).filter(Boolean);
+    return LAYOUTS.filter(([id, title, description]) => {
+        const hay = `${id} ${title} ${description}`.toLowerCase();
+        return words.every(w => hay.includes(w));
+    });
+}
+
 const rect = (x, y, width, height) => ({x: Math.round(x), y: Math.round(y), width: Math.max(1, Math.round(width)), height: Math.max(1, Math.round(height))});
 
 /** `n` equal parts of `length` with `gap` between them: [offset, size] pairs. */

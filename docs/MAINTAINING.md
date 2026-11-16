@@ -9,7 +9,7 @@
   loads a small stylesheet in the accent colour.
 - **The search** (`shell/search`) reads `org.niro.control` directly each time it opens.
 - **The control panel** (`control/`) builds itself from `control/src/catalog.ts`, which `scripts/control-panel-items.py`
-  writes from the schemas (`make catalog`; 177 settings). See "The control panel" below.
+  writes from the schemas (`make catalog`; 186 settings). See "The control panel" below.
 - **The island's programs** (`crates/`) are started by systemd (`island-daemon.service`) and D-Bus
   (`org.niro.island.Daemon`, `org.niro.island.ShelfWindow`); `docs/island-dbus-api.md` describes the API.
 
@@ -214,3 +214,46 @@ or in `floating-apps`. The order is the order the windows came in; `Super+Alt+Re
 again 60 ms after a window comes, goes, is minimized, maximized or moved, the workspace or the work area changes. It is the Windows menu of the
 panel ("Tiling"). The GNOME shortcuts `Super+Alt+Left/Right` are workspace switches, so the master size is on `Super+Alt+=` and `-`.
 Drag and drop with a preview: carrying a tiled window by its title (`grab-op-begin` with `MOVING`) pauses the tiling and draws the layout it would make (`_updateGhost`: one outlined `.tile-ghost` cell for each tile, the carried window included, the cell under the pointer lit; `stylesheet.css`), on whichever monitor the pointer is on; on `grab-op-end` the window takes that cell and the others move over (`_insertAt`). Resizing a tile by its border (`grab-op-begin` with a `RESIZING_*` op) pauses the tiling too; at `grab-op-end` `_resized` reads the new size and keeps what it says: the master size of the Master layouts (`master-factor`), the column width of Scrolling (`column-width`), Dwindle's split shares and the weights of Horizontal and Vertical (kept in memory per monitor for that layout and count of windows: another, and they start over). Grid, Three columns and Monocle have no sizes to set, so the window goes back. A window going to its tile glides there (`_glide`: its actor is moved back by the distance and eased to 0; `animate`, and the system's animations switch). Snapping to a screen edge with a preview is GNOME's own (`edge-tiling`) and is not repeated here. Tested in a headless shell with three windows through every layout (`/tmp`-style script: enable the extension, set `enabled`, read the frame rects).
+
+### Tile as a layout manager (GNOME): the pieces
+
+The brief for a "window tiling layout manager" (ten layouts, panel with Overview / Layouts / Workspaces / Rules / Appearance / Shortcuts /
+Monitors / Profiles / Advanced, quick switcher, CLI, profiles, rollback) is built for GNOME on Tile, not on Hyprland: it moves the
+real windows of this session. Layers: `shell/tile/config.js` (pure data: `layout-map`, `window-rules`, direction maths, tested in
+`tests/island/tileConfig.test.js`); `extension.js` (the engine, and `org.niro.Tile` on the session bus: `GetState`, `ListLayouts`,
+`ApplyLayout(layout, workspace, monitor)` with 0/-1 for "not given", `ClearLayout`, `SetEnabled`, `Retile`, signal `StateChanged`);
+the command line and the panel talk to that and to the settings. Per-workspace and per-monitor layouts: `layout-map`
+(`{"workspaces": {"2": "grid"}, "monitors": {"1": "monocle"}}`, a workspace's wins over its monitor's, which wins over `layout`).
+Rules: `window-rules` (`float`, `tile`, or `workspace` to send an app's windows there). Directional focus and swap: `Super+Ctrl+arrows`,
+with Shift to swap (`neighbor()` in config.js picks the window nearest that way).
+
+### `niro-tile` (the command line) and the backend
+
+`control/src/tileBackend.ts` is what both `niro-tile` (`control/src/tileCli.ts`, launcher `control/niro-tile`, installed to `/usr/bin`) and the panel's Tiling
+pages use. It reads the settings and asks the extension over D-Bus (`org.niro.Tile`) for the live state; with no extension running, `apply`
+writes the settings and the extension reads them when it starts. `change()` is the only way several settings are written: checked
+(`validate`), the old values saved as a backup (`~/.local/state/niro/tile-backups`, newest 20), written, read back, and put back if
+anything differs or throws. `niro-tile undo` restores the newest backup. Profiles are JSON files (`version` 1) in
+`~/.config/niro/tile-profiles`; a file with another version or bad values is refused with a sentence, never half-applied. `layouts.js` and
+`config.js` are copied into `control/build/tile/` by `npm run build` so the panel and the command line use the same pure code.
+Commands: `state`, `layouts`, `apply <layout> [--workspace N] [--monitor N]`, `clear`, `on|off|toggle`, `profile list|save|load|delete|export|import`,
+`validate [file]`, `reset [--yes]`, `undo`, `doctor` (`--json` for the ones that print data). Tested by `tests/gjs/tileBackend.test.js`.
+
+### The panel's Tiling module
+
+`control/src/tilingPage.ts`, in the sidebar as "Tiling": Overview (switch, layout, workspace, monitors, windows, session; a banner when the session is not GNOME),
+Layouts (ten cards, each with a diagram drawn from `arrange()`, and "Apply to": all workspaces, the active one, or a monitor), Workspaces and Monitors
+(a layout for each, "Default" clears it; both follow the shell every 1.5 s while shown, so a hotplug shows), Window Rules (list, add form with a picker of the open windows'
+classes), Appearance (gaps, animation, corner radius, opacity, shadow; there is no border setting because GNOME draws none and the tiling adds none), Shortcuts (the
+recorder with clash detection), Profiles (save, load, export, import, delete, undo, reset) and Advanced (checks, the two JSON documents with check-then-save, the log, the live
+state). A failure is a toast with the reason. Tested with a display by `tests/gjs/tilingPage.test.js`; without the extension running every page says so.
+
+### The quick layout switcher and the real-window test
+
+`shell/tile/switcher.js`: `Super+Alt+Space` (`shortcut-switcher`; plain `Super+Space` is Niro Search's) opens a compact overlay over the monitor with the focused
+window: the ten layouts as cards with a diagram each, a search box (`searchLayouts()` in layouts.js: every word must be in the id, name or description), a larger preview
+of the one chosen, arrows/Tab to move, Enter or a click to apply it to the active workspace, Escape or a click outside to leave. Keys are taken on their way down
+(`captured-event` on the backdrop) because the text field would otherwise keep arrows, Enter and Escape for itself. `tests/shell/tile.sh` (part of `run-staged.sh`) opens 1, 2, 3, 4, 6 and 10 real
+windows in a headless shell, applies each of the ten layouts, and compares every window's frame with `arrange()` (`tileExpect.mjs`); a window that cannot be as small as
+its tile keeps its own minimum size at the tile's corner (`_holdMinimum`), which the check accepts. It then closes a window and checks the nine left are laid out again.
+It runs with its own settings file (keyfile backend) so `gsettings` and the extension see the same values.

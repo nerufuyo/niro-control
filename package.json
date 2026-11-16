@@ -8,7 +8,7 @@
     "shell/dock"
   ],
   "scripts": {
-    "build": "tsc -p shell/island && tsc -p shell/dock && tsc -p shell/search && tsc -p shell/emulator && tsc -p control",
+    "build": "tsc -p shell/island && tsc -p shell/dock && tsc -p shell/search && tsc -p shell/emulator && tsc -p control && mkdir -p control/build/tile && cp shell/tile/layouts.js shell/tile/config.js control/build/tile/",
     "test": "npm run build && node --test tests/island/*.test.js && tests/gjs/run.sh",
     "lint": "biome check shell/dock/src"
   },

@@ -17,10 +17,10 @@ Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built by `ma
 | **Search** | `Super+Space`: a command palette for applications, a calculator, unit conversion, open windows, every Niro setting, profiles, system actions (lock, Do Not Disturb, suspend, log out…) and the island's clipboard history. One typed action registry, also on D-Bus. |
 | **Window blur** | Frosted glass behind application windows, with one strength and opacity for everything. |
 | **Rounded corners** | Round corners and shadows for every window, including Chrome and Electron apps. |
-| **Tile** | Hyprland-style tiling for GNOME windows, off until you switch it on (`Super+Alt+G`): Dwindle, Master left/right, Center master, Grid, Three columns, Horizontal and Vertical split, Scrolling and Monocle, with gaps, a main-window size, and shortcuts to switch layout, make a window the main one, or float it. |
+| **Tile** | A window layout manager for GNOME, off until you switch it on (`Super+Alt+G`): ten layouts (Dwindle, Master left/right, Center master, Grid, Three columns, Horizontal and Vertical split, Scrolling, Monocle), a layout for each workspace and monitor, rules per application (float, tile, send to a workspace), a quick switcher (`Super+Alt+Space`), directional focus and swap, drag a window to a cell of the layout shown as a preview, resize by pulling an edge, profiles, and the `niro-tile` command line. The panel's Tiling module has Overview, Layouts, Workspaces, Window Rules, Appearance, Shortcuts, Monitors, Profiles and Advanced. |
 | **Emoji, Emulator** | An emoji picker; keeps the Android Emulator window on top. |
 | **Profiles** | Save the whole desktop as a profile and switch with one action: four built-ins (Everyday, Deep Work, Creative, Gaming), preview before applying, backups, rollback, import and export. |
-| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 177 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
+| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 186 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
 
 Opacity, blur, blur strength, accent and tint are set once, in **Look**, and the island, dock, search and windows follow.
 Light and dark appearance both work, and the panel adapts to narrow windows.
@@ -115,7 +115,7 @@ for how the parts talk to each other and where to change things.
 ## Status
 
 A personal desktop project, shared as it is. Tested on Ubuntu 24.04 (GNOME 46, Wayland, NVIDIA) and Fedora 45 (GNOME 51, Wayland):
-on Fedora, all eight extensions enable in a real headless GNOME Shell 51 and the 177 node and GJS tests pass.
+on Fedora, all eight extensions enable in a real headless GNOME Shell 51 and the 186 node and GJS tests pass.
 The Fedora `.rpm` has not yet been installed and used in a full session; `docs/UAT.md` is the checklist for that.
 The island's TypeScript still carries `// @ts-nocheck`: converted from JavaScript, to be typed file by file.
 

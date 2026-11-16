@@ -60,10 +60,12 @@ install -D -m 644 README.md "$P/usr/share/doc/niro-control/README.md"
 
 # --- The control panel, the shared schema, the defaults
 for f in control/build/*.js; do install -D -m 644 "$f" "$P/usr/share/niro-control/$(basename "$f")"; done
+for f in control/build/tile/*.js; do install -D -m 644 "$f" "$P/usr/share/niro-control/tile/$(basename "$f")"; done
 echo "$VER" | install -D -m 644 /dev/stdin "$P/usr/share/niro-control/VERSION"
 for f in control/profiles/*.json; do install -D -m 644 "$f" "$P/usr/share/niro-control/profiles/$(basename "$f")"; done
 install -D -m 644 control/gtk3-probe.js "$P/usr/share/niro-control/gtk3-probe.js"
 install -D -m 755 control/niro-control "$P/usr/bin/niro-control"
+install -D -m 755 control/niro-tile "$P/usr/bin/niro-tile"
 install -D -m 644 control/org.niro.Control.desktop "$P/usr/share/applications/org.niro.Control.desktop"
 install -D -m 644 data/icons/hicolor/scalable/apps/org.niro.Control.svg "$P/usr/share/icons/hicolor/scalable/apps/org.niro.Control.svg"
 install -D -m 644 data/icons/hicolor/symbolic/apps/org.niro.Control-symbolic.svg "$P/usr/share/icons/hicolor/symbolic/apps/org.niro.Control-symbolic.svg"

@@ -3179,5 +3179,167 @@ export const CATALOG: Item[] = [
    "id": "tile.enabled",
    "op": "on"
   }
+ },
+ {
+  "id": "tile.shortcut-switcher",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Layout switcher",
+  "help": "Opens the list of layouts: type to search, arrows and Enter, or click, to apply one to this workspace.",
+  "detail": "Opens the list of layouts: type to search, arrows and Enter, or click, to apply one to this workspace.",
+  "source": "tile",
+  "key": "shortcut-switcher",
+  "type": "as",
+  "default": "[\"<Super><Alt>space\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-focus-left",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Focus the window on the left",
+  "help": "Moves the focus to the tiled window nearest on the left.",
+  "detail": "Moves the focus to the tiled window nearest on the left.",
+  "source": "tile",
+  "key": "shortcut-focus-left",
+  "type": "as",
+  "default": "[\"<Super><Control>Left\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-focus-right",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Focus the window on the right",
+  "help": "Moves the focus to the tiled window nearest on the right.",
+  "detail": "Moves the focus to the tiled window nearest on the right.",
+  "source": "tile",
+  "key": "shortcut-focus-right",
+  "type": "as",
+  "default": "[\"<Super><Control>Right\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-focus-up",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Focus the window above",
+  "help": "Moves the focus to the tiled window nearest above.",
+  "detail": "Moves the focus to the tiled window nearest above.",
+  "source": "tile",
+  "key": "shortcut-focus-up",
+  "type": "as",
+  "default": "[\"<Super><Control>Up\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-focus-down",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Focus the window below",
+  "help": "Moves the focus to the tiled window nearest below.",
+  "detail": "Moves the focus to the tiled window nearest below.",
+  "source": "tile",
+  "key": "shortcut-focus-down",
+  "type": "as",
+  "default": "[\"<Super><Control>Down\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-swap-left",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Swap with the window on the left",
+  "help": "Trades places with the tiled window nearest on the left.",
+  "detail": "Trades places with the tiled window nearest on the left.",
+  "source": "tile",
+  "key": "shortcut-swap-left",
+  "type": "as",
+  "default": "[\"<Super><Control><Shift>Left\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-swap-right",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Swap with the window on the right",
+  "help": "Trades places with the tiled window nearest on the right.",
+  "detail": "Trades places with the tiled window nearest on the right.",
+  "source": "tile",
+  "key": "shortcut-swap-right",
+  "type": "as",
+  "default": "[\"<Super><Control><Shift>Right\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-swap-up",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Swap with the window above",
+  "help": "Trades places with the tiled window nearest above.",
+  "detail": "Trades places with the tiled window nearest above.",
+  "source": "tile",
+  "key": "shortcut-swap-up",
+  "type": "as",
+  "default": "[\"<Super><Control><Shift>Up\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-swap-down",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Swap with the window below",
+  "help": "Trades places with the tiled window nearest below.",
+  "detail": "Trades places with the tiled window nearest below.",
+  "source": "tile",
+  "key": "shortcut-swap-down",
+  "type": "as",
+  "default": "[\"<Super><Control><Shift>Down\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
  }
 ];

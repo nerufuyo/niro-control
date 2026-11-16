@@ -176,3 +176,12 @@ Windows,Tiling,Make the window the main one,shortcut,,"[""<Super><Alt>Return""]"
 Windows,Tiling,Float or tile the window,shortcut,,"[""<Super><Alt>f""]","Takes the focused window out of the tiling, or puts it back.",shortcut-float,tile.shortcut-float
 Windows,Tiling,Bigger main window,shortcut,,"[""<Super><Alt>equal""]",Makes the main window of the Master layouts bigger.,shortcut-grow,tile.shortcut-grow
 Windows,Tiling,Smaller main window,shortcut,,"[""<Super><Alt>minus""]",Makes the main window of the Master layouts smaller.,shortcut-shrink,tile.shortcut-shrink
+Windows,Tiling,Layout switcher,shortcut,,"[""<Super><Alt>space""]","Opens the list of layouts: type to search, arrows and Enter, or click, to apply one to this workspace.",shortcut-switcher,tile.shortcut-switcher
+Windows,Tiling,Focus the window on the left,shortcut,,"[""<Super><Control>Left""]",Moves the focus to the tiled window nearest on the left.,shortcut-focus-left,tile.shortcut-focus-left
+Windows,Tiling,Focus the window on the right,shortcut,,"[""<Super><Control>Right""]",Moves the focus to the tiled window nearest on the right.,shortcut-focus-right,tile.shortcut-focus-right
+Windows,Tiling,Focus the window above,shortcut,,"[""<Super><Control>Up""]",Moves the focus to the tiled window nearest above.,shortcut-focus-up,tile.shortcut-focus-up
+Windows,Tiling,Focus the window below,shortcut,,"[""<Super><Control>Down""]",Moves the focus to the tiled window nearest below.,shortcut-focus-down,tile.shortcut-focus-down
+Windows,Tiling,Swap with the window on the left,shortcut,,"[""<Super><Control><Shift>Left""]",Trades places with the tiled window nearest on the left.,shortcut-swap-left,tile.shortcut-swap-left
+Windows,Tiling,Swap with the window on the right,shortcut,,"[""<Super><Control><Shift>Right""]",Trades places with the tiled window nearest on the right.,shortcut-swap-right,tile.shortcut-swap-right
+Windows,Tiling,Swap with the window above,shortcut,,"[""<Super><Control><Shift>Up""]",Trades places with the tiled window nearest above.,shortcut-swap-up,tile.shortcut-swap-up
+Windows,Tiling,Swap with the window below,shortcut,,"[""<Super><Control><Shift>Down""]",Trades places with the tiled window nearest below.,shortcut-swap-down,tile.shortcut-swap-down

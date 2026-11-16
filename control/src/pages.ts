@@ -263,8 +263,8 @@ export class Model {
     }
 }
 
-const scrolled = child => new Gtk.ScrolledWindow({child, hscrollbar_policy: Gtk.PolicyType.NEVER, vexpand: true});
-const page = (...children) => {
+export const scrolled = child => new Gtk.ScrolledWindow({child, hscrollbar_policy: Gtk.PolicyType.NEVER, vexpand: true});
+export const page = (...children) => {
     const box = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 18, margin_top: 18, margin_bottom: 24, margin_start: 18, margin_end: 18});
     children.forEach(c => box.append(c));
     return scrolled(new Adw.Clamp({child: box, maximum_size: 760, tightening_threshold: 600}));
