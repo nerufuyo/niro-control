@@ -162,3 +162,16 @@ Windows,Rounded Corners,Skip libhandy apps,switch,,false,,skip-libhandy-app,corn
 Windows,Rounded Corners,Border width,stepper,-40–40,0,,border-width,corners.border-width
 Windows,Rounded Corners,Never round these apps,list,,[],Window classes.,blacklist,corners.blacklist
 Windows,Rounded Corners,Window shadow,dict,,,"Focused and unfocused windows: offset, blur, spread and opacity.",focused-shadow,corners.shadows
+Windows,Tiling,Tile the windows,switch,,false,"Windows on a monitor are arranged by the chosen layout, none over another.",enabled,tile.enabled
+Windows,Tiling,Layout,select,Dwindle (BSP) / Master left / Master right / Center master / Grid / Three columns / Horizontal split / Vertical split / Scrolling / Monocle,dwindle,"How the windows are arranged: Dwindle (splits again and again), Master left/right, Center master, Grid, Three columns, Horizontal or Vertical split,…",layout,tile.layout
+Windows,Tiling,Gap between windows,stepper,0–40,8,"Space between tiled windows, in pixels (0-40).",gap-inner,tile.gap-inner
+Windows,Tiling,Gap to the screen edge,stepper,0–60,8,"Space between the tiles and the edge of the work area, in pixels (0-60).",gap-outer,tile.gap-outer
+Windows,Tiling,Size of the main window,stepper,0.1–0.9,0.55,The share of the screen the main window takes in the Master layouts (0.1-0.9).,master-factor,tile.master-factor
+Windows,Tiling,Width of a column in Scrolling,stepper,0.2–1,0.5,The share of the screen one column takes in the Scrolling layout (0.2-1).,column-width,tile.column-width
+Windows,Tiling,Applications never tiled,list,,[],"Window classes (the app id, like org.gnome.Calculator) that stay as they are: calculators, pickers and the like.",floating-apps,tile.floating-apps
+Windows,Tiling,Tiling on or off,shortcut,,"[""<Super><Alt>t""]",Turns the tiling of windows on and off.,shortcut-toggle,tile.shortcut-toggle
+Windows,Tiling,Next layout,shortcut,,"[""<Super><Alt>l""]",Goes to the next layout in the list.,shortcut-layout,tile.shortcut-layout
+Windows,Tiling,Make the window the main one,shortcut,,"[""<Super><Alt>Return""]",Moves the focused window to the first place: the main window of the Master layouts.,shortcut-promote,tile.shortcut-promote
+Windows,Tiling,Float or tile the window,shortcut,,"[""<Super><Alt>f""]","Takes the focused window out of the tiling, or puts it back.",shortcut-float,tile.shortcut-float
+Windows,Tiling,Bigger main window,shortcut,,"[""<Super><Alt>equal""]",Makes the main window of the Master layouts bigger.,shortcut-grow,tile.shortcut-grow
+Windows,Tiling,Smaller main window,shortcut,,"[""<Super><Alt>minus""]",Makes the main window of the Master layouts smaller.,shortcut-shrink,tile.shortcut-shrink

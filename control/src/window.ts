@@ -35,7 +35,7 @@ function staleParts(): string[] {
     try {
         const pid = new TextDecoder().decode(GLib.spawn_command_line_sync('pidof -s gnome-shell')[1]).trim();
         const started = Gio.File.new_for_path(`/proc/${pid}`).query_info('time::modified', 0, null).get_modification_date_time().to_unix();
-        const parts = [['Island', 'island'], ['Dock', 'dock'], ['Search', 'search'], ['Blur', 'blur'], ['Corners', 'corners']];
+        const parts = [['Island', 'island'], ['Dock', 'dock'], ['Search', 'search'], ['Blur', 'blur'], ['Corners', 'corners'], ['Tile', 'tile']];
         return parts.filter(([, id]) => {
             const f = Gio.File.new_for_path(`/usr/share/gnome-shell/extensions/${id}@niro.local/extension.js`);
             return f.query_exists(null) && f.query_info('time::modified', 0, null).get_modification_date_time().to_unix() > started;

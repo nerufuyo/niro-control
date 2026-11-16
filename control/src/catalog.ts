@@ -2872,5 +2872,294 @@ export const CATALOG: Item[] = [
    "focused-shadow",
    "unfocused-shadow"
   ]
+ },
+ {
+  "id": "tile.enabled",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Tile the windows",
+  "help": "Windows on a monitor are arranged by the chosen layout, none over another.",
+  "detail": "Windows on a monitor are arranged by the chosen layout, none over another. Off: windows are left where they are. Dialogs, full-screen and maximized windows are never tiled.",
+  "source": "tile",
+  "key": "enabled",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "tile.layout",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Layout",
+  "help": "How the windows are arranged: Dwindle (splits again and again), Master left/right, Center master, Grid, Three columns, Horizontal or Vertical split,…",
+  "detail": "How the windows are arranged: Dwindle (splits again and again), Master left/right, Center master, Grid, Three columns, Horizontal or Vertical split, Scrolling, Monocle.",
+  "source": "tile",
+  "key": "layout",
+  "type": "s",
+  "default": "dwindle",
+  "unit": "",
+  "kind": "select",
+  "options": [
+   {
+    "value": "dwindle",
+    "label": "Dwindle (BSP)"
+   },
+   {
+    "value": "master-left",
+    "label": "Master left"
+   },
+   {
+    "value": "master-right",
+    "label": "Master right"
+   },
+   {
+    "value": "center-master",
+    "label": "Center master"
+   },
+   {
+    "value": "grid",
+    "label": "Grid"
+   },
+   {
+    "value": "three-columns",
+    "label": "Three columns"
+   },
+   {
+    "value": "horizontal",
+    "label": "Horizontal split"
+   },
+   {
+    "value": "vertical",
+    "label": "Vertical split"
+   },
+   {
+    "value": "scrolling",
+    "label": "Scrolling"
+   },
+   {
+    "value": "monocle",
+    "label": "Monocle"
+   }
+  ],
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.gap-inner",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Gap between windows",
+  "help": "Space between tiled windows, in pixels (0-40).",
+  "detail": "Space between tiled windows, in pixels (0-40).",
+  "source": "tile",
+  "key": "gap-inner",
+  "type": "i",
+  "default": "8",
+  "unit": "",
+  "kind": "stepper",
+  "digits": 0,
+  "step": 1,
+  "min": 0.0,
+  "max": 40.0,
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.gap-outer",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Gap to the screen edge",
+  "help": "Space between the tiles and the edge of the work area, in pixels (0-60).",
+  "detail": "Space between the tiles and the edge of the work area, in pixels (0-60).",
+  "source": "tile",
+  "key": "gap-outer",
+  "type": "i",
+  "default": "8",
+  "unit": "",
+  "kind": "stepper",
+  "digits": 0,
+  "step": 1,
+  "min": 0.0,
+  "max": 60.0,
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.master-factor",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Size of the main window",
+  "help": "The share of the screen the main window takes in the Master layouts (0.1-0.9).",
+  "detail": "The share of the screen the main window takes in the Master layouts (0.1-0.9).",
+  "source": "tile",
+  "key": "master-factor",
+  "type": "d",
+  "default": "0.55",
+  "unit": "",
+  "kind": "stepper",
+  "digits": 2,
+  "step": 0.05,
+  "min": 0.1,
+  "max": 0.9,
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.column-width",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Width of a column in Scrolling",
+  "help": "The share of the screen one column takes in the Scrolling layout (0.2-1).",
+  "detail": "The share of the screen one column takes in the Scrolling layout (0.2-1).",
+  "source": "tile",
+  "key": "column-width",
+  "type": "d",
+  "default": "0.5",
+  "unit": "",
+  "kind": "stepper",
+  "digits": 2,
+  "step": 0.05,
+  "min": 0.2,
+  "max": 1.0,
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.floating-apps",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Applications never tiled",
+  "help": "Window classes (the app id, like org.gnome.Calculator) that stay as they are: calculators, pickers and the like.",
+  "detail": "Window classes (the app id, like org.gnome.Calculator) that stay as they are: calculators, pickers and the like.",
+  "source": "tile",
+  "key": "floating-apps",
+  "type": "as",
+  "default": "[]",
+  "unit": "",
+  "kind": "list",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  },
+  "advanced": true
+ },
+ {
+  "id": "tile.shortcut-toggle",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Tiling on or off",
+  "help": "Turns the tiling of windows on and off.",
+  "detail": "Turns the tiling of windows on and off.",
+  "source": "tile",
+  "key": "shortcut-toggle",
+  "type": "as",
+  "default": "[\"<Super><Alt>t\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-layout",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Next layout",
+  "help": "Goes to the next layout in the list.",
+  "detail": "Goes to the next layout in the list.",
+  "source": "tile",
+  "key": "shortcut-layout",
+  "type": "as",
+  "default": "[\"<Super><Alt>l\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-promote",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Make the window the main one",
+  "help": "Moves the focused window to the first place: the main window of the Master layouts.",
+  "detail": "Moves the focused window to the first place: the main window of the Master layouts.",
+  "source": "tile",
+  "key": "shortcut-promote",
+  "type": "as",
+  "default": "[\"<Super><Alt>Return\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-float",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Float or tile the window",
+  "help": "Takes the focused window out of the tiling, or puts it back.",
+  "detail": "Takes the focused window out of the tiling, or puts it back.",
+  "source": "tile",
+  "key": "shortcut-float",
+  "type": "as",
+  "default": "[\"<Super><Alt>f\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-grow",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Bigger main window",
+  "help": "Makes the main window of the Master layouts bigger.",
+  "detail": "Makes the main window of the Master layouts bigger.",
+  "source": "tile",
+  "key": "shortcut-grow",
+  "type": "as",
+  "default": "[\"<Super><Alt>equal\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.shortcut-shrink",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Smaller main window",
+  "help": "Makes the main window of the Master layouts smaller.",
+  "detail": "Makes the main window of the Master layouts smaller.",
+  "source": "tile",
+  "key": "shortcut-shrink",
+  "type": "as",
+  "default": "[\"<Super><Alt>minus\"]",
+  "unit": "",
+  "kind": "shortcut",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
  }
 ];

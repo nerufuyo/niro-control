@@ -11,7 +11,7 @@ cp -r shell/island/build/. "$X/island@niro.local/"
 mkdir -p "$X/dock@niro.local" "$X/search@niro.local" "$X/emulator@niro.local"
 cp -r shell/dock/dist/. "$X/dock@niro.local/"; cp shell/dock/metadata.json shell/dock/stylesheet.css "$X/dock@niro.local/"; cp -r shell/dock/schemas "$X/dock@niro.local/"
 cp shell/search/build/*.js shell/search/metadata.json shell/search/stylesheet.css "$X/search@niro.local/"
-for e in blur corners emoji; do cp -r "shell/$e" "$X/$e@niro.local"; done
+for e in blur corners emoji tile; do cp -r "shell/$e" "$X/$e@niro.local"; done
 cp shell/emulator/build/extension.js shell/emulator/metadata.json "$X/emulator@niro.local/"
 for d in "$X"/*/schemas; do rm -f "$d/gschemas.compiled"; glib-compile-schemas "$d"; done
 cp control/org.niro.control.gschema.xml "$P/share/glib-2.0/schemas/"; glib-compile-schemas "$P/share/glib-2.0/schemas"

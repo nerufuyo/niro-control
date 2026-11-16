@@ -32,8 +32,8 @@ for f in shell/search/build/*.js; do install -D -m 644 "$f" "$EXT/$(basename "$f
 install -D -m 644 shell/search/metadata.json "$EXT/metadata.json"
 install -D -m 644 shell/search/stylesheet.css "$EXT/stylesheet.css"
 
-# --- Blur, Corners, Emoji (kept as they were, renamed) and Emulator (TypeScript)
-for pair in blur:blur corners:corners emoji:emoji; do
+# --- Blur, Corners, Emoji (kept as they were, renamed), Tile (plain JS) and Emulator (TypeScript)
+for pair in blur:blur corners:corners emoji:emoji tile:tile; do
   src="${pair%%:*}"; EXT="$EXTDIR/${pair##*:}@niro.local"; mkdir -p "$EXT"
   cp -r "shell/$src"/. "$EXT"/; rm -f "$EXT"/schemas/gschemas.compiled; glib-compile-schemas "$EXT/schemas"
 done

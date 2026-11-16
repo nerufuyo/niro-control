@@ -1,0 +1,8 @@
+{
+  "uuid": "tile@niro.local",
+  "name": "Tile",
+  "description": "Arrange windows in tiles with Hyprland-style layouts: Dwindle, Master, Grid, Scrolling, Monocle and more.",
+  "settings-schema": "org.gnome.shell.extensions.tile",
+  "shell-version": ["46", "47", "48", "49", "50", "51"],
+  "url": "https://github.com/nerufuyo/niro-control"
+}

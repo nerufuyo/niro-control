@@ -8,9 +8,9 @@ import type {Item} from './types.js';
 
 const EXTENSION_DIRS = ['/usr/share/gnome-shell/extensions', '/usr/local/share/gnome-shell/extensions',
     `${GLib.get_user_data_dir()}/gnome-shell/extensions`];
-const UUID = {island: 'island@niro.local', dock: 'dock@niro.local', blur: 'blur@niro.local', corners: 'corners@niro.local'};
+const UUID = {island: 'island@niro.local', dock: 'dock@niro.local', blur: 'blur@niro.local', corners: 'corners@niro.local', tile: 'tile@niro.local'};
 const SCHEMA = {niro: 'org.niro.control', island: 'org.gnome.shell.extensions.island', dock: 'org.gnome.shell.extensions.dock',
-    blur: 'org.gnome.shell.extensions.blur-my-shell.applications', corners: 'org.gnome.shell.extensions.rounded-window-corners-reborn'};
+    blur: 'org.gnome.shell.extensions.blur-my-shell.applications', corners: 'org.gnome.shell.extensions.rounded-window-corners-reborn', tile: 'org.gnome.shell.extensions.tile'};
 
 /** NIRO_SCHEMA_DIR (tests) points at one folder of compiled schemas that holds them all. */
 function open(source: string) {
