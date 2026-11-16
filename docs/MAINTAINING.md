@@ -247,3 +247,13 @@ Layouts (ten cards, each with a diagram drawn from `arrange()`, and "Apply to": 
 classes), Appearance (gaps, animation, corner radius, opacity, shadow; there is no border setting because GNOME draws none and the tiling adds none), Shortcuts (the
 recorder with clash detection), Profiles (save, load, export, import, delete, undo, reset) and Advanced (checks, the two JSON documents with check-then-save, the log, the live
 state). A failure is a toast with the reason. Tested with a display by `tests/gjs/tilingPage.test.js`; without the extension running every page says so.
+
+### The quick layout switcher and the real-window test
+
+`shell/tile/switcher.js`: `Super+Alt+Space` (`shortcut-switcher`; plain `Super+Space` is Niro Search's) opens a compact overlay over the monitor with the focused
+window: the ten layouts as cards with a diagram each, a search box (`searchLayouts()` in layouts.js: every word must be in the id, name or description), a larger preview
+of the one chosen, arrows/Tab to move, Enter or a click to apply it to the active workspace, Escape or a click outside to leave. Keys are taken on their way down
+(`captured-event` on the backdrop) because the text field would otherwise keep arrows, Enter and Escape for itself. `tests/shell/tile.sh` (part of `run-staged.sh`) opens 1, 2, 3, 4, 6 and 10 real
+windows in a headless shell, applies each of the ten layouts, and compares every window's frame with `arrange()` (`tileExpect.mjs`); a window that cannot be as small as
+its tile keeps its own minimum size at the tile's corner (`_holdMinimum`), which the check accepts. It then closes a window and checks the nine left are laid out again.
+It runs with its own settings file (keyfile backend) so `gsettings` and the extension see the same values.

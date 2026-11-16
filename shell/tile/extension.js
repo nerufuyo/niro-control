@@ -14,6 +14,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {PACKAGE_VERSION} from 'resource:///org/gnome/shell/misc/config.js';
 
 import {arrange, dwindleSplits, inner, LAYOUT_IDS, LAYOUTS} from './layouts.js';
+import {LayoutSwitcher} from './switcher.js';
 import {matchRule, neighbor, parseLayoutMap, parseRules, resolveLayout, withLayout, withoutLayout} from './config.js';
 
 const RETILE_MS = 60;
@@ -240,6 +241,24 @@ export default class Tile extends Extension {
             return;
         win.move_resize_frame(true, r.x, r.y, r.width, r.height);
         this._glide(win, now, r);
+        this._holdMinimum(win, r);
+    }
+
+    /**
+     * A window cannot always get as small as its tile (it has a minimum size of its own). Mutter then answers the request with a place
+     * of its own choosing, so once the window has settled it is put back at the tile's corner, as big as it insists on being.
+     */
+    _holdMinimum(win, r) {
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 120, () => {
+            try {
+                if (this._settings && this._placed?.has(win) && win.get_compositor_private()) {
+                    const f = win.get_frame_rect();
+                    if ((f.width > r.width || f.height > r.height) && (f.x !== r.x || f.y !== r.y))
+                        win.move_frame(true, r.x, r.y);
+                }
+            } catch (_e) { /* the window is gone */ }
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     /** The window glides from where it was to where it went, rather than jumping: its picture is moved back and let go. */
@@ -515,7 +534,31 @@ export default class Tile extends Extension {
         this._schedule();
     }
 
-    _openSwitcher() { /* the layout switcher: see switcher.js */ }
+    /** The quick layout switcher: the ten layouts over the active monitor; the one chosen goes to the active workspace. */
+    _openSwitcher() {
+        if (this._switcher) {
+            this._closeSwitcher();
+            return;
+        }
+        const monitorIndex = global.display.focus_window?.get_monitor() ?? global.display.get_primary_monitor();
+        const workspace = global.workspace_manager.get_active_workspace_index();
+        this._switcher = new LayoutSwitcher({
+            current: this._layoutAt(monitorIndex),
+            workspace: workspace + 1,
+            closed: () => { this._switcher = null; },
+            apply: layout => {
+                this.applyLayout(layout, {workspace});
+                this._osd(LAYOUTS.find(l => l[0] === layout)[1]);
+            },
+        });
+        if (!this._switcher.open(Main.layoutManager.monitors[monitorIndex]))
+            this._switcher = null;
+    }
+
+    _closeSwitcher() {
+        this._switcher?.close();
+        this._switcher = null;
+    }
 
     // ---- What other programs see and ask (D-Bus: org.niro.Tile)
 

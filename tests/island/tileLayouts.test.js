@@ -110,3 +110,14 @@ test('horizontal and vertical weights size the columns and rows in proportion', 
     // weights for another number of windows are ignored: equal parts
     assert.deepEqual(arrange('horizontal', 3, AREA, {...OPT, weights: [3, 1]}), arrange('horizontal', 3, AREA, OPT));
 });
+
+test('searching the layouts: every word must be in the id, name or description', async () => {
+    const {searchLayouts} = await import('../../shell/tile/layouts.js');
+    assert.equal(searchLayouts('').length, 10);
+    assert.deepEqual(searchLayouts('grid').map(l => l[0]), ['grid']);
+    assert.deepEqual(searchLayouts('MASTER').map(l => l[0]), ['master-left', 'master-right', 'center-master', 'three-columns'].filter(id => searchLayouts('master').some(l => l[0] === id)));
+    assert.ok(searchLayouts('master left').some(l => l[0] === 'master-left'));
+    assert.deepEqual(searchLayouts('zzz'), []);
+    const split = searchLayouts('split').map(l => l[0]);
+    assert.ok(split.includes('horizontal') && split.includes('vertical') && searchLayouts('scroll')[0][0] === 'scrolling');
+});

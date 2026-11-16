@@ -8,3 +8,30 @@
   background-color: rgba(120, 160, 255, 0.32);
   border-color: rgba(170, 200, 255, 0.95);
 }
+
+/* The quick layout switcher */
+.tile-switcher-backdrop { background-color: rgba(0, 0, 0, 0.32); }
+.tile-switcher {
+  background-color: rgba(34, 34, 40, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 22px;
+  padding: 18px 20px 20px 20px;
+  spacing: 12px;
+  color: #f2f2f5;
+}
+.tile-switcher-title { font-size: 15pt; font-weight: bold; }
+.tile-switcher-entry { background-color: rgba(255, 255, 255, 0.10); border-radius: 12px; padding: 8px 12px; color: #fff; caret-color: #fff; border: 1px solid transparent; }
+.tile-switcher-entry:focus { border-color: rgba(150, 190, 255, 0.8); }
+.tile-switcher-grid { spacing: 8px; }
+.tile-switcher-row { spacing: 8px; }
+.tile-switcher-card { border-radius: 14px; padding: 8px; border: 2px solid transparent; }
+.tile-switcher-card.selected { background-color: rgba(150, 190, 255, 0.22); border-color: rgba(170, 205, 255, 0.95); }
+.tile-switcher-card.current .tile-switcher-card-title { font-weight: bold; }
+.tile-switcher-card-inner { spacing: 6px; }
+.tile-switcher-card-title { font-size: 9pt; text-align: center; color: #e8e8ee; }
+.tile-switcher-empty { padding: 24px; color: rgba(255, 255, 255, 0.6); }
+.tile-switcher-preview { spacing: 18px; padding: 12px 6px 0 6px; border-top: 1px solid rgba(255, 255, 255, 0.10); }
+.tile-switcher-preview-text { spacing: 4px; }
+.tile-switcher-preview-title { font-size: 13pt; font-weight: bold; }
+.tile-switcher-preview-note { color: rgba(255, 255, 255, 0.75); max-width: 360px; }
+.tile-switcher-preview-hint { color: rgba(150, 190, 255, 0.95); font-size: 9pt; }
