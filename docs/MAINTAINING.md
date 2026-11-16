@@ -176,8 +176,9 @@ The island's Controls page (`shell/island/src/pages/controls.ts`, shortcut Super
 have a desktop file) and where their windows are (workspace, monitor, size, place, maximized, minimized) are written to
 `~/.local/state/niro/session.json` five seconds after the last change. The delay is what keeps a logout from emptying the
 file: the apps close one by one as the session ends and the shell is gone before it settles, so the last settled state stays.
-At the next login, once (a marker in `$XDG_RUNTIME_DIR`, which goes with the login, so a shell restart or unlock does not
-restore again), the apps that are not running are started `restore-session-delay` seconds after the session is up, 0.9 s
+At the next login, once (a marker in `$XDG_RUNTIME_DIR` that names the shell process, pid and start time: the runtime directory can outlive a
+logout, so the file alone cannot tell one login from the next; a new login is a new shell on Wayland, an unlock or an extension
+reload is not), the apps that are not running are started `restore-session-delay` seconds after the session is up, 0.9 s
 apart, and their first window is put back (`restore-positions`). Saving stays off until that is done. Settings:
 `restore-session`, `restore-positions`, `restore-session-delay`, `restore-session-exclude` (desktop file ids). Tested by
 running two headless shells with the same `XDG_STATE_HOME` (`NIRO_RESTORE_MARKER` picks the marker file).
