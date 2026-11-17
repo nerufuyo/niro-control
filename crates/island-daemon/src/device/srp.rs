@@ -108,21 +108,22 @@ fn pad(value: &BigUint) -> Vec<u8> {
     out
 }
 
+/// The device's half of the key exchange, for tests of the daemon's half.
 #[cfg(test)]
-mod tests {
+pub(in crate::device) mod sim {
     use super::*;
 
     /// What `esp_srp` does on the device, written from its source: the salt and verifier from the code
     /// (`x = H(salt | H(user ":" code))`, `v = g^x`), then `B = k v + g^b` and `K = H((A v^u)^b)`.
-    struct Device {
-        salt: Vec<u8>,
+    pub(in crate::device) struct Device {
+        pub salt: Vec<u8>,
         v: BigUint,
         b: BigUint,
-        b_pub: BigUint,
+        pub b_pub: BigUint,
     }
 
     impl Device {
-        fn new(code: &str, salt: &[u8], b_secret: &[u8]) -> Self {
+        pub fn new(code: &str, salt: &[u8], b_secret: &[u8]) -> Self {
             let n = &G_3072.n;
             let g = &G_3072.g;
             let inner = Sha512::new()
@@ -147,13 +148,19 @@ mod tests {
             }
         }
 
-        fn key(&self, a_pub: &BigUint) -> [u8; KEY_LEN] {
+        pub fn key(&self, a_pub: &BigUint) -> [u8; KEY_LEN] {
             let n = &G_3072.n;
             let u = compute_u(a_pub, &self.b_pub);
             let s = (a_pub * self.v.modpow(&u, n) % n).modpow(&self.b, n);
             Sha512::digest(s.to_bytes_be()).into()
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::sim::Device;
+    use super::*;
 
     fn pair(code: &str, typed: &str) -> ([u8; KEY_LEN], [u8; KEY_LEN]) {
         let device = Device::new(typed, &random::<16>(), &random::<48>());

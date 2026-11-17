@@ -16,16 +16,18 @@ use hkdf::Hkdf;
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadHalf, WriteHalf};
 
 use super::proto::{FromDevice, ToDevice};
 use crate::share::{hex, random};
 
 /// The protocol version in `hello`.
-pub const VERSION: u8 = 1;
+pub(super) const VERSION: u8 = 1;
 /// The most a frame carries before sealing: a control message or a few audio frames.
 pub const MAX_PLAIN: usize = 16 * 1024;
 const TAG: usize = 16;
+/// What a clear handshake frame may hold.
+const MAX_CLEAR: usize = 2048;
 /// What one frame may hold on the wire: the type byte, the data and the tag.
 const MAX_FRAME: usize = 1 + MAX_PLAIN + TAG;
 /// The type byte inside a sealed frame.
@@ -45,6 +47,8 @@ pub enum Error {
     Auth,
     /// A sealed frame did not open (changed, repeated, dropped or reordered).
     Sealed,
+    /// The user did not allow the device to pair, or did not answer in time.
+    Declined,
 }
 
 impl From<io::Error> for Error {
@@ -55,7 +59,7 @@ impl From<io::Error> for Error {
 
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "t")]
-enum Clear {
+pub(super) enum Clear {
     #[serde(rename = "hello")]
     Hello {
         v: u8,
@@ -68,6 +72,21 @@ enum Clear {
     Auth { mac: String },
     #[serde(rename = "ready")]
     Ready { mac: String },
+    /// A device that wants to pair: it made a salt and `B` from the code the user typed on it.
+    #[serde(rename = "pair.hello")]
+    PairHello {
+        v: u8,
+        device_id: String,
+        name: String,
+        salt: String,
+        b: String,
+    },
+    #[serde(rename = "pair.a")]
+    PairA { a: String },
+    #[serde(rename = "pair.proof")]
+    PairProof { mac: String },
+    #[serde(rename = "pair.done")]
+    PairDone { mac: String, sealed: String },
 }
 
 /// What a sealed frame holds.
@@ -156,7 +175,7 @@ fn mac(key: &[u8; 32], who: &[u8], nonce: &[u8]) -> Hmac<Sha256> {
     mac
 }
 
-fn unhex<const N: usize>(text: &str) -> Option<[u8; N]> {
+pub(super) fn unhex<const N: usize>(text: &str) -> Option<[u8; N]> {
     if text.len() != N * 2 {
         return None;
     }
@@ -167,7 +186,7 @@ fn unhex<const N: usize>(text: &str) -> Option<[u8; N]> {
     Some(out)
 }
 
-async fn write_frame<W: AsyncWrite + Unpin>(stream: &mut W, bytes: &[u8]) -> Result<(), Error> {
+pub(super) async fn write_frame<W: AsyncWrite + Unpin>(stream: &mut W, bytes: &[u8]) -> Result<(), Error> {
     let len = u16::try_from(bytes.len()).map_err(|_| Error::Protocol("frame too long"))?;
     stream.write_all(&len.to_be_bytes()).await?;
     stream.write_all(bytes).await?;
@@ -176,7 +195,7 @@ async fn write_frame<W: AsyncWrite + Unpin>(stream: &mut W, bytes: &[u8]) -> Res
 }
 
 /// Reads one frame; a length over `max` is refused before any of it is read.
-async fn read_frame<R: AsyncRead + Unpin>(stream: &mut R, max: usize) -> Result<Vec<u8>, Error> {
+pub(super) async fn read_frame<R: AsyncRead + Unpin>(stream: &mut R, max: usize) -> Result<Vec<u8>, Error> {
     let mut len = [0u8; 2];
     stream.read_exact(&mut len).await?;
     let len = usize::from(u16::from_be_bytes(len));
@@ -188,14 +207,15 @@ async fn read_frame<R: AsyncRead + Unpin>(stream: &mut R, max: usize) -> Result<
     Ok(frame)
 }
 
-async fn write_clear<W: AsyncWrite + Unpin>(stream: &mut W, message: &Clear) -> Result<(), Error> {
+pub(super) async fn write_clear<W: AsyncWrite + Unpin>(stream: &mut W, message: &Clear) -> Result<(), Error> {
     let json = serde_json::to_vec(message).map_err(|_| Error::Protocol("encode"))?;
     write_frame(stream, &json).await
 }
 
-async fn read_clear<R: AsyncRead + Unpin>(stream: &mut R) -> Result<Clear, Error> {
-    // A handshake frame is a few hundred bytes; nothing larger is read before a device is known.
-    let frame = read_frame(stream, 512).await?;
+pub(super) async fn read_clear<R: AsyncRead + Unpin>(stream: &mut R) -> Result<Clear, Error> {
+    // A clear frame is under a thousand bytes (the largest holds `B`, 768 hex digits); nothing larger is
+    // read before a device is known.
+    let frame = read_frame(stream, MAX_CLEAR).await?;
     serde_json::from_slice(&frame).map_err(|_| Error::Protocol("handshake"))
 }
 
@@ -213,54 +233,178 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Link<S> {
     }
 
     pub async fn send(&mut self, message: &ToDevice) -> Result<(), Error> {
-        let json = serde_json::to_vec(message).map_err(|_| Error::Protocol("encode"))?;
-        self.send_sealed(CONTROL, &json).await
+        send_control(&mut self.stream, &mut self.send, message).await
     }
 
     pub async fn send_audio(&mut self, frame: &[u8]) -> Result<(), Error> {
-        self.send_sealed(AUDIO, frame).await
-    }
-
-    async fn send_sealed(&mut self, kind: u8, data: &[u8]) -> Result<(), Error> {
-        if data.len() > MAX_PLAIN {
-            return Err(Error::Protocol("frame too long"));
-        }
-        let sealed = self.send.seal(kind, data);
-        write_frame(&mut self.stream, &sealed).await
+        send_sealed(&mut self.stream, &mut self.send, AUDIO, frame).await
     }
 
     pub async fn receive(&mut self) -> Result<Incoming, Error> {
-        let frame = read_frame(&mut self.stream, MAX_FRAME).await?;
-        let (kind, data) = self.receive.open(&frame)?;
-        match kind {
-            CONTROL => serde_json::from_slice(&data)
-                .map(Incoming::Control)
-                .map_err(|_| Error::Protocol("message")),
-            AUDIO => Ok(Incoming::Audio(data)),
-            _ => Err(Error::Protocol("frame type")),
-        }
+        receive_one(&mut self.stream, &mut self.receive).await
+    }
+
+    /// The two directions apart, so one task can read while another writes: a read that is cut short
+    /// in a `select!` would lose bytes of a frame.
+    pub fn split(self) -> (String, Reader<ReadHalf<S>>, Writer<WriteHalf<S>>) {
+        let (read, write) = tokio::io::split(self.stream);
+        (
+            self.device_id,
+            Reader {
+                stream: read,
+                receive: self.receive,
+            },
+            Writer {
+                stream: write,
+                send: self.send,
+            },
+        )
     }
 }
 
-/// The daemon's side: a device says hello, and is answered only when it is paired and then proves it
+/// The reading half of a [`Link`].
+pub struct Reader<R> {
+    stream: R,
+    receive: Seal,
+}
+
+impl<R: AsyncRead + Unpin> Reader<R> {
+    pub async fn receive(&mut self) -> Result<Incoming, Error> {
+        receive_one(&mut self.stream, &mut self.receive).await
+    }
+}
+
+/// The writing half of a [`Link`].
+pub struct Writer<W> {
+    stream: W,
+    send: Seal,
+}
+
+impl<W: AsyncWrite + Unpin> Writer<W> {
+    pub async fn send(&mut self, message: &ToDevice) -> Result<(), Error> {
+        send_control(&mut self.stream, &mut self.send, message).await
+    }
+
+    pub async fn send_audio(&mut self, frame: &[u8]) -> Result<(), Error> {
+        send_sealed(&mut self.stream, &mut self.send, AUDIO, frame).await
+    }
+}
+
+async fn send_control<W: AsyncWrite + Unpin>(
+    stream: &mut W,
+    seal: &mut Seal,
+    message: &ToDevice,
+) -> Result<(), Error> {
+    let json = serde_json::to_vec(message).map_err(|_| Error::Protocol("encode"))?;
+    send_sealed(stream, seal, CONTROL, &json).await
+}
+
+async fn send_sealed<W: AsyncWrite + Unpin>(
+    stream: &mut W,
+    seal: &mut Seal,
+    kind: u8,
+    data: &[u8],
+) -> Result<(), Error> {
+    if data.len() > MAX_PLAIN {
+        return Err(Error::Protocol("frame too long"));
+    }
+    let sealed = seal.seal(kind, data);
+    write_frame(stream, &sealed).await
+}
+
+async fn receive_one<R: AsyncRead + Unpin>(
+    stream: &mut R,
+    seal: &mut Seal,
+) -> Result<Incoming, Error> {
+    let frame = read_frame(stream, MAX_FRAME).await?;
+    let (kind, data) = seal.open(&frame)?;
+    match kind {
+        CONTROL => serde_json::from_slice(&data)
+            .map(Incoming::Control)
+            .map_err(|_| Error::Protocol("message")),
+        AUDIO => Ok(Incoming::Audio(data)),
+        _ => Err(Error::Protocol("frame type")),
+    }
+}
+
+/// What a device opens a connection with.
+pub(super) enum Opening {
+    /// A paired device coming back.
+    Hello { device_id: String, nonce: [u8; 16] },
+    /// A device that wants to pair.
+    Pair(PairHello),
+}
+
+/// The pairing request: the device's id and name, and the salt and `B` it made from the code.
+pub(super) struct PairHello {
+    pub device_id: String,
+    pub name: String,
+    pub salt: Vec<u8>,
+    pub b: Vec<u8>,
+}
+
+/// Reads how a device opens the connection.
+pub(super) async fn open<S: AsyncRead + Unpin>(stream: &mut S) -> Result<Opening, Error> {
+    match read_clear(stream).await? {
+        Clear::Hello {
+            v,
+            device_id,
+            nonce,
+        } => {
+            if v != VERSION {
+                return Err(Error::Protocol("version"));
+            }
+            let nonce = unhex(&nonce).ok_or(Error::Protocol("nonce"))?;
+            Ok(Opening::Hello { device_id, nonce })
+        }
+        Clear::PairHello {
+            v,
+            device_id,
+            name,
+            salt,
+            b,
+        } => {
+            if v != VERSION {
+                return Err(Error::Protocol("version"));
+            }
+            let salt = unhex_vec(&salt, 8, 64).ok_or(Error::Protocol("salt"))?;
+            let b = unhex_vec(&b, 1, 384).ok_or(Error::Protocol("b"))?;
+            Ok(Opening::Pair(PairHello {
+                device_id,
+                name,
+                salt,
+                b,
+            }))
+        }
+        _ => Err(Error::Protocol("expected hello")),
+    }
+}
+
+/// Hex of `min` to `max` bytes.
+pub(super) fn unhex_vec(text: &str, min: usize, max: usize) -> Option<Vec<u8>> {
+    let len = text.len() / 2;
+    if text.len() % 2 != 0 || !(min..=max).contains(&len) {
+        return None;
+    }
+    text.as_bytes()
+        .chunks(2)
+        .map(|pair| u8::from_str_radix(std::str::from_utf8(pair).ok()?, 16).ok())
+        .collect()
+}
+
+/// The daemon's side for a paired device: it is answered only when it is paired and then proves it
 /// holds the key. `key_of` gives a paired device's key.
-pub async fn accept<S, F>(mut stream: S, daemon_id: &str, key_of: F) -> Result<Link<S>, Error>
+pub(super) async fn accept_hello<S, F>(
+    mut stream: S,
+    daemon_id: &str,
+    device_id: String,
+    nonce_d: [u8; 16],
+    key_of: F,
+) -> Result<Link<S>, Error>
 where
     S: AsyncRead + AsyncWrite + Unpin,
     F: FnOnce(&str) -> Option<[u8; 32]>,
 {
-    let Clear::Hello {
-        v,
-        device_id,
-        nonce,
-    } = read_clear(&mut stream).await?
-    else {
-        return Err(Error::Protocol("expected hello"));
-    };
-    if v != VERSION {
-        return Err(Error::Protocol("version"));
-    }
-    let nonce_d: [u8; 16] = unhex(&nonce).ok_or(Error::Protocol("nonce"))?;
     // An unknown device gets no answer at all, so it learns nothing, not even that it was once paired.
     let key = key_of(&device_id).ok_or(Error::Unknown)?;
     let nonce_s = random::<16>();
@@ -289,6 +433,21 @@ where
         send: Seal::new(&keys.to_device),
         receive: Seal::new(&keys.from_device),
     })
+}
+
+/// Opens and accepts a paired device in one step (the tests; the server looks at the opening first).
+#[cfg(test)]
+pub async fn accept<S, F>(mut stream: S, daemon_id: &str, key_of: F) -> Result<Link<S>, Error>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+    F: FnOnce(&str) -> Option<[u8; 32]>,
+{
+    match open(&mut stream).await? {
+        Opening::Hello { device_id, nonce } => {
+            accept_hello(stream, daemon_id, device_id, nonce, key_of).await
+        }
+        Opening::Pair(_) => Err(Error::Protocol("expected hello")),
+    }
 }
 
 /// The device's side, as the firmware does it. The daemon does not need it; the tests and a device
@@ -495,6 +654,18 @@ mod tests {
         writer.write_all(&u16::MAX.to_be_bytes()).await.unwrap();
         let result = read_frame(&mut reader, MAX_FRAME).await;
         assert!(matches!(result, Err(Error::Protocol("frame too long"))));
+    }
+
+    #[tokio::test]
+    async fn a_split_link_reads_and_writes_apart() {
+        let (daemon, device) = pair_up(KEY).await;
+        let (daemon, mut device) = (daemon.unwrap(), device.unwrap());
+        let (id, mut reader, mut writer) = daemon.split();
+        assert_eq!(id, MAC);
+        device.send(&button()).await.unwrap();
+        writer.send(&ToDevice::Pong).await.unwrap();
+        assert_eq!(reader.receive().await.unwrap(), Incoming::Control(button()));
+        assert_eq!(device.receive().await.unwrap(), ToDevice::Pong);
     }
 
     #[tokio::test]
