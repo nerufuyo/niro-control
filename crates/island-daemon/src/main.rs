@@ -218,7 +218,8 @@ async fn run() -> anyhow::Result<()> {
         }
     });
     tokio::spawn(todo::run(todo));
-    tokio::spawn(device::run(devices));
+    tokio::spawn(device::run(devices.clone()));
+    tokio::spawn(device::listen(devices));
     tokio::spawn(app_usage::run(app_usage));
     tokio::spawn(assistant::run(assistant, own_data, assistant_commands));
 
