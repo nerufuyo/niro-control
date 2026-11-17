@@ -1,6 +1,6 @@
 // @ts-nocheck: GTK / libadwaita are untyped here
-// "Connections" on the Island's AI Usage page: how each AI is reached (Claude, ChatGPT Plus or Pro, Grok through their command lines' sign-ins; DeepSeek with an
-// API key) and, for DeepSeek, where to put the key. The key goes into a private file of the user's (~/.config/niro/deepseek-api-key, mode 600), never into the
+// "Connections" on the Island's AI Usage page: how each AI is reached (Claude, ChatGPT Plus or Pro, Grok through their command lines' sign-ins; opencode's Go plan
+// through the key opencode keeps; DeepSeek with an API key) and, for DeepSeek, where to put the key. The key goes into a private file of the user's (~/.config/niro/deepseek-api-key, mode 600), never into the
 // settings (dconf is not private); island-daemon reads it from there.
 import Adw from 'gi://Adw?version=1';
 import Gio from 'gi://Gio';
@@ -10,6 +10,17 @@ import Gtk from 'gi://Gtk?version=4.0';
 export const deepseekKeyFile = () => GLib.build_filenamev([GLib.get_user_config_dir(), 'niro', 'deepseek-api-key']);
 
 const exists = path => GLib.file_test(path, GLib.FileTest.EXISTS);
+/** Whether opencode holds an API key for the OpenCode Go plan (`opencode auth login`), in its own auth.json: what island-daemon asks the limits with. */
+export function opencodeGoSignedIn(dataDir = GLib.get_user_data_dir()) {
+    try {
+        const [, bytes] = GLib.file_get_contents(GLib.build_filenamev([dataDir, 'opencode', 'auth.json']));
+        const entry = JSON.parse(new TextDecoder().decode(bytes))?.['opencode-go'];
+        return entry?.type === 'api' && String(entry.key ?? '').trim() !== '';
+    } catch (_e) {
+        return false;
+    }
+}
+
 const homeDir = (variable, fallback) => GLib.getenv(variable) || GLib.build_filenamev([GLib.get_home_dir(), fallback]);
 
 /** What is not a key at all: nothing, blanks, or a sentence. */
@@ -60,7 +71,7 @@ function refreshDaemon() {
 
 export function aiConnectionsGroup(model, ctx) {
     const group = new Adw.PreferencesGroup({title: 'Connections',
-        description: 'How the island reaches each AI. Claude, ChatGPT and Grok use the sign-in of their command line, so nothing is typed here; DeepSeek has no sign-in, only an API key.'});
+        description: 'How the island reaches each AI. Claude, ChatGPT and Grok use the sign-in of their command line, and opencode the key it keeps for its Go plan, so nothing is typed here; DeepSeek has no sign-in, only an API key.'});
     const island = model.stores.by.island;
     const row = (title, subtitle, ok) => {
         const r = new Adw.ActionRow({title, subtitle});
@@ -72,7 +83,7 @@ export function aiConnectionsGroup(model, ctx) {
     const codex = homeDir('CODEX_HOME', '.codex');
     const grok = homeDir('GROK_HOME', '.grok');
     const rows = {
-        claude: row('Claude', '', false), chatgpt: row('ChatGPT Plus or Pro', '', false), grok: row('Grok', '', false),
+        claude: row('Claude', '', false), chatgpt: row('ChatGPT Plus or Pro', '', false), grok: row('Grok', '', false), opencode: row('opencode (Go plan)', '', false),
     };
     Object.values(rows).forEach(r => group.add(r));
     const deepseek = row('DeepSeek', '', false);
@@ -92,6 +103,8 @@ export function aiConnectionsGroup(model, ctx) {
         rows.chatgpt.set_subtitle(exists(GLib.build_filenamev([codex, 'auth.json'])) ? 'Signed in with Codex: the Plus or Pro limits (5 hours, week) show'
             : 'Not signed in. Install Codex, run `codex login` and choose "Sign in with ChatGPT". No API key.');
         rows.grok.set_subtitle(exists(GLib.build_filenamev([grok, 'auth.json'])) ? 'Signed in with Grok: its allowance shows' : 'Not signed in. Open the Grok command line and sign in.');
+        rows.opencode.set_subtitle(opencodeGoSignedIn() ? 'Signed in to the Go plan with opencode: its 5-hour, weekly and monthly limits show'
+            : 'Not signed in to the Go plan. Install opencode, run `opencode auth login` and choose OpenCode Go.');
         const status = keyStatus();
         deepseek.set_subtitle(status.saved
             ? `An API key is saved (ends in …${status.tail}${status.source === 'environment' ? ', from DEEPSEEK_API_KEY' : ''}); the balance shows when "Show DeepSeek's balance" is on`

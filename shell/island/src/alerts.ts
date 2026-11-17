@@ -461,11 +461,11 @@ export function meeting(event, link, join, onShown) {
     return alert;
 }
 
-const AGENT_NAMES = {claude: 'Claude', codex: 'Codex', grok: 'Grok'};
-const AGENT_APPS = {claude: 'Claude Code', codex: 'Codex', grok: 'Grok'};
+const AGENT_NAMES = {claude: 'Claude', codex: 'Codex', grok: 'Grok', opencode: 'opencode'};
+const AGENT_APPS = {claude: 'Claude Code', codex: 'Codex', grok: 'Grok', opencode: 'opencode'};
 /** The agent's icon and accent colour; Claude's for anything unknown. */
-const agentIcon = provider => provider === 'codex' ? 'island-openai' : provider === 'grok' ? 'island-grok' : 'island-claude';
-const agentTone = provider => provider === 'codex' ? 'codex' : provider === 'grok' ? 'grok' : 'claude';
+const agentIcon = provider => provider === 'codex' ? 'island-openai' : provider === 'grok' ? 'island-grok' : provider === 'opencode' ? 'island-terminal-symbolic' : 'island-claude';
+const agentTone = provider => provider === 'codex' ? 'codex' : provider === 'grok' ? 'grok' : provider === 'opencode' ? 'neutral' : 'claude';
 
 /** An AI agent needs the user, or is done ({provider, kind, project, message}); `show` brings its window up. */
 export function agent(event, show) {
@@ -677,7 +677,8 @@ export function agentConnected(provider, look, settings) {
         key: `agent-connected:${provider}`,
         bot: {look, glyph: 'check', form: 'success'},
         title: `${AGENT_APPS[provider]} is connected`,
-        subtitle: provider === 'codex' ? 'In Codex, type /hooks once and allow Island' : 'Answer it from here when it asks',
+        subtitle: provider === 'codex' ? 'In Codex, type /hooks once and allow Island'
+            : provider === 'opencode' ? 'It tells you here when it needs you or is done' : 'Answer it from here when it asks',
         tone: 'good',
         actions: [
             {label: 'Settings', callback: settings},

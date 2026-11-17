@@ -1747,27 +1747,78 @@
 #panel.island-panel #panelRight { background-color: transparent !important; border-width: 0 !important; padding: 0 !important; margin: 0 !important; min-width: 0 !important; width: 0 !important; }
 #panel.island-panel #panelRight .panel-button, #panel.island-panel #panelRight StBoxLayout, #panel.island-panel #panelRight StLabel, #panel.island-panel #panelRight StIcon { width: 0 !important; min-width: 0 !important; max-width: 0 !important; padding: 0 !important; margin: 0 !important; border-width: 0 !important; -natural-hpadding: 0px; -minimum-hpadding: 0px; font-size: 0px; icon-size: 0px !important; background-color: transparent !important; box-shadow: none !important; }
 
-/* ── Power page (local addition) ──────────────────────────── */
-.island-power-row { spacing: 8px; padding: 6px 0 12px 0; }
-.island-power-heading { padding-top: 2px; }
-.island-power-action, .island-power-switch { text-align: center; }
+/* ── Power page: the battery, the power mode and the session's actions ───────────────── */
+.island-power-top { spacing: 10px; padding-bottom: 10px; }
+.island-power-card { border-radius: 16px; background-color: rgba(255, 255, 255, 0.08); padding: 12px 14px; }
+.island-power-battery { spacing: 8px; }
+.island-power-head { spacing: 12px; }
+.island-power-percent { font-size: 30px; font-weight: 700; color: #ffffff; }
+.island-power-low { color: #ff453a; }
+.island-power-title { font-size: 13px; font-weight: 600; color: #ffffff; }
+.island-power-detail { font-size: 11px; color: rgba(255, 255, 255, 0.68); }
+.island-power-facts { font-size: 11px; color: rgba(255, 255, 255, 0.55); }
+.island-level { height: 8px; }
+.island-level-track { border-radius: 4px; background-color: rgba(255, 255, 255, 0.16); }
+.island-level-fill { border-radius: 4px; background-color: #ffffff; }
+.island-level-charging { background-color: #30d158; }
+.island-level-low { background-color: #ff453a; }
+.island-power-modes { spacing: 8px; min-width: 176px; }
+.island-power-label { font-size: 11px; color: rgba(255, 255, 255, 0.6); }
+.island-power-segments { spacing: 4px; }
+.island-power-segment { padding: 5px 10px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.08); font-size: 12px;
+  font-weight: 600; text-align: center; color: #ffffff; }
+.island-power-segment:hover, .island-power-segment:focus { background-color: rgba(255, 255, 255, 0.18); }
+.island-power-segment-on, .island-power-segment-on:hover { background-color: #E8472B; color: #ffffff; }
+.island-power-actions { spacing: 8px; }
+.island-power-action { border-radius: 14px; padding: 8px 6px; text-align: center; }
+.island-power-action-text { font-size: 11px; font-weight: 600; padding-top: 3px; }
 .island-power-danger { color: #E8472B; }
 .island-power-on { background-color: #E8472B; color: #ffffff; }
 
-/* Controls page: sliders, switches, Bluetooth, Wi-Fi and sound lists */
-.island-controls-tabs { spacing: 6px; padding: 0 0 6px 0; }
-.island-controls-tab { padding: 2px 12px; }
-.island-controls-sliders { spacing: 16px; }
-.island-controls-column { spacing: 4px; }
-.island-controls-slider-row { spacing: 8px; }
-.island-controls-icon { padding: 4px; }
-.island-controls-pills { padding: 6px 0 0 0; spacing: 6px; }
-.island-controls-view { spacing: 6px; }
-.island-controls-sound { spacing: 16px; }
-.island-controls-list { min-height: 56px; }
-.island-controls-row { padding: 4px 10px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.08); margin-bottom: 3px; }
-.island-controls-row:hover, .island-controls-row:focus { background-color: rgba(255, 255, 255, 0.16); }
-.island-controls-row.island-power-on { background-color: #E8472B; color: #ffffff; }
-.island-controls-row-text { font-size: 13px; font-weight: 600; }
-.island-controls-row-detail { font-size: 11px; color: rgba(255, 255, 255, 0.7); padding-left: 8px; }
-.island-controls-empty { font-size: 12px; color: rgba(255, 255, 255, 0.6); padding: 8px 0; }
+/* ── Controls page: sliders, switch tiles, and the Wi-Fi, Bluetooth and Sound lists ───── */
+.island-ctl-tabs { spacing: 6px; padding: 0 0 10px 0; }
+.island-ctl-tab { padding: 5px 16px; }
+.island-ctl-quick { spacing: 12px; }
+.island-ctl-sliders { spacing: 8px; }
+.island-ctl-card { border-radius: 14px; background-color: rgba(255, 255, 255, 0.08); padding: 6px 12px 6px 6px; spacing: 0; }
+.island-ctl-slider-row { spacing: 8px; }
+.island-ctl-round { padding: 7px; border-radius: 999px; background-color: rgba(255, 255, 255, 0.12); }
+.island-ctl-round:hover { background-color: rgba(255, 255, 255, 0.22); }
+.island-ctl-percent { font-size: 12px; font-weight: 600; min-width: 44px; text-align: right; color: #ffffff; }
+.island-ctl-device { padding: 0 0 0 8px; }
+.island-ctl-device-text { font-size: 11px; color: rgba(255, 255, 255, 0.6); }
+.island-ctl-device:hover .island-ctl-device-text, .island-ctl-device:focus .island-ctl-device-text { color: #ffffff; }
+.island-slider-thick { height: 30px; }
+.island-ctl-grid { spacing: 8px; min-width: 288px; }
+.island-ctl-grid-row { spacing: 8px; }
+.island-ctl-tile { border-radius: 16px; padding: 9px 10px; text-align: left; }
+.island-ctl-tile-title { font-size: 12px; font-weight: 600; }
+.island-ctl-tile-detail { font-size: 10px; font-weight: 500; color: rgba(255, 255, 255, 0.66); max-width: 78px; }
+.island-ctl-tile.island-power-on .island-ctl-tile-detail { color: rgba(255, 255, 255, 0.85); }
+.island-ctl-more { padding: 5px; margin: 5px 5px 0 0; border-radius: 999px; }
+.island-ctl-view { spacing: 8px; }
+.island-ctl-head { spacing: 8px; }
+.island-ctl-switch { padding: 5px 16px; }
+.island-ctl-sound { spacing: 14px; }
+.island-ctl-column { spacing: 6px; }
+.island-ctl-heading { font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.6); padding-left: 4px; }
+.island-ctl-list { min-height: 60px; }
+.island-ctl-row { border-radius: 12px; background-color: rgba(255, 255, 255, 0.08); margin-bottom: 4px; spacing: 6px; padding-right: 8px; }
+.island-ctl-row:hover { background-color: rgba(255, 255, 255, 0.15); }
+.island-ctl-row.island-power-on { background-color: #E8472B; color: #ffffff; }
+.island-ctl-row-body { padding: 6px 4px 6px 10px; border-radius: 12px; }
+.island-ctl-row-line { spacing: 8px; }
+.island-ctl-row-text { font-size: 13px; font-weight: 600; color: #ffffff; }
+.island-ctl-row-detail { font-size: 10px; color: rgba(255, 255, 255, 0.66); }
+.island-ctl-row.island-power-on .island-ctl-row-detail { color: rgba(255, 255, 255, 0.85); }
+.island-ctl-bad { color: #ff8a80; }
+.island-ctl-row-meta { spacing: 6px; }
+.island-ctl-signal { padding-left: 2px; }
+.island-ctl-row-action { padding: 3px 12px; margin: 4px 0; }
+.island-ctl-empty { font-size: 12px; color: rgba(255, 255, 255, 0.6); padding: 8px 4px; }
+.island-ctl-prompt { border-radius: 14px; background-color: rgba(255, 255, 255, 0.1); padding: 6px 8px; spacing: 4px; }
+.island-ctl-prompt-row { spacing: 8px; }
+.island-ctl-entry { border-radius: 10px; padding: 5px 10px; font-size: 13px; color: #ffffff; background-color: rgba(0, 0, 0, 0.35);
+  caret-color: #ffffff; selection-background-color: rgba(255, 255, 255, 0.35); border: 1px solid rgba(255, 255, 255, 0.18); }
+.island-ctl-entry:focus { border-color: rgba(255, 255, 255, 0.6); }
+.island-ctl-prompt-error { font-size: 11px; color: #ff8a80; }

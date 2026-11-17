@@ -1243,19 +1243,21 @@ export const Slider = GObject.registerClass({
         'released': {param_types: [GObject.TYPE_DOUBLE]},
     },
 }, class Slider extends St.Widget {
-    /** `scrollStep` is how far one scroll moves it; 0 leaves scrolling to the parent. */
-    _init({scrollStep = 0} = {}) {
+    /** `scrollStep` is how far one scroll moves it; 0 leaves scrolling to the parent. `thick` is the Controls page's: a track
+     * twice as thick, a knob always shown and a taller place to press, so it is easy to hit and to read. */
+    _init({scrollStep = 0, thick = false} = {}) {
         super._init({
-            style_class: 'island-slider',
+            style_class: thick ? 'island-slider island-slider-thick' : 'island-slider',
             reactive: true,
             track_hover: true,
             x_expand: true,
             y_align: Clutter.ActorAlign.CENTER,
         });
         this._scrollStep = scrollStep;
+        this._thick = thick;
         this._track = new St.Widget({style_class: 'island-slider-track'});
         this._fill = new St.Widget({style_class: 'island-slider-fill'});
-        this._knob = new St.Widget({style_class: 'island-slider-knob', opacity: 0});
+        this._knob = new St.Widget({style_class: 'island-slider-knob', opacity: thick ? 255 : 0});
         this.add_child(this._track);
         this.add_child(this._fill);
         this.add_child(this._knob);
@@ -1294,6 +1296,8 @@ export const Slider = GObject.registerClass({
 
     /** The knob shows while hovered or dragged. */
     _syncKnob() {
+        if (this._thick)
+            return;
         this._knob.ease({opacity: this.hover || this._grab ? 255 : 0, duration: 120});
     }
 
@@ -1301,14 +1305,16 @@ export const Slider = GObject.registerClass({
     vfunc_allocate(box) {
         this.set_allocation(box);
         const [width, height] = [box.get_width(), box.get_height()];
-        const trackHeight = px(4);
+        const trackHeight = px(this._thick ? 8 : 4);
         const y = Math.round((height - trackHeight) / 2);
         this._width = width;
         this._filled = Math.round(width * this._value);
         allocateAt(this._track, 0, y, width, trackHeight);
         allocateAt(this._fill, 0, y, this._filled, trackHeight);
-        const knob = px(12);
-        allocateAt(this._knob, Math.round(width * this._value - knob / 2), Math.round((height - knob) / 2), knob, knob);
+        const knob = px(this._thick ? 18 : 12);
+        // A thick one's knob stays inside its ends, so a full or empty slider is not cut at the page's edge.
+        const x = this._thick ? Math.min(Math.max(width * this._value - knob / 2, 0), width - knob) : width * this._value - knob / 2;
+        allocateAt(this._knob, Math.round(x), Math.round((height - knob) / 2), knob, knob);
     }
 
     /** Sets the value under the pointer and emits `value-changed`. */

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 zickrian
 
-//! `island-daemon --agent-hook claude|codex`: run by the AI, it passes its hook events to island-daemon and asks the island
+//! `island-daemon --agent-hook claude|codex|opencode`: run by the AI, it passes its hook events to island-daemon and asks the island
 //! about permissions. With no answer (no island-daemon, no reply in time) it prints nothing: the AI asks in its terminal.
 
 use std::io::{Read, Seek, SeekFrom};
@@ -63,6 +63,8 @@ pub async fn run(args: &[String]) {
     let event = match ai {
         Some("claude" | "grok") => from_named(ai.unwrap_or("claude"), &payload),
         Some("codex") => from_codex(&payload).or_else(|| from_codex_hook(&payload)),
+        // opencode's plugin speaks Claude Code's words: a Notification (permission or question) and Stop.
+        Some("opencode") => from_named("opencode", &payload),
         _ => None,
     };
     if let Some(event) = event {
@@ -373,6 +375,7 @@ fn ai_of(named: Option<&str>, parents: &[String]) -> Option<&'static str> {
         Some("claude") => Some("claude"),
         Some("codex") => Some("codex"),
         Some("grok") => Some("grok"),
+        Some("opencode") => Some("opencode"),
         _ => None,
     }
 }
@@ -617,6 +620,31 @@ mod tests {
         assert_eq!(ai_of(Some("codex"), &parents), Some("codex"));
         assert!(from_claude(&json!({"hook_event_name": "PreToolUse"})).is_none());
         assert!(from_claude(&json!([1, 2])).is_none());
+    }
+
+    #[test]
+    fn opencodes_plugin_reports_in_claudes_words() {
+        assert_eq!(ai_of(Some("opencode"), &["opencode".to_owned()]), Some("opencode"));
+        let permission = from_named("opencode", &json!({
+            "hook_event_name": "Notification", "notification_type": "permission_prompt",
+            "message": "Permission for bash: git push", "session_id": "ses_1", "cwd": "/home/a/korus"
+        }))
+        .unwrap();
+        assert_eq!(
+            (permission.provider.as_str(), permission.kind.as_str(), permission.message.as_str(), permission.project.as_str(), permission.session.as_str()),
+            ("opencode", "permission", "Permission for bash: git push", "korus", "ses_1")
+        );
+        let question = from_named("opencode", &json!({
+            "hook_event_name": "Notification", "notification_type": "elicitation_dialog",
+            "message": "Which branch?", "session_id": "ses_1", "cwd": "/home/a/korus"
+        }))
+        .unwrap();
+        assert_eq!((question.kind.as_str(), question.message.as_str()), ("waiting", "Which branch?"));
+        let done = from_named("opencode", &json!({"hook_event_name": "Stop", "session_id": "ses_1", "cwd": "/home/a/korus"})).unwrap();
+        assert_eq!((done.provider.as_str(), done.kind.as_str(), done.message.as_str()), ("opencode", "done", ""));
+        // Nothing else is passed on, and opencode's permissions are never put to the island to answer.
+        assert!(from_named("opencode", &json!({"hook_event_name": "PreToolUse"})).is_none());
+        assert!(request("opencode", &json!({"tool_name": "bash", "tool_input": {"command": "ls"}})).is_none());
     }
 
     #[test]

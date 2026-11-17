@@ -66,6 +66,7 @@ pub use self::grok::{
 use self::mic::Mic;
 use self::models::{Catalogs, Why};
 pub use self::models::{claude_plan, codex_plan, plan_seen, set_assistant_on};
+pub use self::opencode::go_key as opencode_go_key;
 pub use self::tasks::shows_whole;
 use self::whisper::Whisper;
 use crate::store::{Store, data_dir};

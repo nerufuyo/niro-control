@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+# A stand-in for nmcli with one Wi-Fi adapter, for tests/shell/controls.sh: enough for the island's Wi-Fi view. Its state (the network joined, the saved ones, every command it was given) is the JSON file in $NMCLI_FAKE_STATE.
+import json, os, sys
+S = os.environ["NMCLI_FAKE_STATE"]
+st = json.load(open(S)) if os.path.exists(S) else {"active": "Home", "saved": ["Home"], "log": []}
+nets = [("Home", 82, "WPA2"), ("Cafe Latte", 64, "WPA2"), ("Guest", 48, "--"), ("Kantor-5G", 91, "WPA2"), ("Tetangga", 31, "WPA2"), ("Warung", 22, "WPA2")]
+a = [x for x in sys.argv[1:] if x not in ("--wait", "25", "-t")]
+def save():
+    st["log"].append(" ".join(sys.argv[1:])); json.dump(st, open(S, "w"))
+if "device" in a and "list" in a:
+    for n, sig, sec in nets:
+        print(("*" if n == st["active"] else " ") + ":" + n + ":" + str(sig) + ":" + sec)
+elif a[:2] == ["DEVICE,TYPE", "device"] or ("DEVICE,TYPE" in a):
+    print("wlan0:wifi\nlo:loopback")
+elif a[:2] == ["radio", "wifi"]:
+    print("enabled")
+elif "NAME,TYPE" in a:
+    for n in st["saved"]: print(n + ":802-11-wireless")
+    print("Wired:802-3-ethernet")
+elif "rescan" in a:
+    pass
+elif "wifi" in a and "connect" in a:
+    i = a.index("connect"); ssid = a[i + 1]
+    pw = a[a.index("password") + 1] if "password" in a else None
+    sec = [x[2] for x in nets if x[0] == ssid]
+    if sec and sec[0] != "--" and pw != "correct":
+        sys.stderr.write("Error: Connection activation failed: (7) Secrets were required, but not provided.\n"); st["saved"].append(ssid); save(); sys.exit(4)
+    st["saved"] = sorted(set(st["saved"] + [ssid])); st["active"] = ssid; save()
+elif a[:2] == ["connection", "up"]:
+    st["active"] = a[3]; save()
+elif a[:2] == ["connection", "delete"]:
+    st["saved"] = [x for x in st["saved"] if x != a[3]]; save()
+elif a[:2] == ["device", "disconnect"]:
+    st["active"] = ""; save()
+else:
+    save()

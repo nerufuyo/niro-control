@@ -174,7 +174,7 @@ const VOICE_WORKING = ['transcribing', 'thinking', 'acting'];
 // by hand lately. Notifications count only when some arrived unseen (others were shown as alerts).
 const DEFAULT_PAGE_ORDER = ['call', 'notifications', 'music', 'focus'];
 /** The AI agents Island can hear from (see `Agents1` in the daemon). */
-const AGENT_PROVIDERS = ['claude', 'codex'];
+const AGENT_PROVIDERS = ['claude', 'codex', 'opencode'];
 
 /** Whether `alert` waits on screen while no one is there, its time counted once they are back: a reminder,
  * or a notification, as GNOME's banner does. */
@@ -606,7 +606,7 @@ export class Controller {
         this._settingsChanged.push(this._settings.connect('changed::voice-shortcut', () => (this._voice.shortcut = this._voiceShortcut)));
         for (const key of ['bot-shape', 'bot-color', 'bot-glow'])
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncBotLook()));
-        for (const key of ['usage-enabled', 'usage-claude', 'usage-codex', 'usage-grok', 'usage-deepseek', 'usage-warn', 'usage-critical'])
+        for (const key of ['usage-enabled', 'usage-claude', 'usage-codex', 'usage-grok', 'usage-opencode', 'usage-deepseek', 'usage-warn', 'usage-critical'])
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncUsage()));
         for (const key of ['event-alerts', 'event-alert-minutes'])
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncEventAlerts()));
@@ -2639,6 +2639,7 @@ export class Controller {
             claude: this._settings.get_boolean('usage-claude'),
             codex: this._settings.get_boolean('usage-codex'),
             grok: this._settings.get_boolean('usage-grok'),
+            opencode: this._settings.get_boolean('usage-opencode'),
             deepseek: this._settings.get_boolean('usage-deepseek'),
             // Off, a plan seen there starts no AI to list its models.
             assistant: this._settings.get_boolean('voice-assistant'),

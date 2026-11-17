@@ -1,3 +1,4 @@
+// The Connections on the Island's AI Usage page: opencode's Go plan is signed in only with an API key for it in opencode's auth.json.
 // The DeepSeek key on the Island's AI Usage page: refused when it is not a key, saved as a private file (mode 600) when it is, never put into the settings,
 // forgotten on request; saving it turns the card on.
 import Adw from 'gi://Adw?version=1';
@@ -13,7 +14,7 @@ GLib.setenv('DEEPSEEK_API_KEY', '', true);
 if (!Gtk.init_check()) { print('aiConnections: no display, skipped'); imports.system.exit(0); }
 Adw.init();
 
-const {aiConnectionsGroup, checkKey, deepseekKeyFile, keyStatus, removeKey, saveKey} = await import('../../control/build/aiConnections.js');
+const {aiConnectionsGroup, checkKey, deepseekKeyFile, keyStatus, opencodeGoSignedIn, removeKey, saveKey} = await import('../../control/build/aiConnections.js');
 const {Stores} = await import('../../control/build/store.js');
 
 const stores = new Stores();
@@ -57,5 +58,20 @@ all(group, w => w instanceof Gtk.Button && w.label === 'Forget the key')[0].emit
 if (GLib.file_test(deepseekKeyFile(), GLib.FileTest.EXISTS)) fail('the key file is still there');
 if (keyStatus().saved) fail('the key is still reported');
 removeKey();   // forgetting again is not an error
+
+// opencode's Go plan: a "opencode-go" API key in opencode's own auth.json, and nothing else, counts
+const opencodeAuth = (name, content) => {
+    const dir = `${tmp}/${name}`;
+    GLib.mkdir_with_parents(`${dir}/opencode`, 0o700);
+    if (content !== null)
+        GLib.file_set_contents(`${dir}/opencode/auth.json`, JSON.stringify(content));
+    return dir;
+};
+if (!opencodeGoSignedIn(opencodeAuth('oc-go', {'opencode-go': {type: 'api', key: 'sk-go-123'}}))) fail('a Go key was not seen');
+for (const [name, content] of [['oc-none', null], ['oc-empty', {}], ['oc-zen', {opencode: {type: 'api', key: 'sk-zen'}}],
+    ['oc-oauth', {'opencode-go': {type: 'oauth', access: 'x'}}], ['oc-blank', {'opencode-go': {type: 'api', key: '  '}}]]) {
+    if (opencodeGoSignedIn(opencodeAuth(name, content))) fail(`${name} counted as the Go plan`);
+}
+if (!all(group, w => w instanceof Adw.ActionRow && w.get_title() === 'opencode (Go plan)').length) fail('no opencode row in Connections');
 
 print('aiConnections: ok');

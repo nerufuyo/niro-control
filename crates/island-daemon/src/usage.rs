@@ -46,6 +46,9 @@ const CODEX_FILES: usize = 8;
 const CODEX_USAGE: &str = "https://chatgpt.com/backend-api/wham/usage";
 /// Where DeepSeek says how much is left of what was paid for and granted.
 const DEEPSEEK_BALANCE: &str = "https://api.deepseek.com/user/balance";
+/// Where an OpenCode Go plan's limits are read, with its API key. Not documented by opencode (its console shows them): the shape
+/// is the one other tools read, `{usage: {rolling, weekly, monthly: {status, percent, resetsAt}}}`, and anything else is "could not read".
+const OPENCODE_USAGE: &str = "https://opencode.ai/zen/go/v1/usage";
 
 /// Every plan's limits, as the page draws them.
 #[derive(Debug, Clone, Default, Serialize, PartialEq)]
@@ -91,6 +94,9 @@ struct Config {
     grok: bool,
     /// Off until asked for (it needs an API key): the page has no DeepSeek card for anyone who did not.
     deepseek: bool,
+    /// Missing from an older extension: on. The card shows only with an OpenCode Go sign-in.
+    #[serde(default = "on")]
+    opencode: bool,
     /// The AI assistant turned on: off, a plan seen here starts no AI to list its models.
     #[serde(default = "on")]
     assistant: bool,
@@ -113,6 +119,7 @@ impl Default for Config {
             codex: true,
             grok: true,
             deepseek: false,
+            opencode: true,
             assistant: true,
             warn: 80.0,
             critical: 95.0,
@@ -144,7 +151,7 @@ impl UsageService {
 
 #[interface(name = "org.niro.island.Usage1")]
 impl UsageService {
-    /// JSON `{enabled, claude, codex, grok, deepseek, assistant, warn, critical}`, from Settings.
+    /// JSON `{enabled, claude, codex, grok, deepseek, opencode, assistant, warn, critical}`, from Settings.
     fn set_config(&mut self, config: &str) -> fdo::Result<()> {
         self.config =
             serde_json::from_str(config).map_err(|err| fdo::Error::InvalidArgs(err.to_string()))?;
@@ -193,6 +200,11 @@ pub async fn run(iface: InterfaceRef<UsageService>, refresh: Arc<Notify>) {
     let mut grok_wait = CLAUDE_EVERY;
     let mut grok_failures = 0;
     let mut grok_last_error = None;
+    let mut opencode: Option<Provider> = None;
+    let mut asked_opencode: Option<Instant> = None;
+    let mut opencode_wait = CLAUDE_EVERY;
+    let mut opencode_failures = 0;
+    let mut opencode_last_error = None;
     let mut deepseek: Option<Provider> = None;
     let mut asked_deepseek: Option<Instant> = None;
     let mut codex = CodexReader::default();
@@ -298,6 +310,44 @@ pub async fn run(iface: InterfaceRef<UsageService>, refresh: Arc<Notify>) {
         } else {
             grok = None;
         }
+        if config.opencode && crate::assistant::opencode_go_key().is_some() {
+            let due = |every| asked_opencode.is_none_or(|at: Instant| at.elapsed() >= every);
+            if (forced && opencode_page_wait(opencode_last_error).is_some_and(due))
+                || (!paused && due(opencode_wait))
+            {
+                asked_opencode = Some(Instant::now());
+                let fresh = tokio::task::spawn_blocking(read_opencode).await.ok();
+                opencode_failures = if matches!(fresh, Some(Ok(_))) {
+                    0
+                } else {
+                    opencode_failures + 1
+                };
+                opencode_last_error = match &fresh {
+                    Some(Err(why)) => Some(*why),
+                    _ => None,
+                };
+                opencode_wait = opencode_wait_after(
+                    fresh.as_ref().map(|r| r.as_ref().map(|_| ())),
+                    opencode_failures,
+                );
+                opencode = match (fresh, opencode.take()) {
+                    (Some(Ok(fresh)), _) => Some(fresh),
+                    // The last numbers stay, saying why they are old.
+                    (Some(Err(why)), Some(mut last)) => Some(Provider {
+                        note: why.note().into(),
+                        ..std::mem::take(&mut last)
+                    }),
+                    (Some(Err(why)), None) => Some(Provider {
+                        note: why.note().into(),
+                        ..opencode_shell()
+                    }),
+                    (None, last) => last,
+                };
+            }
+            providers.extend(opencode.clone());
+        } else {
+            opencode = None;
+        }
         if config.deepseek {
             let due = |every| asked_deepseek.is_none_or(|at: Instant| at.elapsed() >= every);
             if deepseek_key().is_none() {
@@ -363,18 +413,18 @@ pub async fn run(iface: InterfaceRef<UsageService>, refresh: Arc<Notify>) {
             .as_ref()
             .filter(|_| !paused)
             .map(|_| due_in(asked_grok, grok_wait));
+        let opencode_due_in = opencode
+            .as_ref()
+            .filter(|_| !paused)
+            .map(|_| due_in(asked_opencode, opencode_wait));
         let deepseek_due_in = deepseek
             .as_ref()
             .filter(|d| !paused && d.updated_ms > 0)
             .map(|_| due_in(asked_deepseek, CLAUDE_EVERY));
-        let remote_due = match (claude_due_in, grok_due_in) {
-            (Some(claude_in), Some(grok_in)) => Some(claude_in.min(grok_in)),
-            (due, None) | (None, due) => due,
-        };
-        let remote_due = match (remote_due, deepseek_due_in) {
-            (Some(a), Some(b)) => Some(a.min(b)),
-            (due, None) | (None, due) => due,
-        };
+        let remote_due = [claude_due_in, grok_due_in, opencode_due_in, deepseek_due_in]
+            .into_iter()
+            .flatten()
+            .min();
         next = Some(next_wait(
             config.codex && !paused && codex_signed_in(),
             remote_due,
@@ -635,6 +685,111 @@ fn claude_windows(response: &Value) -> Vec<Window> {
         })
     })
     .collect()
+}
+
+/// Why an OpenCode Go plan's limits could not be read.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum OpencodeError {
+    /// The key was turned down.
+    SignIn,
+    /// No network (yet).
+    Offline,
+    /// The server failed or answered in a way not understood.
+    Busy,
+}
+
+impl OpencodeError {
+    /// What the page says, under the last numbers.
+    fn note(self) -> &'static str {
+        match self {
+            OpencodeError::SignIn => "opencode turned the Go key down; sign in again with opencode",
+            OpencodeError::Offline => "Offline; showing the last numbers",
+            OpencodeError::Busy => "Could not read opencode's limits; showing the last numbers",
+        }
+    }
+
+    /// Its failures map onto Claude's, so all back off alike.
+    fn as_claude(self) -> ClaudeError {
+        match self {
+            OpencodeError::SignIn => ClaudeError::SignIn,
+            OpencodeError::Offline => ClaudeError::Offline,
+            OpencodeError::Busy => ClaudeError::Busy,
+        }
+    }
+}
+
+/// The opencode card with nothing read yet.
+fn opencode_shell() -> Provider {
+    Provider {
+        id: "opencode".into(),
+        name: "opencode".into(),
+        plan: "Go".into(),
+        ..Provider::default()
+    }
+}
+
+/// How long until opencode is asked again: the same pauses as Claude's.
+fn opencode_wait_after(outcome: Option<Result<(), &OpencodeError>>, failures: usize) -> Duration {
+    let mapped = outcome.map(|result| result.map_err(|err| err.as_claude()));
+    wait_after(
+        mapped.as_ref().map(|result| result.as_ref().map(|_| ())),
+        failures,
+    )
+}
+
+/// opencode's take on `page_wait`.
+fn opencode_page_wait(last: Option<OpencodeError>) -> Option<Duration> {
+    page_wait(last.map(OpencodeError::as_claude))
+}
+
+/// The OpenCode Go plan's limits now, with the plan's API key (never shown, logged or kept).
+fn read_opencode() -> Result<Provider, OpencodeError> {
+    let key = crate::assistant::opencode_go_key().ok_or(OpencodeError::SignIn)?;
+    read_opencode_at(&key, OPENCODE_USAGE)
+}
+
+/// As `read_opencode`, asking `url`: tests ask a server of their own.
+fn read_opencode_at(key: &str, url: &str) -> Result<Provider, OpencodeError> {
+    let response: Value = crate::http::get(url, CLAUDE_TIMEOUT)
+        .header("Authorization", &format!("Bearer {key}"))
+        // Said plainly who asks, never another app.
+        .header("User-Agent", concat!("Island/", env!("CARGO_PKG_VERSION")))
+        .call()
+        .and_then(|mut reply| reply.body_mut().read_json())
+        .map_err(|err| {
+            warn!("could not read opencode's usage: {err}");
+            match err {
+                ureq::Error::StatusCode(401 | 403) => OpencodeError::SignIn,
+                ureq::Error::StatusCode(_) | ureq::Error::Json(_) => OpencodeError::Busy,
+                _ => OpencodeError::Offline,
+            }
+        })?;
+    opencode_live(&response, now_ms()).ok_or(OpencodeError::Busy)
+}
+
+/// The answer of the usage endpoint as a card: the 5-hour (rolling), weekly and monthly limits that came with a percentage.
+/// `None` when none did (not the shape this reads), so the page says it could not read them rather than showing zeros.
+fn opencode_live(response: &Value, now: i64) -> Option<Provider> {
+    let usage = &response["usage"];
+    let windows: Vec<Window> = [("rolling", "5 hours"), ("weekly", "Week"), ("monthly", "Month")]
+        .into_iter()
+        .filter_map(|(key, label)| {
+            let percent = usage[key]["percent"].as_f64()?;
+            Some(Window {
+                label: label.into(),
+                percent: percent.clamp(0.0, 100.0),
+                resets_at_ms: usage[key]["resetsAt"].as_str().map(rfc3339_ms).unwrap_or(0),
+            })
+        })
+        .collect();
+    if windows.is_empty() {
+        return None;
+    }
+    Some(Provider {
+        windows,
+        updated_ms: now,
+        ..opencode_shell()
+    })
 }
 
 /// Why DeepSeek's balance could not be read.
@@ -1233,6 +1388,66 @@ mod tests {
             format!("http://{}/user/balance", listener.local_addr().unwrap())
         };
         assert_eq!(read_deepseek_at("sk-x", &closed).unwrap_err(), DeepseekError::Offline);
+    }
+
+    #[test]
+    fn reads_opencodes_three_limits() {
+        let reply = json!({"usage": {
+            "rolling": {"status": "ok", "percent": 12, "resetsAt": "2026-08-14T07:51:13Z"},
+            "weekly": {"status": "ok", "percent": 41.5, "resetsAt": "2026-08-17T00:00:00Z"},
+            "monthly": {"status": "ok", "percent": 140, "resetsAt": "2026-08-21T13:05:13Z"},
+        }});
+        let card = opencode_live(&reply, 9_000).unwrap();
+        assert_eq!((card.id.as_str(), card.name.as_str(), card.plan.as_str(), card.updated_ms), ("opencode", "opencode", "Go", 9_000));
+        let shown: Vec<_> = card.windows.iter().map(|w| (w.label.as_str(), w.percent)).collect();
+        // A percentage past the limit is drawn as the limit.
+        assert_eq!(shown, [("5 hours", 12.0), ("Week", 41.5), ("Month", 100.0)]);
+        assert_eq!(card.windows[0].resets_at_ms, rfc3339_ms("2026-08-14T07:51:13Z"));
+        // A limit with no percentage is left out; none at all is not this shape.
+        let part = json!({"usage": {"weekly": {"status": "ok", "percent": 3}, "monthly": {"status": "ok"}}});
+        assert_eq!(opencode_live(&part, 1).unwrap().windows.len(), 1);
+        assert_eq!(opencode_live(&part, 1).unwrap().windows[0].resets_at_ms, 0);
+        assert!(opencode_live(&json!({"usage": {}}), 1).is_none());
+        assert!(opencode_live(&json!({"error": "nope"}), 1).is_none());
+    }
+
+    #[test]
+    fn asks_opencode_with_the_go_key() {
+        let (url, server) = serve_once(
+            "200 OK",
+            r#"{"usage":{"rolling":{"status":"ok","percent":0,"resetsAt":"2026-08-14T07:51:13Z"}}}"#,
+        );
+        let card = read_opencode_at("sk-go-test-1", &url).expect("limits");
+        let asked = server.join().unwrap();
+        assert!(asked.starts_with("GET /"), "{asked}");
+        assert!(asked.to_lowercase().contains("authorization: bearer sk-go-test-1"), "{asked}");
+        assert!(asked.contains("Island/"), "{asked}");
+        assert_eq!(card.windows.len(), 1);
+    }
+
+    #[test]
+    fn opencode_failures_are_told_apart() {
+        let (url, server) = serve_once("401 Unauthorized", "{}");
+        assert_eq!(read_opencode_at("sk-bad", &url).unwrap_err(), OpencodeError::SignIn);
+        server.join().unwrap();
+        let (url, server) = serve_once("500 Internal Server Error", "{}");
+        assert_eq!(read_opencode_at("sk-x", &url).unwrap_err(), OpencodeError::Busy);
+        server.join().unwrap();
+        let (url, server) = serve_once("200 OK", r#"{"unrelated": true}"#);
+        assert_eq!(read_opencode_at("sk-x", &url).unwrap_err(), OpencodeError::Busy);
+        server.join().unwrap();
+        let closed = {
+            let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+            format!("http://{}/zen/go/v1/usage", listener.local_addr().unwrap())
+        };
+        assert_eq!(read_opencode_at("sk-x", &closed).unwrap_err(), OpencodeError::Offline);
+    }
+
+    #[test]
+    fn opencodes_key_never_shows_in_what_the_page_gets() {
+        let page = serde_json::to_string(&opencode_shell()).unwrap();
+        assert!(!page.contains("sk-"), "{page}");
+        assert!(OpencodeError::SignIn.note().contains("sign in again"));
     }
 
     #[test]

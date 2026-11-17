@@ -2,13 +2,15 @@
 // Copyright (C) 2026 zickrian
 
 //! AI agent alerts: Claude Code and Codex, once the user turns them on, run `island-daemon --agent-hook` when
-//! they need the user or finish, and the island shows it. The hooks live in each AI's own config.
+//! they need the user or finish, and the island shows it. The hooks live in each AI's own config; opencode's is a plugin file
+//! Island writes in its plugins folder (opencode.rs), which only tells: its permissions are answered in opencode.
 
 mod claude;
 mod codex;
 mod file;
 pub mod hook;
 mod json_hooks;
+mod opencode;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -56,16 +58,18 @@ const KINDS: [&str; 3] = ["permission", "waiting", "done"];
 pub enum Ai {
     Claude,
     Codex,
+    OpenCode,
 }
 
 impl Ai {
-    const ALL: [Ai; 2] = [Ai::Claude, Ai::Codex];
+    const ALL: [Ai; 3] = [Ai::Claude, Ai::Codex, Ai::OpenCode];
 
     /// As Settings and the hooks name it.
     fn id(self) -> &'static str {
         match self {
             Ai::Claude => "claude",
             Ai::Codex => "codex",
+            Ai::OpenCode => "opencode",
         }
     }
 
@@ -79,6 +83,7 @@ impl Ai {
         match self {
             Ai::Claude => "Claude Code",
             Ai::Codex => "Codex",
+            Ai::OpenCode => "opencode",
         }
     }
 
@@ -87,6 +92,7 @@ impl Ai {
         match self {
             Ai::Claude => claude::settings_path(),
             Ai::Codex => codex::config_path(),
+            Ai::OpenCode => opencode::plugin_path(),
         }
     }
 
@@ -105,6 +111,7 @@ impl Ai {
         match self {
             Ai::Claude => Provider::Claude.program().is_some(),
             Ai::Codex => Provider::Codex.program().is_some(),
+            Ai::OpenCode => Provider::Opencode.program().is_some(),
         }
     }
 
@@ -113,6 +120,7 @@ impl Ai {
         match self {
             Ai::Claude => claude::hooked(&self.config()),
             Ai::Codex => codex::hooked(&self.config()),
+            Ai::OpenCode => opencode::hooked(&self.config()),
         }
     }
 
@@ -125,6 +133,7 @@ impl Ai {
         match self {
             Ai::Claude => claude::install(&self.config(), &claude::command(islandd, "claude")),
             Ai::Codex => codex::install(&self.config(), islandd, &claude::command(islandd, "codex")),
+            Ai::OpenCode => opencode::install(&self.config(), islandd),
         }
     }
 
@@ -133,6 +142,7 @@ impl Ai {
         match self {
             Ai::Claude => claude::remove(&self.config()),
             Ai::Codex => codex::remove(&self.config()),
+            Ai::OpenCode => opencode::remove(&self.config()),
         }
     }
 }
@@ -154,11 +164,12 @@ struct Status {
     hooked: bool,
 }
 
-/// Both AIs' status, for the `Agents` property.
+/// Every AI's status, for the `Agents` property.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
 struct Agents {
     claude: Status,
     codex: Status,
+    opencode: Status,
 }
 
 impl Agents {
@@ -171,6 +182,7 @@ impl Agents {
         Self {
             claude: status(Ai::Claude),
             codex: status(Ai::Codex),
+            opencode: status(Ai::OpenCode),
         }
     }
 }
@@ -230,6 +242,8 @@ fn refusal(ai: Ai, error: &str) -> String {
     let said = |words: &[&str]| words.iter().any(|word| error.contains(word));
     if said(&["already sends its notifications"]) {
         format!("{name} already sends its alerts to another app.")
+    } else if said(&["is not Island's own plugin file"]) {
+        format!("{name} has a plugin of yours named niro-island.js. Rename it, then turn this on again.")
     } else if said(&[
         "not valid JSON",
         "not valid TOML",
@@ -797,6 +811,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn a_plugin_file_that_is_not_islands_is_refused_in_plain_words() {
+        let said = refusal(Ai::OpenCode, "/home/u/.config/opencode/plugins/niro-island.js is not Island's own plugin file");
+        assert_eq!(said, "opencode has a plugin of yours named niro-island.js. Rename it, then turn this on again.");
+        assert_eq!(Ai::from_id("opencode"), Some(Ai::OpenCode));
+        assert_eq!(Ai::OpenCode.name(), "opencode");
+    }
+
+    #[test]
     fn a_refusal_reads_plainly() {
         let broken = "/home/u/.claude/settings.json is not valid JSON; fix it first: expected value at line 3";
         let said = refusal(Ai::Claude, broken);
@@ -937,10 +959,14 @@ mod tests {
                 hooked: false,
             },
             codex: Status::default(),
+            opencode: Status {
+                found: true,
+                hooked: true,
+            },
         };
         assert_eq!(
             serde_json::to_string(&agents).unwrap(),
-            r#"{"claude":{"found":true,"hooked":false},"codex":{"found":false,"hooked":false}}"#
+            r#"{"claude":{"found":true,"hooked":false},"codex":{"found":false,"hooked":false},"opencode":{"found":true,"hooked":true}}"#
         );
     }
 }

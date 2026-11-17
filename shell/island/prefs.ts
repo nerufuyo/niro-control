@@ -148,7 +148,7 @@ export default class IslandPreferences extends ExtensionPreferences {
             const agentGroup = new Adw.PreferencesGroup({
                 title: 'AI Agents',
                 description: 'Answer your coding agents from the island when they ask, and know when they are done. ' +
-                    'On by default; off, Island stops getting that agent\'s alerts.',
+                    'Claude Code and Codex are on by default, opencode off until you turn it on; off, Island stops getting that agent\'s alerts.',
             });
             for (const {provider, title, subtitle} of agents) {
                 agentGroup.add(switchRow(settings, `agent-alerts-${provider}`, title, subtitle));
@@ -810,6 +810,7 @@ function agentsFound() {
     return [
         {provider: 'claude', title: 'Claude Code', subtitle: 'Allow, deny or always allow, and when it is done'},
         {provider: 'codex', title: 'Codex', subtitle: 'Allow or deny, and when it is done · in Codex, type /hooks once and allow Island'},
+        {provider: 'opencode', title: 'opencode', subtitle: 'Tells you when it needs a permission, asks a question or is done · its answers stay in opencode · off until you turn it on'},
     ].filter(({provider}) => agents[provider]?.found);
 }
 
@@ -1445,6 +1446,17 @@ function nvmBins(home) {
     return versions.map(name => GLib.build_filenamev([root, name, 'bin']));
 }
 
+/** Whether opencode holds an API key for the OpenCode Go plan (`opencode auth login`): what island-daemon reads for the Usage page. */
+function opencodeGoKey() {
+    try {
+        const [, bytes] = GLib.file_get_contents(GLib.build_filenamev([GLib.get_user_data_dir(), 'opencode', 'auth.json']));
+        const entry = JSON.parse(new TextDecoder().decode(bytes))?.['opencode-go'];
+        return entry?.type === 'api' && String(entry.key ?? '').trim() !== '';
+    } catch {
+        return false;
+    }
+}
+
 /** The AI providers signed in here, as rows to switch: Claude Code's sign-in, Codex's (or its logs), and Grok's. */
 // Where island-daemon reads them (usage.rs): Claude Code's config dir, the user's Codex home and Island's own.
 function usageProviders() {
@@ -1458,6 +1470,8 @@ function usageProviders() {
         providers.push({key: 'usage-codex', title: 'ChatGPT', subtitle: 'Signed in with Codex'});
     if (GLib.file_test(GLib.build_filenamev([grokHome(), 'auth.json']), GLib.FileTest.EXISTS))
         providers.push({key: 'usage-grok', title: 'Grok', subtitle: 'Signed in with Grok'});
+    if (opencodeGoKey())
+        providers.push({key: 'usage-opencode', title: 'opencode', subtitle: 'OpenCode Go plan, signed in with opencode'});
     return providers;
 }
 

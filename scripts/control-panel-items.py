@@ -57,7 +57,7 @@ DEPENDS = {
 }
 # Rules whose link is only reasoned from the wiring, not seen in code: the panel shows them as a hint and never disables the row.
 UNVERIFIED = {'dock.show-threshold', 'island.call-preview', 'island.auto-hide-delay'}
-for k in ('usage-claude', 'usage-codex', 'usage-grok', 'usage-deepseek', 'usage-warn', 'usage-critical'):
+for k in ('usage-claude', 'usage-codex', 'usage-grok', 'usage-opencode', 'usage-deepseek', 'usage-warn', 'usage-critical'):
     DEPENDS[f'island.{k}'] = ('island.usage-enabled', 'on', None)
 
 def clean(t):
@@ -258,7 +258,7 @@ items += [
 ids = [i['id'] for i in items]
 assert len(ids) == len(set(ids)), 'duplicate ids'
 from collections import Counter; print(dict(Counter(i['menu'] for i in items)), dict(Counter((i['menu'],i['group']) for i in items if i['menu']=='Dock')))
-assert len(items) == 198, f'expected 198 items, got {len(items)}'
+assert len(items) == 200, f'expected 200 items, got {len(items)}'
 for i in items:
     assert '&' not in re.sub(r'&\s', '', i['title'] + i['help']) or '&apos;' not in i['title'], i
 
