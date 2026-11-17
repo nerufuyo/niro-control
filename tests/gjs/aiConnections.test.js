@@ -75,3 +75,30 @@ for (const [name, content] of [['oc-none', null], ['oc-empty', {}], ['oc-zen', {
 if (!all(group, w => w instanceof Adw.ActionRow && w.get_title() === 'opencode (Go plan)').length) fail('no opencode row in Connections');
 
 print('aiConnections: ok');
+
+// Sign in buttons: a terminal command that runs the AI's own sign-in, and says so when there is no terminal or no CLI.
+{
+    const {SIGN_INS, signInScript, terminalCommand} = await import('../../control/build/aiConnections.js');
+    const has = names => n => names.includes(n);
+    const argv = terminalCommand(signInScript(SIGN_INS.opencode), has(['kgx', 'xterm']));
+    if (argv[0] !== 'kgx' || argv[1] !== '-e' || argv[2] !== 'sh' || argv[3] !== '-c') fail(`terminal command: ${argv}`);
+    if (terminalCommand('x', has([])) !== null) fail('a terminal was invented');
+    const script = signInScript(SIGN_INS.opencode);
+    if (!script.includes('opencode auth login') || !script.includes('is not installed')) fail(`sign-in script: ${script}`);
+    for (const [kind, s] of Object.entries(SIGN_INS)) if (!/^[a-z]+$/.test(s.bin) || /["`$\\]/.test(s.hint + s.args)) fail(`${kind}: unsafe for a shell line`);
+    // the buttons are there for the AIs that are not signed in
+    const buttons = all(group, w => w instanceof Gtk.Button && w.get_label() === 'Sign in');
+    if (buttons.length !== 4) fail(`${buttons.length} Sign in buttons, 4 expected`);
+    // a real terminal runs the line (ptyxis here, when it exists)
+    if (GLib.find_program_in_path('ptyxis')) {
+        const out = `${tmp}/ran`;
+        const cmd = terminalCommand(`echo ok > ${out}`, has(['ptyxis']));
+        Gio.Subprocess.new(cmd, Gio.SubprocessFlags.NONE);
+        const loop = GLib.MainLoop.new(null, false);
+        let tries = 0;
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 200, () => { if (GLib.file_test(out, GLib.FileTest.EXISTS) || ++tries > 40) { loop.quit(); return GLib.SOURCE_REMOVE; } return GLib.SOURCE_CONTINUE; });
+        loop.run();
+        if (!GLib.file_test(out, GLib.FileTest.EXISTS)) fail('ptyxis did not run the command');
+    }
+    print('aiConnections sign-in: ok');
+}
