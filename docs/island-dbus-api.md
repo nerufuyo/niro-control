@@ -196,6 +196,7 @@ Shell only.
 | `Rename(s device_id, s name)` | | A name is 1 to 64 characters without control characters. `InvalidArgs` when the name is not acceptable or no such device is paired. |
 | `Forget(s device_id)` | | The device's key stops working and it is told to disconnect. `InvalidArgs` when no such device is paired. |
 | `Notify(s kind, s title, s body, b urgent)` | `u` | Shows a notification on every connected device and returns how many it was sent to. `kind` is `agent`, `reminder`, `meeting`, `battery` or `system`; `InvalidArgs` otherwise. |
+| `Face(s name)` | `u` | Sets the face on every connected device and returns how many it reached. `name` is `idle`, `listening`, `thinking`, `speaking`, `happy`, `alert`, `sleepy`, `sad`, `curious` or `love`; `InvalidArgs` otherwise. |
 | `Devices` | `s` | `[{device_id, name, paired_at_ms, online, status}]`, `status` being what the device last said (`battery`, `charging`, `temp_c`, `rssi`, `fw`) or null; never a key. Kept in `~/.local/share/island/devices.json`. |
 | `Pairing` | `s` | `{active, expires_at_ms}`: whether a code is open, and when it ends. `active` turns false by itself when the time is up, the tries are used or a device paired, with `PropertiesChanged`. Never the code. |
 | `Request` | `s` | `{pending, device_id?, name?}`: a device that typed the right code and waits for `Answer`. |

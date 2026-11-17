@@ -85,6 +85,7 @@ const INTERFACES = {
             <method name="Answer"><arg name="allow" type="b" direction="in"/></method>
             <method name="Rename"><arg name="device_id" type="s" direction="in"/><arg name="name" type="s" direction="in"/></method>
             <method name="Forget"><arg name="device_id" type="s" direction="in"/></method>
+            <method name="Face"><arg name="name" type="s" direction="in"/><arg type="u" direction="out"/></method>
             <method name="Notify"><arg name="kind" type="s" direction="in"/><arg name="title" type="s" direction="in"/><arg name="body" type="s" direction="in"/><arg name="urgent" type="b" direction="in"/><arg type="u" direction="out"/></method>
             <property name="Devices" type="s" access="read"/>
             <property name="Pairing" type="s" access="read"/>

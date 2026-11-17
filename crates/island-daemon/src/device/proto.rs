@@ -36,6 +36,10 @@ pub enum Face {
     Speaking,
     Happy,
     Alert,
+    Sleepy,
+    Sad,
+    Curious,
+    Love,
 }
 
 /// Sent by the device.
@@ -141,6 +145,16 @@ mod tests {
         let back: ToDevice =
             serde_json::from_str(&serde_json::to_string(&message).unwrap()).unwrap();
         assert_eq!(back, message);
+    }
+
+    #[test]
+    fn every_face_has_its_name_on_the_wire() {
+        for name in ["idle", "listening", "thinking", "speaking", "happy", "alert", "sleepy", "sad", "curious", "love"] {
+            let text = format!("{{\"t\":\"face\",\"name\":\"{name}\"}}");
+            let message: ToDevice = serde_json::from_str(&text).unwrap_or_else(|err| panic!("{name}: {err}"));
+            assert_eq!(serde_json::to_string(&message).unwrap(), text);
+        }
+        assert!(serde_json::from_str::<ToDevice>(r#"{"t":"face","name":"angry"}"#).is_err());
     }
 
     #[test]

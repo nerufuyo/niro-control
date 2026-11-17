@@ -42,7 +42,7 @@ static esp_lcd_panel_handle_t panel;
 static uint16_t *fb;
 static SemaphoreHandle_t sent;
 
-/** The panel takes its colours big endian; the buffer holds them already swapped. */
+/** The panel takes its colours big endian; the buffer holds them in the CPU's order and is swapped on the way out. */
 static inline uint16_t swap(uint16_t c) { return (uint16_t)((c >> 8) | (c << 8)); }
 
 static bool on_sent(esp_lcd_panel_io_handle_t io, esp_lcd_panel_io_event_data_t *data, void *ctx) {
@@ -109,12 +109,11 @@ void gfx_backlight(int percent) {
 }
 
 void gfx_clear(uint16_t colour) {
-    uint16_t c = swap(colour);
-    for (int i = 0; i < LCD_W * LCD_H; i++) fb[i] = c;
+    for (int i = 0; i < LCD_W * LCD_H; i++) fb[i] = colour;
 }
 
 void gfx_rect(int x, int y, int w, int h, uint16_t colour) {
-    uint16_t c = swap(colour);
+    uint16_t c = colour;
     for (int j = y; j < y + h; j++) {
         if (j < 0 || j >= LCD_H) continue;
         for (int i = x; i < x + w; i++)
@@ -139,7 +138,11 @@ void gfx_text_center(int y, int scale, uint16_t fg, uint16_t bg, const char *tex
     gfx_text((LCD_W - width) / 2, y, scale, fg, bg, text);
 }
 
+uint16_t *gfx_canvas(void) { return fb; }
+
 void gfx_flush(void) {
+    for (int i = 0; i < LCD_W * LCD_H; i++) fb[i] = swap(fb[i]);
     ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(panel, 0, 0, LCD_W, LCD_H, fb));
     xSemaphoreTake(sent, pdMS_TO_TICKS(1000));
+    for (int i = 0; i < LCD_W * LCD_H; i++) fb[i] = swap(fb[i]);  // back, so the next frame draws over what this one was
 }

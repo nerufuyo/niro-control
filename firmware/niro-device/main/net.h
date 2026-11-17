@@ -1,6 +1,7 @@
 // Wi-Fi, and finding the daemon on the local network by mDNS (_niro-device._tcp).
 #pragma once
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 typedef struct {
@@ -19,3 +20,7 @@ bool net_find_daemon(const char *want_id, bool need_pair, daemon_t *out);
 /** A connected TCP socket to it, or -1. */
 int net_connect(const daemon_t *daemon);
 int net_rssi(void);
+/** One line saying which network is saved and whether it is joined (never the password). */
+void net_describe(char *out, size_t cap);
+/** Lists the networks in range on the serial console (it stops trying to join while it does). */
+void net_scan(void);

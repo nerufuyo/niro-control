@@ -7,6 +7,7 @@
 #include "buttons.h"
 #include "cJSON.h"
 #include "console.h"
+#include "face_task.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_timer.h"
@@ -28,40 +29,46 @@ static char device_id[18];    // the MAC, as the daemon is told it
 static char device_name[24];  // "Niro Device 9D34"
 
 static int64_t now_ms(void) { return esp_timer_get_time() / 1000; }
+
+/** The face with a few words under it (19 characters at most): how the device says what it is doing. */
+static void mood(face_mood_t m, const char *caption) {
+    face_task_mood(m, caption);
+    face_show();
+}
 static void sleep_ms(int ms) { vTaskDelay(pdMS_TO_TICKS(ms)); }
 
 static bool next_button(button_event_t *event, int wait_ms) { return xQueueReceive(buttons, event, pdMS_TO_TICKS(wait_ms)) == pdTRUE; }
 
 /** Tries the code on the daemon that has one open, and says how it went. */
 static void run_pairing(const char *code) {
-    ui_message("PAIRING", "LOOKING FOR YOUR", "COMPUTER...", NULL, COL_BLUE);
+    mood(FACE_SEARCHING, "LOOKING FOR PC");
     daemon_t daemon;
     bool found = false;
     for (int attempt = 0; attempt < 4 && !found; attempt++) found = net_find_daemon(NULL, true, &daemon);
     if (!found) {
-        ui_message("NOT FOUND", "OPEN ADD A DEVICE", "ON YOUR PC", "THEN TRY AGAIN", COL_AMBER);
+        mood(FACE_SAD, "NO PC IN PAIR MODE");
         sleep_ms(4000);
         return;
     }
     int fd = net_connect(&daemon);
     if (fd < 0) {
-        ui_message("NO CONNECTION", "TO YOUR PC", NULL, NULL, COL_RED);
+        mood(FACE_SAD, "CANNOT REACH PC");
         sleep_ms(3000);
         return;
     }
-    ui_message("PAIRING", "ALLOW IT ON", "YOUR COMPUTER", NULL, COL_BLUE);
+    mood(FACE_THINKING, "ALLOW IT ON YOUR PC");
     uint8_t daemon_id[16], key[32];
     pair_result_t result = pair_with_daemon(fd, code, device_id, device_name, daemon_id, key);
     close(fd);
     switch (result) {
     case PAIR_OK:
         store_set_pairing(daemon_id, key);
-        ui_message("PAIRED", "READY", NULL, NULL, COL_GREEN);
+        mood(FACE_HAPPY, "PAIRED!");
         break;
-    case PAIR_CODE: ui_message("WRONG CODE", "CHECK THE CODE", "ON YOUR PC", NULL, COL_RED); break;
-    case PAIR_DENIED: ui_message("NOT ALLOWED", "YOU DID NOT ALLOW", "IT ON THE PC", NULL, COL_RED); break;
-    case PAIR_NETWORK: ui_message("NO CONNECTION", "TO YOUR PC", NULL, NULL, COL_RED); break;
-    default: ui_message("PAIRING FAILED", "TRY AGAIN", NULL, NULL, COL_RED); break;
+    case PAIR_CODE: mood(FACE_SAD, "WRONG CODE"); break;
+    case PAIR_DENIED: mood(FACE_SAD, "NOT ALLOWED"); break;
+    case PAIR_NETWORK: mood(FACE_SAD, "CANNOT REACH PC"); break;
+    default: mood(FACE_SAD, "PAIRING FAILED"); break;
     }
     sleep_ms(2500);
 }
@@ -90,9 +97,26 @@ static void enter_code(void) {
 }
 
 static void unpaired(void) {
-    ui_message("NOT PAIRED", "ADD A DEVICE ON", "YOUR PC, THEN", "PRESS BOOT", COL_AMBER);
+    mood(FACE_CURIOUS, "BOOT: PAIR ME");
     button_event_t event;
     if (next_button(&event, 1000) && event.id == BTN_BOOT && event.kind == PRESS_SHORT) enter_code();
+}
+
+/** The mood a `face` message names, or -1. */
+static int face_in(const char *json) {
+    cJSON *msg = cJSON_Parse(json);
+    const cJSON *name = msg ? cJSON_GetObjectItem(msg, "name") : NULL;
+    int found = cJSON_IsString(name) ? face_from_name(name->valuestring) : -1;
+    cJSON_Delete(msg);
+    return found;
+}
+
+/** Is it urgent? */
+static bool urgent_in(const char *json) {
+    cJSON *msg = cJSON_Parse(json);
+    bool urgent = cJSON_IsTrue(cJSON_GetObjectItem(msg, "urgent"));
+    cJSON_Delete(msg);
+    return urgent;
 }
 
 static void show_notification(const char *json) {
@@ -108,12 +132,12 @@ static void show_notification(const char *json) {
     cJSON_Delete(msg);
 }
 
-/** What the daemon sent: 1 a notification, 2 goodbye, 0 anything else. */
+/** What the daemon sent: 1 a notification, 2 goodbye, 3 a face, 0 anything else. */
 static int kind_of(const char *json) {
     cJSON *msg = cJSON_Parse(json);
     const cJSON *t = msg ? cJSON_GetObjectItem(msg, "t") : NULL;
     int kind = 0;
-    if (cJSON_IsString(t)) kind = !strcmp(t->valuestring, "notify") ? 1 : !strcmp(t->valuestring, "bye") ? 2 : 0;
+    if (cJSON_IsString(t)) kind = !strcmp(t->valuestring, "notify") ? 1 : !strcmp(t->valuestring, "bye") ? 2 : !strcmp(t->valuestring, "face") ? 3 : 0;
     cJSON_Delete(msg);
     return kind;
 }
@@ -133,26 +157,31 @@ static void serve(const uint8_t daemon_id[16], const uint8_t key[32]) {
             refused++;
         }
         if (refused >= 4) {
-            ui_message("NOT RECOGNISED", "HOLD BOOT TO", "FORGET THE PC", NULL, COL_AMBER);
+            mood(FACE_SAD, "HOLD BOOT: FORGET PC");
             button_event_t event;
             if (next_button(&event, 5000) && event.id == BTN_BOOT && event.kind == PRESS_LONG) {
                 store_clear_pairing();
                 refused = 0;
             }
         } else {
-            ui_idle(false, 0);
+            mood(FACE_SAD, "OFFLINE");
             sleep_ms(5000);
         }
         return;
     }
     refused = 0;
     ESP_LOGI(TAG, "connected");
-    ui_idle(true, net_rssi());
+    mood(FACE_HAPPY, "CONNECTED");
+    int64_t connected_at = now_ms();
 
     int64_t last_ping = 0, last_status = -30000, shown_until = 0;
     bool notifying = false;
     for (;;) {
         int64_t now = now_ms();
+        if (connected_at && now - connected_at > 4000) {
+            connected_at = 0;
+            mood(FACE_IDLE, NULL);
+        }
         if (now - last_ping >= 15000) {
             if (link_send(&link, "{\"t\":\"ping\"}") != 0) break;
             last_ping = now;
@@ -172,33 +201,42 @@ static void serve(const uint8_t daemon_id[16], const uint8_t key[32]) {
         if (got == 1 && len) {
             int kind = kind_of(text);
             if (kind == 2) break;
+            face_task_poke();
+            if (kind == 3 && !notifying) {
+                int m = face_in(text);
+                if (m >= 0) mood((face_mood_t)m, NULL);
+            }
             if (kind == 1) {
+                // The slime reacts first, then the words.
+                mood(urgent_in(text) ? FACE_ALERT : FACE_HAPPY, urgent_in(text) ? "ATTENTION!" : "NEW MESSAGE");
+                sleep_ms(1400);
                 show_notification(text);
                 notifying = true;
-                shown_until = now + 30000;
+                shown_until = now_ms() + 30000;
             }
         }
         button_event_t event;
         while (next_button(&event, 0))
             if (notifying) {
                 notifying = false;
-                ui_idle(true, net_rssi());
+                mood(FACE_IDLE, NULL);
             }
         if (notifying && now_ms() > shown_until) {
             notifying = false;
-            ui_idle(true, net_rssi());
+            mood(FACE_IDLE, NULL);
         }
     }
     close(fd);
     ESP_LOGI(TAG, "disconnected");
-    ui_idle(false, 0);
+    mood(FACE_SAD, "OFFLINE");
     sleep_ms(3000);
 }
 
 void app_main(void) {
     store_init();
     gfx_init();
-    ui_splash();
+    face_task_start();
+    mood(FACE_WAKING, NULL);
     buttons = buttons_start();
     net_start();
     console_start();
@@ -212,12 +250,12 @@ void app_main(void) {
     for (;;) {
         char ssid[33], pass[65] = "";
         if (!store_get_wifi(ssid, pass)) {
-            ui_message("NO WIFI", "SERIAL CONSOLE:", "WIFI SSID PASS", NULL, COL_AMBER);
+            mood(FACE_SEARCHING, "NO WIFI: USE SERIAL");
             sleep_ms(2000);
             continue;
         }
         if (!net_connected()) {
-            ui_message("WIFI", "CONNECTING...", NULL, NULL, COL_BLUE);
+            mood(FACE_SEARCHING, "JOINING WIFI");
             sleep_ms(1500);
             continue;
         }

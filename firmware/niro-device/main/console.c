@@ -37,6 +37,19 @@ static int cmd_unpair(int argc, char **argv) {
     return 0;
 }
 
+static int cmd_status(int argc, char **argv) {
+    char line[128];
+    net_describe(line, sizeof line);
+    uint8_t id[16], key[32];
+    printf("%s; %s\n", line, store_get_pairing(id, key) ? "paired" : "not paired");
+    return 0;
+}
+
+static int cmd_scan(int argc, char **argv) {
+    net_scan();
+    return 0;
+}
+
 static int cmd_restart(int argc, char **argv) {
     esp_restart();
     return 0;
@@ -57,6 +70,10 @@ void console_start(void) {
     const esp_console_cmd_t forget = {.command = "forget", .help = "Forget the Wi-Fi network", .func = cmd_forget};
     const esp_console_cmd_t unpair = {.command = "unpair", .help = "Forget the pairing and restart", .func = cmd_unpair};
     const esp_console_cmd_t restart = {.command = "restart", .help = "Restart", .func = cmd_restart};
+    const esp_console_cmd_t status = {.command = "status", .help = "Show the network and whether it is paired", .func = cmd_status};
+    const esp_console_cmd_t scan = {.command = "scan", .help = "List the Wi-Fi networks in range", .func = cmd_scan};
+    ESP_ERROR_CHECK(esp_console_cmd_register(&scan));
+    ESP_ERROR_CHECK(esp_console_cmd_register(&status));
     ESP_ERROR_CHECK(esp_console_cmd_register(&wifi));
     ESP_ERROR_CHECK(esp_console_cmd_register(&forget));
     ESP_ERROR_CHECK(esp_console_cmd_register(&unpair));

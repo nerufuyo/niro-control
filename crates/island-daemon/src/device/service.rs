@@ -19,7 +19,7 @@ use zbus::{Connection, fdo, interface};
 use super::enroll::Offer;
 use super::pair::{LIFETIME, Pairing};
 use super::paired::PairedDevices;
-use super::proto::{FromDevice, Kind, ToDevice};
+use super::proto::{Face, FromDevice, Kind, ToDevice};
 use crate::clock::{now_ms, wait_until};
 use crate::store::Store;
 
@@ -309,6 +309,11 @@ impl DeviceService {
     }
 }
 
+/// The face a name means.
+fn face_named(name: &str) -> Option<Face> {
+    serde_json::from_value(Value::String(name.to_owned())).ok()
+}
+
 /// A trimmed id or name: not empty, not long, no control characters.
 pub(super) fn text(value: &str) -> Option<String> {
     let value = value.trim();
@@ -429,6 +434,19 @@ impl DeviceService {
         Ok(self.broadcast(&message) as u32)
     }
 
+    /// Sets the face on every connected device (`idle`, `listening`, `thinking`, `speaking`, `happy`, `alert`, `sleepy`,
+    /// `sad`, `curious`, `love`); returns how many it reached. GNOME Shell only.
+    async fn face(
+        &self,
+        name: &str,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] connection: &Connection,
+    ) -> fdo::Result<u32> {
+        crate::caller::shell_only(connection, &header).await?;
+        let name = face_named(name).ok_or_else(|| fdo::Error::InvalidArgs(format!("unknown face `{name}`")))?;
+        Ok(self.broadcast(&ToDevice::Face { name }) as u32)
+    }
+
     /// JSON `{pending, device_id?, name?}`: a device that asks to pair and waits for `Answer`.
     #[zbus(property)]
     fn request(&self) -> String {
@@ -539,6 +557,15 @@ mod tests {
         assert!(service.pairing.is_none());
         assert!(!service.expire());
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_face_is_known_by_its_name() {
+        assert_eq!(face_named("happy"), Some(Face::Happy));
+        assert_eq!(face_named("sleepy"), Some(Face::Sleepy));
+        assert_eq!(face_named("Happy"), None);
+        assert_eq!(face_named("waking"), None);
+        assert_eq!(face_named(""), None);
     }
 
     #[test]

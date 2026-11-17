@@ -16,3 +16,5 @@ CONFIG_MBEDTLS_CHACHAPOLY_C=y
 CONFIG_FREERTOS_HZ=1000
 CONFIG_ESP_CONSOLE_UART_DEFAULT=y
 CONFIG_ESP_CONSOLE_UART_BAUDRATE=115200
+# Pairing keeps a few kilobytes of buffers on the stack and runs 3072-bit SRP in it; the default 3584 bytes overflows.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=16384

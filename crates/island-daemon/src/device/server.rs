@@ -552,6 +552,9 @@ mod tests {
         assert_eq!(sent, 1);
         let notification = next_line(&mut lines).await;
         assert!(notification.contains("\"title\":\"Claude Code\"") && notification.contains("\"urgent\":true"), "{notification}");
+        // A face is shown by name.
+        assert_eq!(iface.get().await.broadcast(&ToDevice::Face { name: super::super::proto::Face::Sleepy }), 1);
+        assert_eq!(next_line(&mut lines).await, "MSG {\"t\":\"face\",\"name\":\"sleepy\"}");
         iface.get_mut().await.forget_for_test("10:b4:1d:e9:9d:34");
         assert!(next_line(&mut lines).await.contains("\"t\":\"bye\""));
         assert_eq!(next_line(&mut lines).await, "END");
@@ -575,5 +578,65 @@ mod tests {
         let mut stranger = device(["hello", &host, &port, &key, "aa:bb:cc:dd:ee:ff"].map(String::from).to_vec());
         assert_eq!(first_line(&mut stranger).await, "REFUSED");
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    /// A real board on the network: opens a pairing code (written to `NIRO_BOARD_DEMO`), allows the device that types it, then
+    /// sends it two notifications and reports what the daemon saw. For trying the firmware by hand; not a test of anything.
+    /// `NIRO_BOARD_DEMO=/tmp/demo.log dbus-run-session -- cargo test -p island-daemon -- --ignored board_demo --nocapture`
+    #[tokio::test]
+    #[ignore = "needs a session bus and a board: set NIRO_BOARD_DEMO"]
+    async fn board_demo() {
+        use std::io::Write;
+        let path = std::env::var("NIRO_BOARD_DEMO").expect("NIRO_BOARD_DEMO");
+        let mut log = std::fs::File::create(&path).unwrap();
+        let mut say = |text: String| {
+            writeln!(log, "{text}").unwrap();
+            log.flush().unwrap();
+        };
+        let bus = zbus::connection::Builder::session()
+            .unwrap()
+            .serve_at("/org/niro/island/DevicesDemo", DeviceService::load())
+            .unwrap()
+            .build()
+            .await
+            .unwrap();
+        let iface = bus.object_server().interface::<_, DeviceService>("/org/niro/island/DevicesDemo").await.unwrap();
+        tokio::spawn(super::super::service::run(iface.clone()));
+        tokio::spawn(run(iface.clone()));
+
+        let code = iface.get_mut().await.open_pairing();
+        say(format!("CODE {code}"));
+        // The user types the code on the board; whoever asks with it is allowed.
+        for _ in 0..3600 {
+            let pending = iface.get().await.request.as_ref().map(|p| p.offer.clone());
+            if let Some(offer) = pending {
+                say(format!("ASKED {} {}", offer.device_id, offer.name));
+                iface.get_mut().await.answer_request(true);
+                break;
+            }
+            sleep(Duration::from_millis(50)).await;
+        }
+        for _ in 0..1200 {
+            if iface.get().await.devices_json().contains("\"online\":true") {
+                break;
+            }
+            sleep(Duration::from_millis(50)).await;
+        }
+        say(format!("DEVICES {}", iface.get().await.devices_json()));
+        for (i, (title, body, urgent)) in [("Niro", "Hello from your computer", false), ("Claude Code", "Needs you now", true)].into_iter().enumerate() {
+            sleep(Duration::from_secs(if i == 0 { 2 } else { 12 })).await;
+            let sent = iface.get().await.broadcast(&ToDevice::Notify {
+                id: i as u64 + 1,
+                kind: super::super::proto::Kind::Agent,
+                title: title.into(),
+                body: body.into(),
+                urgent,
+                expire_ms: 30_000,
+            });
+            say(format!("SENT {title} to {sent}"));
+        }
+        sleep(Duration::from_secs(40)).await;
+        say(format!("DEVICES {}", iface.get().await.devices_json()));
+        say("DONE".into());
     }
 }
