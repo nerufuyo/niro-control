@@ -1,0 +1,8 @@
+#!/bin/sh
+# Turns the daily update on or off. Run as root through pkexec (org.niro.control.auto-update), which asks the user to authenticate.
+set -eu
+case "${1:-}" in
+    on) exec systemctl enable --now niro-control-update.timer ;;
+    off) exec systemctl disable --now niro-control-update.timer ;;
+    *) echo "usage: $0 on|off" >&2; exit 2 ;;
+esac

@@ -1054,7 +1054,7 @@ dependencies = [
 
 [[package]]
 name = "island-core"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1062,7 +1062,7 @@ dependencies = [
 
 [[package]]
 name = "island-daemon"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1088,7 +1088,7 @@ dependencies = [
 
 [[package]]
 name = "island-shelf"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "env_logger",
  "gdk4-x11",
@@ -1101,7 +1101,7 @@ dependencies = [
 
 [[package]]
 name = "island-whisper"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "island-core",
  "libc",
