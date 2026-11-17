@@ -22,6 +22,8 @@ Requires:       vulkan-loader
 Requires:       glib2
 Requires:       gnome-shell-extension-appindicator
 Requires:       gnome-shell-extension-user-theme
+Requires:       polkit
+BuildRequires:  systemd-rpm-macros
 
 %description
 Island (a notch on the top bar), a macOS-style dock, an application search, window blur,
@@ -40,8 +42,14 @@ fc-cache %{_datadir}/fonts/island >/dev/null 2>&1 || :
 dconf update >/dev/null 2>&1 || :
 gtk-update-icon-cache -q -t -f %{_datadir}/icons/hicolor >/dev/null 2>&1 || :
 systemctl --global enable island-daemon.service >/dev/null 2>&1 || :
+# The daily update timer is installed but stays off until the user switches it on (Settings → About).
+%systemd_post niro-control-update.timer
+
+%preun
+%systemd_preun niro-control-update.timer
 
 %postun
+%systemd_postun niro-control-update.timer
 glib-compile-schemas %{_datadir}/glib-2.0/schemas >/dev/null 2>&1 || :
 gtk-update-icon-cache -q -t -f %{_datadir}/icons/hicolor >/dev/null 2>&1 || :
 if [ $1 -eq 0 ]; then
@@ -61,6 +69,10 @@ fi
 %{_datadir}/fonts/island
 %{_datadir}/doc/niro-control
 %{_prefix}/lib/systemd/user/island-daemon.service
+%{_prefix}/lib/systemd/system/niro-control-update.service
+%{_prefix}/lib/systemd/system/niro-control-update.timer
+%{_prefix}/libexec/niro-control
+%{_datadir}/polkit-1/actions/org.niro.control.auto-update.policy
 %config(noreplace) %{_sysconfdir}/dconf/db/local.d/00-niro
 
 %changelog

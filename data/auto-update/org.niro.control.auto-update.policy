@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN" "http://www.freedesktop.org/standards/PolicyKit/1.0/policyconfig.dtd">
+<policyconfig>
+  <vendor>Niro Control</vendor>
+  <vendor_url>https://github.com/nerufuyo/niro-control</vendor_url>
+  <action id="org.niro.control.auto-update">
+    <description>Turn automatic Niro Control updates on or off</description>
+    <message>Authentication is required to turn automatic Niro Control updates on or off</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/niro-control/auto-update-switch</annotate>
+  </action>
+</policyconfig>

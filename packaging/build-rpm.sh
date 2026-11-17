@@ -10,6 +10,13 @@ STAGE="$W/stage"; mkdir -p "$OUT" "$STAGE"
 # Everything is staged exactly as the .deb does (build.sh stops short of dpkg-deb when asked).
 NIRO_STAGE_ONLY="$STAGE" ./packaging/build.sh >/dev/null
 
+# The daily update (opt-in, off until switched on in Settings → About): only in the rpm, as only Fedora has the package repository.
+install -D -m 644 data/auto-update/niro-control-update.service "$STAGE/usr/lib/systemd/system/niro-control-update.service"
+install -D -m 644 data/auto-update/niro-control-update.timer "$STAGE/usr/lib/systemd/system/niro-control-update.timer"
+install -D -m 755 data/auto-update/auto-update "$STAGE/usr/libexec/niro-control/auto-update"
+install -D -m 755 data/auto-update/auto-update-switch "$STAGE/usr/libexec/niro-control/auto-update-switch"
+install -D -m 644 data/auto-update/org.niro.control.auto-update.policy "$STAGE/usr/share/polkit-1/actions/org.niro.control.auto-update.policy"
+
 mkdir -p "$W/rpmbuild"/{SPECS,BUILD,RPMS,SRPMS}
 sed -e "s/@VERSION@/$VER/" -e "s/@RELEASE@/$REL/" packaging/rpm/niro-control.spec > "$W/rpmbuild/SPECS/niro-control.spec"
 rpmbuild -bb --define "_topdir $W/rpmbuild" --define "_stagedir $STAGE" "$W/rpmbuild/SPECS/niro-control.spec" >&2
