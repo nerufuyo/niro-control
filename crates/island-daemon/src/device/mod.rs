@@ -9,6 +9,7 @@
 // The messages and the SRP client wait for the socket that will use them.
 #![allow(dead_code, unused_imports)]
 
+mod enroll;
 mod link;
 mod pair;
 mod paired;
