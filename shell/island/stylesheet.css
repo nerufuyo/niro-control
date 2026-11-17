@@ -1291,6 +1291,29 @@
 #islandIsland.island-translucent .island-apps-total { color: rgba(255, 255, 255, 0.64); }
 #islandIsland.island-translucent .island-apps-time { color: rgba(255, 255, 255, 0.73); }
 #islandIsland.island-translucent .island-device-card { background-color: rgba(255, 255, 255, 0.08); }
+/* Niro Device page: the code to type, a device asking, and the paired devices, a card each. */
+.island-nd { spacing: 8px; }
+.island-nd-header { spacing: 8px; }
+.island-nd-title { font-size: 15px; font-weight: 600; letter-spacing: -0.1px; }
+.island-nd-list { spacing: 6px; }
+.island-nd-card { spacing: 4px; padding: 10px 14px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.07); }
+.island-nd-ask { background-color: rgba(10, 132, 255, 0.2); }
+.island-nd-code { font-size: 28px; font-weight: 700; letter-spacing: 3px; font-feature-settings: "tnum"; }
+.island-nd-line { spacing: 8px; }
+.island-nd-hint { font-size: 11px; color: rgba(255, 255, 255, 0.6); }
+.island-nd-name { font-size: 13px; font-weight: 600; }
+.island-nd-note { font-size: 12px; color: rgba(255, 255, 255, 0.7); }
+.island-nd-buttons { spacing: 6px; padding-top: 4px; }
+.island-pill-small.island-nd-allow { background-color: #0a84ff; }
+.island-pill-small.island-nd-allow:hover { background-color: #3395ff; }
+.island-nd-row { spacing: 10px; padding: 8px 8px 8px 12px; border-radius: 12px; background-color: rgba(255, 255, 255, 0.07); }
+.island-nd-dot { width: 8px; height: 8px; border-radius: 4px; background-color: rgba(255, 255, 255, 0.3); }
+.island-nd-row.online .island-nd-dot { background-color: #30d158; }
+.island-nd-forget { padding: 4px; border-radius: 999px; }
+.island-nd-forget:hover { background-color: rgba(255, 255, 255, 0.12); }
+#islandIsland.island-translucent .island-nd-card,
+#islandIsland.island-translucent .island-nd-row { background-color: rgba(255, 255, 255, 0.08); }
+#islandIsland.island-translucent .island-nd-hint { color: rgba(255, 255, 255, 0.7); }
 #islandIsland.island-translucent .island-device-tile { background-color: rgba(255, 255, 255, 0.14); }
 #islandIsland.island-translucent .island-device-connected,
 #islandIsland.island-translucent .island-device-none { color: rgba(255, 255, 255, 0.7); }

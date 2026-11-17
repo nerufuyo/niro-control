@@ -260,6 +260,11 @@
       <summary>The Devices page</summary>
       <description>Shows the Devices page: each connected Bluetooth device with its battery. Its tab shows only while a device is connected. Off until you turn it on.</description>
     </key>
+    <key name="niro-device-page" type="b">
+      <default>false</default>
+      <summary>The Niro Device page</summary>
+      <description>Shows the Niro Device page: pair an assistant with a screen, a microphone and a speaker by a code, allow it, and see which are online with their battery. Off until you turn it on; island-daemon listens for devices only once one is paired or a code is open.</description>
+    </key>
     <key name="app-usage-clear" type="b">
       <default>false</default>
       <summary>Clear app usage once</summary>

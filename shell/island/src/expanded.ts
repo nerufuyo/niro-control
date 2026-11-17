@@ -41,6 +41,7 @@ const TABS = {
     calendar: {icon: 'island-calendar', label: 'Calendar'},
     apps: {icon: 'island-apps', label: 'Apps'},
     devices: {icon: 'island-headphones', label: 'Devices'},
+    niro: {icon: 'island-output', label: 'Niro Device'},
     usage: {icon: 'island-gauge', label: 'Usage'},
     controls: {icon: 'island-settings', label: 'Controls'},
     system: {icon: 'island-bolt', label: 'System'},
