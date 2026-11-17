@@ -1,12 +1,12 @@
 # Niro Control
 
-<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control 1.2.0: one look for the whole GNOME desktop"></p>
+<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control 1.3.0: one look for the whole GNOME desktop"></p>
 
 **One look for the whole GNOME desktop.** A top-bar island, a macOS-style dock, an application search, window blur and
 rounded corners, a tiling layout manager, an emoji picker, and a control panel that sets them all from one place. One repository, one package.
 
 Runs on **Fedora 45 (GNOME Shell 51)** and **Ubuntu 24.04 (GNOME Shell 46)**, on Wayland. The extensions declare GNOME Shell 46 to 51.
-Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.2.0** ([releases](https://github.com/nerufuyo/niro-control/releases)).
+Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.3.0** ([releases](https://github.com/nerufuyo/niro-control/releases)).
 
 ## What you get
 
@@ -103,7 +103,7 @@ On Fedora, if the extensions do not show up after logging in, enable them once: 
 
 ## Updating
 
-The island tells you when a newer version is out (Settings → Island → About; it asks GitHub for the latest release once a day and sends nothing but the request; turn it off there). It never downloads or runs anything itself: it says where the new version is.
+The island tells you when a newer version is out (Settings → Island → About; it asks GitHub for the latest release every six hours and sends nothing but the request; turn it off there). It never downloads or runs anything itself: it says where the new version is.
 
 On **Fedora**, add the package repository once, then update like any package (GNOME Software shows it too):
 
