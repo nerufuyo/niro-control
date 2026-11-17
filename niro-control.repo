@@ -1,0 +1,7 @@
+[niro-control]
+name=Niro Control
+baseurl=https://nerufuyo.github.io/niro-control/rpm/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
+metadata_expire=6h
