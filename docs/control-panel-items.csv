@@ -92,7 +92,7 @@ Island,Voice Assistant,Model opencode answers with,text,,,A model as “opencode
 Island,Voice Assistant,Model the voice assistant asks,text,,gemini-3.8-flash-low,A model id from “agy models”; empty for agy's default.,voice-agy-model,island.voice-agy-model
 Island,Voice Assistant,Speech recognition model,text,,small,"A whisper.cpp model: tiny, base, small or medium.",voice-speech-model,island.voice-speech-model
 Island,Voice Assistant,Spoken language,text,,,"A language code such as “id” or “en”, several (“id,en”) to tell them apart, or empty to detect any.",voice-language,island.voice-language
-Island,Voice Assistant,The assistant's shape,select,Circle / Pebble / Squircle / Capsule / Cloud / Hexagon / Drop / Ghost,circle,,bot-shape,island.bot-shape
+Island,Voice Assistant,The assistant's shape,select,Circle / Pebble / Squircle / Capsule / Cloud / Hexagon / Drop / Ghost / Slime,circle,,bot-shape,island.bot-shape
 Island,Voice Assistant,The assistant's colour,text,,cloud,"One of Island's colours (cloud, ink, peach, coral, amber, mint, teal, sky, lavender, rose, graphite) or a colour as #rrggbb.",bot-color,island.bot-color
 Island,Voice Assistant,The colours the island glows with while the assistant is open,text,,match,"""match"" follows the assistant's colour, ""classic"" is violet, blue and cyan, or a colour as #rrggbb to glow around.",bot-glow,island.bot-glow
 Island,Voice Assistant,How long the assistant keeps a conversation,select,Idle 30m / Idle 2h / Day,day,"Until midnight (never more than a day), or after 30 minutes or 2 hours without a word: then it starts a new one and deletes the old, here and in the…",voice-keep-chat,island.voice-keep-chat

@@ -1594,6 +1594,10 @@ export const CATALOG: Item[] = [
    {
     "value": "ghost",
     "label": "Ghost"
+   },
+   {
+    "value": "slime",
+    "label": "Slime"
    }
   ]
  },

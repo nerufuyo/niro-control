@@ -468,6 +468,7 @@
         <choice value="hexagon"/>
         <choice value="drop"/>
         <choice value="ghost"/>
+        <choice value="slime"/>
       </choices>
       <default>'circle'</default>
       <summary>The assistant's shape</summary>
