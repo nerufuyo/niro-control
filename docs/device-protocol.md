@@ -113,7 +113,7 @@ JSON text frames for control; binary frames for audio. `t` is the type.
 | `answer` | `id`, `text`, `done` | The AI's reply in pieces; `done` ends it. |
 | *(binary)* | Opus frame | Spoken reply, after `answer` with `audio: true`. |
 | `notify` | `id`, `kind`, `title`, `body`, `urgency`, `expire_ms` | An alert. `kind`: `agent`, `reminder`, `meeting`, `battery`, `system`. |
-| `face` | `name` | The status face: `idle`, `listening`, `thinking`, `speaking`, `happy`, `alert`. |
+| `face` | `name` | The mood of the mascot, a slime (see `firmware/niro-device/MASCOT.md`): `idle`, `listening`, `thinking`, `speaking`, `happy`, `alert`, `sleepy`, `sad`, `curious`, `love`. The device also has moods of its own for what it is doing (waking, searching for Wi-Fi). |
 | `config` | `volume`, `brightness`, `language` | Set by the user in the panel, kept by the device. |
 | `pong` | | |
 | `bye` | `reason` | The daemon is closing (`forgotten`, `shutdown`). |

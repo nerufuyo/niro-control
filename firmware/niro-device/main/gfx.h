@@ -19,5 +19,7 @@ void gfx_rect(int x, int y, int w, int h, uint16_t colour);
 void gfx_text(int x, int y, int scale, uint16_t fg, uint16_t bg, const char *text);
 /** Centred across the screen. */
 void gfx_text_center(int y, int scale, uint16_t fg, uint16_t bg, const char *text);
+/** The frame buffer, 240 x 240 RGB565 in the CPU's byte order, for drawing straight into. */
+uint16_t *gfx_canvas(void);
 /** Sends the frame to the screen and waits until it is there. */
 void gfx_flush(void);

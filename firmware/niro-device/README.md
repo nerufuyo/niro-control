@@ -17,8 +17,10 @@ one user's Niro by a six-digit code and shows the notifications Niro sends it. T
    daemon's pings, reports its signal strength every 30 seconds, and shows a notification (any button dismisses it).
 4. If the daemon stops knowing it (it was forgotten on the PC), the screen says so and a long BOOT forgets the pairing here too.
 
-Not done yet: audio (the microphone and the speaker), asking questions, the battery level (it reports 255, "unknown"), and the
-status faces.
+The screen shows [Niro, a little slime](MASCOT.md), whose face follows what the device is doing (waking, looking for Wi-Fi, curious when it is not
+paired, happy when it is connected, alert for an urgent notification, sad when offline, sleepy when left alone) and what the daemon sets.
+
+Not done yet: audio (the microphone and the speaker), asking questions, and the battery level (it reports 255, "unknown").
 
 ## Build
 
@@ -62,5 +64,6 @@ NIRO_DEVICE_SIM=/tmp/niro-host/device_sim \
   board's own stack and the console have only been compiled.
 - The display's pins MOSI 41, SCLK 42 and CS 21 come from reading the old firmware's code, not its log (DC 40 and RST 45 were confirmed by
   the log). A wrong one shows a black screen.
+- The mascot has been looked at on the PC, not on the screen, and how fast it runs on the board is not known (see [MASCOT.md](MASCOT.md)).
 - The fonts, colours and layout have not been seen on the screen.
 - `esp_srp`'s own salt handling has a flaw (one salt in 256 is read one byte too long); `srp_device.c` makes the salt itself to avoid it.

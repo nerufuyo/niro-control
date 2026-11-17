@@ -1,5 +1,7 @@
 #include "net.h"
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "esp_event.h"
@@ -19,12 +21,21 @@ static bool have_credentials;
 
 static void on_event(void *arg, esp_event_base_t base, int32_t id, void *data) {
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_START) {
-        if (have_credentials) esp_wifi_connect();
+        ESP_LOGI(TAG, "wifi started; a network is %s", have_credentials ? "saved" : "not saved");
+        if (have_credentials) {
+            esp_err_t err = esp_wifi_connect();
+            if (err != ESP_OK) ESP_LOGW(TAG, "connect failed: %s", esp_err_to_name(err));
+        }
+    } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_CONNECTED) {
+        ESP_LOGI(TAG, "joined the network, waiting for an address");
     } else if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
+        wifi_event_sta_disconnected_t *gone = data;
+        ESP_LOGW(TAG, "wifi disconnected, reason %d", gone ? gone->reason : -1);
         xEventGroupClearBits(bits, GOT_IP);
         if (have_credentials) {
             vTaskDelay(pdMS_TO_TICKS(1000));
-            esp_wifi_connect();
+            esp_err_t err = esp_wifi_connect();
+            if (err != ESP_OK) ESP_LOGW(TAG, "connect failed: %s", esp_err_to_name(err));
         }
     } else if (base == IP_EVENT && id == IP_EVENT_STA_GOT_IP) {
         xEventGroupSetBits(bits, GOT_IP);
@@ -61,10 +72,21 @@ bool net_connected(void) { return xEventGroupGetBits(bits) & GOT_IP; }
 
 void net_set_credentials(const char *ssid, const char *pass) {
     store_set_wifi(ssid, pass);
+    // Stop the attempt that is running (it holds the driver in "connecting") before the new network is tried.
+    have_credentials = false;
+    esp_wifi_disconnect();
+    vTaskDelay(pdMS_TO_TICKS(300));
     have_credentials = true;
     apply(ssid, pass);
-    esp_wifi_disconnect();
-    esp_wifi_connect();
+    esp_err_t err = esp_wifi_connect();
+    ESP_LOGI(TAG, "joining \"%s\": %s", ssid, esp_err_to_name(err));
+}
+
+void net_describe(char *out, size_t cap) {
+    char ssid[33], pass[65] = "";
+    bool saved = store_get_wifi(ssid, pass);
+    snprintf(out, cap, "network: %s%s%s, %s, signal %d dBm", saved ? "\"" : "none", saved ? ssid : "", saved ? "\"" : "",
+             net_connected() ? "connected" : "not connected", net_rssi());
 }
 
 int net_rssi(void) {
@@ -119,4 +141,36 @@ int net_connect(const daemon_t *daemon) {
         return -1;
     }
     return fd;
+}
+
+void net_scan(void) {
+    // A scan cannot run while the station is busy joining: stop trying for its length, and go on after.
+    bool was = have_credentials;
+    have_credentials = false;
+    esp_wifi_disconnect();
+    vTaskDelay(pdMS_TO_TICKS(300));
+    wifi_scan_config_t config = {.show_hidden = true};
+    esp_err_t err = esp_wifi_scan_start(&config, true);
+    if (err != ESP_OK) {
+        printf("scan failed: %s\n", esp_err_to_name(err));
+    } else {
+        uint16_t count = 0;
+        esp_wifi_scan_get_ap_num(&count);
+        if (count > 30) count = 30;
+        wifi_ap_record_t *list = calloc(count ? count : 1, sizeof *list);
+        if (list && esp_wifi_scan_get_ap_records(&count, list) == ESP_OK) {
+            printf("%u networks (2.4 GHz only):\n", count);
+            for (int i = 0; i < count; i++) {
+                const char *security = list[i].authmode == WIFI_AUTH_OPEN ? "open" :
+                                       list[i].authmode == WIFI_AUTH_WPA3_PSK ? "WPA3" :
+                                       list[i].authmode == WIFI_AUTH_WPA2_WPA3_PSK ? "WPA2/WPA3" :
+                                       list[i].authmode == WIFI_AUTH_WPA_PSK ? "WPA" : "WPA2";
+                printf("  %-32s ch %2d  %4d dBm  %s\n", list[i].ssid[0] ? (char *)list[i].ssid : "(hidden)", list[i].primary,
+                       list[i].rssi, security);
+            }
+        }
+        free(list);
+    }
+    have_credentials = was;
+    if (was) esp_wifi_connect();
 }
