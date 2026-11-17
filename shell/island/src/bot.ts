@@ -96,6 +96,19 @@ function ghost() {
     return points;
 }
 
+/** A slime (Niro's own look): a wide mound, flatter below, with a small soft peak on top. The radius at each angle from the middle is
+ * that of an ellipse sitting a little low, with a gentle bump at the top. */
+function slime() {
+    const a = 0.96, b = 0.78, c = 0.2;   // the mound's half width, half height, and how far below the middle its centre is
+    return ANGLES.map((angle, i) => {
+        const cos = COS[i], sin = SIN[i];
+        const A = cos * cos / (a * a) + sin * sin / (b * b), B = -2 * c * sin / (b * b), C = c * c / (b * b) - 1;
+        const r = (-B + Math.sqrt(B * B - 4 * A * C)) / (2 * A);
+        const up = Math.atan2(Math.sin(angle + Math.PI / 2), Math.cos(angle + Math.PI / 2));   // 0 straight up
+        return r + 0.34 * Math.exp(-((up / 0.4) ** 2));
+    });
+}
+
 /** The shapes to pick from, in order; a squircle or a capsule weighs as much as the circle at a larger peak. */
 export const SHAPES = {
     circle: {label: 'Circle', radii: new Float64Array(SAMPLES).fill(1)},
@@ -107,9 +120,10 @@ export const SHAPES = {
     hexagon: {label: 'Hexagon', radii: normalize(fromPolygon(roundedPolygon(6, 1.04, 0.26)), 1.04)},
     drop: {label: 'Drop', radii: normalize(fromPolygon(hullOfCircles(0, 0.28, 0.66, 0, -0.96, 0.05)), 1.06)},
     ghost: {label: 'Ghost', radii: normalize(fromPolygon(ghost()), 1.04)},
+    slime: {label: 'Slime', radii: normalize(slime(), 1.04)},
 };
 /** Where the eyes sit on each shape (down, in body radii) and how big, so they stay well inside it. */
-const EYE_FIT = {cloud: {y: 0.1, size: 1}, drop: {y: 0.2, size: 0.9}, hexagon: {y: 0, size: 0.95}, ghost: {y: -0.06, size: 1}};
+const EYE_FIT = {cloud: {y: 0.1, size: 1}, drop: {y: 0.2, size: 0.9}, hexagon: {y: 0, size: 0.95}, ghost: {y: -0.06, size: 1}, slime: {y: 0.14, size: 0.95}};
 
 /** '#rrggbb' to RGB in 0..1. */
 const hex = value => [1, 3, 5].map(i => parseInt(value.slice(i, i + 2), 16) / 255);

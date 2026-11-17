@@ -11,6 +11,11 @@ mod net;
 mod server;
 mod session;
 
+/// The kernel's random bytes and their hex form, for what else needs a secret (Niro Devices).
+pub(crate) use self::session::{hex, random};
+/// The local network a device must be on.
+pub(crate) use self::net::lan;
+
 use std::path::PathBuf;
 use std::sync::Arc;
 

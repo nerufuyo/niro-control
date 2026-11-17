@@ -111,8 +111,8 @@ appear in the same place instead of in the middle of the screen.
 </tr>
 <tr>
 <td width="50%" valign="top">
-<img src="docs/images/bot-looks.png" alt="The bot in eight shapes and several colours, with matching glows" width="100%"><br>
-<b>A bot of your own.</b> Eight shapes, from a circle to a cloud or a ghost, eleven colours or your own, softly shaded, and a glow round the island that matches it.
+<img src="docs/images/bot-looks.png" alt="The bot in nine shapes and several colours, with matching glows" width="100%"><br>
+<b>A bot of your own.</b> Nine shapes, from a circle to a cloud, a ghost or Niro the slime, eleven colours or your own, softly shaded, and a glow round the island that matches it.
 </td>
 <td width="50%" valign="top">
 <img src="docs/images/usage.png" alt="Claude plan usage: a bar for the 5-hour limit and one for the week" width="100%"><br>
@@ -142,7 +142,11 @@ appear in the same place instead of in the middle of the screen.
 </table>
 
 Also: a Devices page with each connected Bluetooth device's battery (off
-until you turn it on), privacy dots while the camera, microphone or screen
+until you turn it on), a Niro Device page to pair an assistant (a screen, a
+microphone and a speaker) by a six-digit code, allow it and see which are
+online with their battery, beside Niro the slime (also off until you turn it on; the daemon listens
+for devices only once one is paired or a code is open, and only on your local
+network; see [device-protocol.md](device-protocol.md)), privacy dots while the camera, microphone or screen
 sharing is in use, a recording timer with a stop button, and a slim glass top
 bar that leaves your windows uncovered.
 

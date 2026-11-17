@@ -11,6 +11,7 @@ mod calendar;
 mod caller;
 mod clipboard;
 mod clock;
+mod device;
 mod eds;
 mod http;
 mod login_env;
@@ -45,6 +46,7 @@ use crate::reminders::RemindersService;
 use crate::share::ShareService;
 use crate::shelf::ShelfService;
 use crate::system::SystemService;
+use crate::device::DeviceService;
 use crate::todo::TodoService;
 use crate::updates::UpdatesService;
 use crate::usage::UsageService;
@@ -180,10 +182,12 @@ async fn run() -> anyhow::Result<()> {
     server.at(OBJECT_PATH, usage).await?;
     server.at(OBJECT_PATH, updates).await?;
     server.at(OBJECT_PATH, AgentsService::default()).await?;
+    server.at(OBJECT_PATH, DeviceService::load()).await?;
 
     let media = server.interface::<_, MediaService>(OBJECT_PATH).await?;
     let pomodoro = server.interface::<_, PomodoroService>(OBJECT_PATH).await?;
     let todo = server.interface::<_, TodoService>(OBJECT_PATH).await?;
+    let devices = server.interface::<_, DeviceService>(OBJECT_PATH).await?;
     let system = server.interface::<_, SystemService>(OBJECT_PATH).await?;
     let app_usage = server.interface::<_, AppUsageService>(OBJECT_PATH).await?;
     let assistant = server.interface::<_, AssistantService>(OBJECT_PATH).await?;
@@ -214,6 +218,8 @@ async fn run() -> anyhow::Result<()> {
         }
     });
     tokio::spawn(todo::run(todo));
+    tokio::spawn(device::run(devices.clone()));
+    tokio::spawn(device::listen(devices));
     tokio::spawn(app_usage::run(app_usage));
     tokio::spawn(assistant::run(assistant, own_data, assistant_commands));
 
