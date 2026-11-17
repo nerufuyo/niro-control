@@ -1104,36 +1104,31 @@
 
 /* One provider at a time (usage.js): its mark, name and plan, then a line and a bar per limit;
  * dots on the right move between providers, as in a widget stack. */
-.island-usage-content { spacing: 14px; padding: 0 0 4px 0; }
-.island-usage-head { spacing: 8px; }
-.island-usage-mark { width: 10px; height: 10px; border-radius: 5px; }
-.island-usage-name { font-size: 15px; font-weight: 700; letter-spacing: -0.2px; }
+.island-usage-col { spacing: 6px; padding: 10px 12px; border-radius: 16px; background-color: rgba(255, 255, 255, 0.07); }
+.island-usage-head { spacing: 7px; }
+.island-usage-mark { width: 9px; height: 9px; border-radius: 5px; }
+.island-usage-name { font-size: 14px; font-weight: 700; letter-spacing: -0.2px; }
 .island-usage-plan {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
   padding: 1px 7px;
   border-radius: 99px;
   color: rgba(255, 255, 255, 0.7);
   background-color: rgba(255, 255, 255, 0.1);
 }
-.island-usage-stamp { font-size: 11px; color: rgba(255, 255, 255, 0.55); }
-.island-usage-stamp.warning { color: rgba(255, 255, 255, 0.8); }
-.island-usage-limits { spacing: 11px; }
-.island-usage-limit { spacing: 5px; }
-.island-usage-line { spacing: 10px; }
-.island-usage-window { font-size: 13px; font-weight: 600; color: rgba(255, 255, 255, 0.9); }
-.island-usage-reset { font-size: 11px; color: rgba(255, 255, 255, 0.55); }
-.island-usage-percent { font-size: 13px; font-weight: 700; min-width: 40px; text-align: right; }
+.island-usage-stamp { font-size: 10px; color: rgba(255, 255, 255, 0.5); }
+.island-usage-stamp.warning { color: rgba(255, 255, 255, 0.85); }
+.island-usage-limits { spacing: 7px; padding-top: 4px; }
+.island-usage-limit { spacing: 3px; }
+.island-usage-line { spacing: 6px; }
+.island-usage-window { font-size: 12px; font-weight: 600; color: rgba(255, 255, 255, 0.9); }
+.island-usage-reset { font-size: 10px; color: rgba(255, 255, 255, 0.5); }
+.island-usage-percent { font-size: 12px; font-weight: 700; text-align: right; }
 .island-usage-percent.critical { color: #ff453a; }
 .island-usage-track { height: 5px; border-radius: 3px; background-color: rgba(255, 255, 255, 0.1); }
 .island-usage-fill { height: 5px; border-radius: 3px; }
 .island-usage-fill.critical { background-color: #ff453a; }
-.island-usage-empty { font-size: 12px; color: rgba(255, 255, 255, 0.55); }
-
-.island-usage-dots { spacing: 6px; padding-left: 14px; }
-.island-usage-dot { width: 6px; height: 6px; border-radius: 3px; background-color: rgba(255, 255, 255, 0.22); transition-duration: 200ms; }
-.island-usage-dot:hover { background-color: rgba(255, 255, 255, 0.45); }
-.island-usage-dot.shown { height: 16px; background-color: #ffffff; }
+.island-usage-empty { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
 
 /* Apps: time in each application, today or over the last seven days */
 
@@ -1765,6 +1760,8 @@
 .island-power-modes { spacing: 8px; min-width: 176px; }
 .island-power-label { font-size: 11px; color: rgba(255, 255, 255, 0.6); }
 .island-power-segments { spacing: 4px; }
+.island-power-segments-row { spacing: 8px; }
+.island-power-segments-row .island-power-segment { padding: 9px 10px; }
 .island-power-segment { padding: 5px 10px; border-radius: 10px; background-color: rgba(255, 255, 255, 0.08); font-size: 12px;
   font-weight: 600; text-align: center; color: #ffffff; }
 .island-power-segment:hover, .island-power-segment:focus { background-color: rgba(255, 255, 255, 0.18); }
@@ -1803,19 +1800,22 @@
 .island-ctl-column { spacing: 6px; }
 .island-ctl-heading { font-size: 11px; font-weight: 600; color: rgba(255, 255, 255, 0.6); padding-left: 4px; }
 .island-ctl-list { min-height: 60px; }
-.island-ctl-row { border-radius: 12px; background-color: rgba(255, 255, 255, 0.08); margin-bottom: 4px; spacing: 6px; padding-right: 8px; }
+.island-ctl-row { border-radius: 12px; background-color: rgba(255, 255, 255, 0.08); margin-bottom: 3px; spacing: 6px; padding-right: 8px; }
 .island-ctl-row:hover { background-color: rgba(255, 255, 255, 0.15); }
-.island-ctl-row.island-power-on { background-color: #E8472B; color: #ffffff; }
-.island-ctl-row-body { padding: 6px 4px 6px 10px; border-radius: 12px; }
+.island-ctl-row-active { background-color: rgba(255, 255, 255, 0.2); }
+.island-ctl-row-active:hover { background-color: rgba(255, 255, 255, 0.26); }
+.island-ctl-row-body { padding: 4px 4px 4px 10px; border-radius: 12px; }
 .island-ctl-row-line { spacing: 8px; }
 .island-ctl-row-text { font-size: 13px; font-weight: 600; color: #ffffff; }
 .island-ctl-row-detail { font-size: 10px; color: rgba(255, 255, 255, 0.66); }
-.island-ctl-row.island-power-on .island-ctl-row-detail { color: rgba(255, 255, 255, 0.85); }
+.island-ctl-row-active .island-ctl-row-detail { color: rgba(255, 255, 255, 0.8); }
 .island-ctl-bad { color: #ff8a80; }
 .island-ctl-row-meta { spacing: 6px; }
 .island-ctl-signal { padding-left: 2px; }
 .island-ctl-row-action { padding: 3px 12px; margin: 4px 0; }
-.island-ctl-empty { font-size: 12px; color: rgba(255, 255, 255, 0.6); padding: 8px 4px; }
+.island-ctl-none { spacing: 6px; padding: 10px 0; }
+.island-ctl-none-icon { color: rgba(255, 255, 255, 0.45); }
+.island-ctl-empty { font-size: 12px; color: rgba(255, 255, 255, 0.6); }
 .island-ctl-prompt { border-radius: 14px; background-color: rgba(255, 255, 255, 0.1); padding: 6px 8px; spacing: 4px; }
 .island-ctl-prompt-row { spacing: 8px; }
 .island-ctl-entry { border-radius: 10px; padding: 5px 10px; font-size: 13px; color: #ffffff; background-color: rgba(0, 0, 0, 0.35);
