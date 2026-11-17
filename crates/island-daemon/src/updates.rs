@@ -17,7 +17,7 @@ use crate::clock::{now_ms, wait_until};
 use crate::store::Store;
 
 const LATEST: &str = "https://api.github.com/repos/nerufuyo/niro-control/releases/latest";
-const EVERY_MS: i64 = 24 * 3600 * 1000;
+const EVERY_MS: i64 = 6 * 3600 * 1000;
 /// After a failed look (offline), the next is this much sooner.
 const RETRY_MS: i64 = 3600 * 1000;
 const TIMEOUT: Duration = Duration::from_secs(15);
