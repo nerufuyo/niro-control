@@ -1752,6 +1752,58 @@ function logOut() {
         });
 }
 
+/** The daily update the rpm ships (a systemd timer, off until switched on here): turned on and off through pkexec, which asks the user to
+ * authenticate (polkit action org.niro.control.auto-update). Only on a package that has the helper, and with the repository added. */
+const AUTO_SWITCH = '/usr/libexec/niro-control/auto-update-switch';
+const AUTO_REPO = '/etc/yum.repos.d/niro-control.repo';
+const AUTO_NOTE = 'Once a day, as an administrator task, from the Niro Control package repository. That repository is not signed: turn this on only if you trust the project\u2019s GitHub account. A new version loads at your next login.';
+
+function autoUpdateRow() {
+    if (!GLib.file_test(AUTO_SWITCH, GLib.FileTest.EXISTS))
+        return null;
+    const row = new Adw.SwitchRow({title: 'Install updates automatically', subtitle: AUTO_NOTE, use_markup: false});
+    const repo = GLib.file_test(AUTO_REPO, GLib.FileTest.EXISTS);
+    /** Runs `argv`; whether it exited well. Never throws. */
+    const run = argv => new Promise(resolve => {
+        try {
+            const process = Gio.Subprocess.new(argv, Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE);
+            process.wait_async(null, (_process, result) => {
+                try {
+                    process.wait_finish(result);
+                    resolve(process.get_successful());
+                } catch {
+                    resolve(false);
+                }
+            });
+        } catch {
+            resolve(false);
+        }
+    });
+    // Set from the timer's own state, never from a setting: only systemd knows whether it runs.
+    let busy = true;
+    const sync = async () => {
+        busy = true;
+        row.active = await run(['systemctl', 'is-enabled', '--quiet', 'niro-control-update.timer']);
+        busy = false;
+    };
+    if (!repo) {
+        row.subtitle = 'Needs the package repository first: add it as the README\u2019s Updating section says';
+        row.sensitive = false;
+    }
+    row.connect('notify::active', async () => {
+        if (busy)
+            return;
+        busy = true;
+        row.sensitive = false;
+        const done = await run(['pkexec', AUTO_SWITCH, row.active ? 'on' : 'off']);
+        await sync();
+        row.sensitive = repo;
+        row.subtitle = done ? AUTO_NOTE : 'It was not changed (cancelled, or not allowed)';
+    });
+    sync();
+    return row;
+}
+
 /** The About page's update status and the switch to ask GitHub, following what island-daemon last found (its updates.json). A
  * new version is not fetched or run from here: on Fedora the row offers the dnf command that updates the package (once the
  * repository is added, see the README), and always the page to download it from; the new one is loaded at the next login. */
@@ -1833,7 +1885,7 @@ function updateRows(settings, window, version, dir) {
         return false;
     });
     sync();
-    return [status, check];
+    return [status, check, autoUpdateRow()].filter(Boolean);
 }
 
 /** Runs `island-daemon --report` and puts what it says on the clipboard, saying so on `row`. */

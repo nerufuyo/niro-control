@@ -100,6 +100,8 @@ sudo curl -o /etc/yum.repos.d/niro-control.repo https://nerufuyo.github.io/niro-
 sudo dnf install niro-control        # later: sudo dnf upgrade niro-control
 ```
 
+To have Fedora install new versions by itself, turn on **Install updates automatically** in Settings → Island → About (off until you do; it asks for your administrator password once). That switches on a systemd timer, `niro-control-update.timer`, which once a day runs `dnf upgrade niro-control` and nothing else; turn it off the same way, or `sudo systemctl disable --now niro-control-update.timer`. It needs the repository above. Because the repository is unsigned (next paragraph), turn this on only if you trust the project's GitHub account.
+
 The repository is **not signed**: its packages are as trustworthy as the GitHub account that publishes them, the same as a package downloaded from the [releases](https://github.com/nerufuyo/niro-control/releases). Log out and back in after an update: GNOME Shell loads a new version of an extension only at login. On Ubuntu/Debian, download the `.deb` from the releases and open it.
 
 ## Repository layout
