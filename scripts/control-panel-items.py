@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds the control panel's catalog from the schemas: docs/control-panel-items.{md,csv} and control/src/catalog.ts.
 
-Every setting the panel shows is one item here (186 in all). The schemas are the source of truth for keys, types, ranges and
+Every setting the panel shows is one item here (201 in all). The schemas are the source of truth for keys, types, ranges and
 defaults; this script adds what a person sees (title, help, group), the control to use, and a few UI-only hints
 (advanced, managed by Look, depends on). Run it again after a schema changes (`make catalog`)."""
 import csv, json, re, xml.etree.ElementTree as ET
@@ -258,7 +258,7 @@ items += [
 ids = [i['id'] for i in items]
 assert len(ids) == len(set(ids)), 'duplicate ids'
 from collections import Counter; print(dict(Counter(i['menu'] for i in items)), dict(Counter((i['menu'],i['group']) for i in items if i['menu']=='Dock')))
-assert len(items) == 200, f'expected 200 items, got {len(items)}'
+assert len(items) == 201, f'expected 201 items, got {len(items)}'
 for i in items:
     assert '&' not in re.sub(r'&\s', '', i['title'] + i['help']) or '&apos;' not in i['title'], i
 

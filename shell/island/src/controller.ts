@@ -42,6 +42,7 @@ import {AppsPage} from './pages/apps.js';
 import {CallPage} from './pages/call.js';
 import {CalendarPage} from './pages/calendar.js';
 import {DevicesPage} from './pages/devices.js';
+import {NiroDevicePage} from './pages/niroDevice.js';
 import {MediaPage} from './pages/media.js';
 import {NotificationsPage} from './pages/notifications.js';
 import {ShelfPage} from './pages/shelf.js';
@@ -452,6 +453,7 @@ export class Controller {
             () => new CalendarPage(this._daemon, this._settings, size),
             () => new AppsPage(this._daemon, this._appUsage, size),
             () => new DevicesPage(this._daemon, size),
+            () => new NiroDevicePage(this._daemon, size),
             () => new UsagePage(this._daemon, size),
             () => new ControlsPage(this._daemon, this._audio, size),
             () => new SystemPage(this._daemon, size),
@@ -610,7 +612,7 @@ export class Controller {
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncUsage()));
         for (const key of ['event-alerts', 'event-alert-minutes'])
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncEventAlerts()));
-        for (const key of ['hidden-pages', 'world-clocks', 'app-usage', 'devices-page', 'open-size'])
+        for (const key of ['hidden-pages', 'world-clocks', 'app-usage', 'devices-page', 'niro-device-page', 'open-size'])
             this._settingsChanged.push(this._settings.connect(`changed::${key}`, () => this._syncPages()));
         this._settingsChanged.push(this._settings.connect('changed::app-usage-clear', () => this._syncAppUsage()));
         for (const key of ['island-theme', 'glass-tint'])
@@ -1316,6 +1318,9 @@ export class Controller {
             // Devices is off until turned on, as an app is installed: its own switch, not `hidden-pages`.
             else if (page.name === 'devices')
                 page.hidden = !this._settings.get_boolean('devices-page');
+            // Niro Device: off until turned on, like Devices.
+            else if (page.name === 'niro')
+                page.hidden = !this._settings.get_boolean('niro-device-page');
             else if (page.name !== 'call' && page.name !== 'usage')
                 page.hidden = hidden.includes(page.name);
         }

@@ -1068,6 +1068,10 @@ function pagesGroup(settings, window) {
         'Connected Bluetooth devices and their battery; its tab shows while one is connected');
     devices.add_prefix(new Gtk.Image({icon_name: 'bluetooth-active-symbolic'}));
     group.add(devices);
+    const niro = switchRow(settings, 'niro-device-page', 'Niro Device',
+        'Pair an assistant with a screen and a microphone by a code, and see which are online');
+    niro.add_prefix(new Gtk.Image({icon_name: 'audio-speakers-symbolic'}));
+    group.add(niro);
     const usage = switchRow(settings, 'usage-enabled', 'AI Usage', 'Your AI plans’ limits, and warnings as one nears its end');
     usage.add_prefix(new Gtk.Image({icon_name: 'power-profile-performance-symbolic'}));
     if (!usageProviders().length) {

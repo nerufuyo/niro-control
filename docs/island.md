@@ -142,7 +142,11 @@ appear in the same place instead of in the middle of the screen.
 </table>
 
 Also: a Devices page with each connected Bluetooth device's battery (off
-until you turn it on), privacy dots while the camera, microphone or screen
+until you turn it on), a Niro Device page to pair an assistant (a screen, a
+microphone and a speaker) by a six-digit code, allow it and see which are
+online with their battery (also off until you turn it on; the daemon listens
+for devices only once one is paired or a code is open, and only on your local
+network; see [device-protocol.md](device-protocol.md)), privacy dots while the camera, microphone or screen
 sharing is in use, a recording timer with a stop button, and a slim glass top
 bar that leaves your windows uncovered.
 
