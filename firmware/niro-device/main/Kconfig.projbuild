@@ -1,0 +1,23 @@
+menu "Niro Device"
+    config NIRO_LCD_INVERT
+        bool "Invert the display's colours"
+        default y
+        help
+            Many 240x240 ST7789 panels show inverted colours unless told to invert. If the screen looks like a
+            negative, turn this off. Not known for this board until it is seen on the screen.
+    config NIRO_LCD_MIRROR_X
+        bool "Mirror the display horizontally"
+        default n
+    config NIRO_LCD_MIRROR_Y
+        bool "Mirror the display vertically"
+        default n
+    config NIRO_LCD_SWAP_XY
+        bool "Swap the display's axes"
+        default n
+    config NIRO_LCD_GAP_X
+        int "Display column offset"
+        default 0
+    config NIRO_LCD_GAP_Y
+        int "Display row offset"
+        default 0
+endmenu
