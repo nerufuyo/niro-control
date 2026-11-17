@@ -1,9 +1,6 @@
 # Niro Control
 
-<p align="center"><img src="data/icons/hicolor/scalable/apps/org.niro.Control.svg" width="96" alt="Niro Control icon"></p>
-
-<p align="center"><img src="docs/images/niro-mascot-moods.png" width="640" alt="Niro, the mascot: a little blue slime in twelve moods"></p>
-<p align="center"><sub>Niro, the mascot: a slime that feels what your desktop is doing.</sub></p>
+<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control 1.2.0: one look for the whole GNOME desktop"></p>
 
 **One look for the whole GNOME desktop.** A top-bar island, a macOS-style dock, an application search, window blur and
 rounded corners, a tiling layout manager, an emoji picker, and a control panel that sets them all from one place. One repository, one package.
@@ -30,6 +27,8 @@ Opacity, blur, blur strength, accent and tint are set once, in **Look**, and the
 Light and dark appearance both work, and the panel adapts to narrow windows.
 
 ## Niro, the mascot
+
+<p align="center"><img src="docs/images/niro-mascot-poster.png" alt="Niro, the mascot: a little blue slime, and how it feels in twelve moods"></p>
 
 Niro is a small slime (a nod to Rimuru's slime form) that lives in two places and means the same thing in both:
 
