@@ -61,6 +61,43 @@ export function keyStatus() {
     return env ? {saved: true, tail: env.slice(-4), source: 'environment'} : {saved: false, tail: '', source: null};
 }
 
+/** The sign-in of each AI that has a command line: what to run and what to say when it is not installed. Constants only: they go into a shell line. */
+export const SIGN_INS = {
+    claude: {bin: 'claude', args: '', hint: 'Install Claude Code from https://claude.com/claude-code, then sign in here.'},
+    chatgpt: {bin: 'codex', args: 'login', hint: 'Install Codex (npm install -g @openai/codex), then run codex login and choose Sign in with ChatGPT.'},
+    grok: {bin: 'grok', args: '', hint: 'Install the Grok command line, then run it and sign in.'},
+    opencode: {bin: 'opencode', args: 'auth login', hint: 'Install opencode from https://opencode.ai, then run opencode auth login and choose OpenCode Go.'},
+};
+
+/** The shell line a terminal runs for a sign-in: the command, or the way to get it when it is missing, and a pause so the window stays to be read. */
+export function signInScript({bin, args, hint}) {
+    return `if command -v ${bin} >/dev/null 2>&1; then ${bin} ${args}; else echo "${bin} is not installed."; echo "${hint}"; fi; echo; printf "Press Enter to close. "; read _`;
+}
+
+/** The terminals tried in order, with how each is told to run a command. */
+const TERMINALS = [['ptyxis', ['--']], ['kgx', ['-e']], ['gnome-terminal', ['--']], ['konsole', ['-e']], ['xterm', ['-e']]];
+
+/** The command line that opens the first terminal found and runs `script` in it, or null when none is installed. */
+export function terminalCommand(script, find = name => GLib.find_program_in_path(name)) {
+    for (const [name, lead] of TERMINALS)
+        if (find(name))
+            return [name, ...lead, 'sh', '-c', script];
+    return null;
+}
+
+function openSignIn(kind, ctx) {
+    const argv = terminalCommand(signInScript(SIGN_INS[kind]));
+    if (!argv) {
+        ctx.toast('No terminal found. Open one and run the command shown.');
+        return;
+    }
+    try {
+        Gio.Subprocess.new(argv, Gio.SubprocessFlags.NONE);
+    } catch (e) {
+        ctx.toast(`Could not open a terminal: ${e.message}`);
+    }
+}
+
 /** Tells island-daemon to read the usage again now (it also does by itself every ten minutes). */
 function refreshDaemon() {
     try {
@@ -71,7 +108,7 @@ function refreshDaemon() {
 
 export function aiConnectionsGroup(model, ctx) {
     const group = new Adw.PreferencesGroup({title: 'Connections',
-        description: 'How the island reaches each AI. Claude, ChatGPT and Grok use the sign-in of their command line, and opencode the key it keeps for its Go plan, so nothing is typed here; DeepSeek has no sign-in, only an API key.'});
+        description: 'How the island reaches each AI. Claude, ChatGPT and Grok use the sign-in of their command line, and opencode the key it keeps for its Go plan, so nothing is typed here (Sign in opens a terminal on it); DeepSeek has no sign-in, only an API key.'});
     const island = model.stores.by.island;
     const row = (title, subtitle, ok) => {
         const r = new Adw.ActionRow({title, subtitle});
@@ -85,6 +122,15 @@ export function aiConnectionsGroup(model, ctx) {
     const rows = {
         claude: row('Claude', '', false), chatgpt: row('ChatGPT Plus or Pro', '', false), grok: row('Grok', '', false), opencode: row('opencode (Go plan)', '', false),
     };
+    // Each AI that is not signed in gets a button that opens a terminal on its sign-in; once signed in the button goes.
+    const signIn = {};
+    for (const kind of Object.keys(rows)) {
+        const button = new Gtk.Button({label: 'Sign in', valign: Gtk.Align.CENTER, css_classes: ['suggested-action']});
+        button.update_property([Gtk.AccessibleProperty.LABEL], [`Sign in to ${rows[kind].title} in a terminal`]);
+        button.connect('clicked', () => openSignIn(kind, ctx));
+        rows[kind].add_suffix(button);
+        signIn[kind] = button;
+    }
     Object.values(rows).forEach(r => group.add(r));
     const deepseek = row('DeepSeek', '', false);
     group.add(deepseek);
@@ -105,6 +151,10 @@ export function aiConnectionsGroup(model, ctx) {
         rows.grok.set_subtitle(exists(GLib.build_filenamev([grok, 'auth.json'])) ? 'Signed in with Grok: its allowance shows' : 'Not signed in. Open the Grok command line and sign in.');
         rows.opencode.set_subtitle(opencodeGoSignedIn() ? 'Signed in to the Go plan with opencode: its 5-hour, weekly and monthly limits show'
             : 'Not signed in to the Go plan. Install opencode, run `opencode auth login` and choose OpenCode Go.');
+        signIn.claude.set_visible(!exists(GLib.build_filenamev([claude, '.credentials.json'])));
+        signIn.chatgpt.set_visible(!exists(GLib.build_filenamev([codex, 'auth.json'])));
+        signIn.grok.set_visible(!exists(GLib.build_filenamev([grok, 'auth.json'])));
+        signIn.opencode.set_visible(!opencodeGoSignedIn());
         const status = keyStatus();
         deepseek.set_subtitle(status.saved
             ? `An API key is saved (ends in …${status.tail}${status.source === 'environment' ? ', from DEEPSEEK_API_KEY' : ''}); the balance shows when "Show DeepSeek's balance" is on`
