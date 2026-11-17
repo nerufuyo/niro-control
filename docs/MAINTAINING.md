@@ -277,6 +277,8 @@ Kaomoji are laid out two to a row, in a text font, in wide buttons. `tests/islan
 
 ## AI usage: Claude, ChatGPT Plus/Pro, Grok, opencode Go, DeepSeek
 
+The Usage page (`shell/island/src/pages/usage.ts`, 226 px tall, shortcut Super+Alt+U) shows every provider at once, a column each in the order Claude, DeepSeek, ChatGPT, opencode, Grok (equal columns, up to five), with nothing to scroll or page through: the name and plan, up to three limits (name and share, a bar, when it starts over) and at the foot when it was read or what is wrong. DeepSeek's column says the balance in words.
+
 `crates/island-daemon/src/usage.rs` reads each provider where its own tool does: Claude with Claude Code's sign-in, ChatGPT (Plus or Pro; the 5-hour and weekly limits) with
 Codex's sign-in (`codex login`, "Sign in with ChatGPT"; the plan name comes from the answer, so Plus shows as Plus), Grok with its CLI's. **DeepSeek** has no sign-in: its
 card shows the balance left on an API account (`GET https://api.deepseek.com/user/balance`, `Authorization: Bearer <key>`; a balance in each currency, topped up and

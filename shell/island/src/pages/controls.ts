@@ -247,14 +247,19 @@ class ControlsPage extends Page {
 
     /** Fills `scroll` with `rows` ({text, detail, tone, active, glyph, glyphOpacity, right, onClick}), or `empty` when there are none.
      * `right` is an actor (a button, an icon) on the row's far side. */
-    _rows(scroll, rows, empty) {
+    _rows(scroll, rows, empty, emptyIcon = null) {
         scroll.box.destroy_all_children();
         if (!rows.length) {
-            scroll.box.add_child(label(empty, 'island-ctl-empty'));
+            const none = new St.BoxLayout({...VERTICAL, style_class: 'island-ctl-none', x_expand: true, y_expand: true,
+                x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER});
+            if (emptyIcon)
+                none.add_child(new St.Icon({gicon: icon(emptyIcon), icon_size: 22, x_align: Clutter.ActorAlign.CENTER, style_class: 'island-ctl-none-icon'}));
+            none.add_child(label(empty, 'island-ctl-empty', {x_align: Clutter.ActorAlign.CENTER}));
+            scroll.box.add_child(none);
             return;
         }
         for (const {text, detail, tone, active, glyph, glyphOpacity, right, onClick} of rows) {
-            const row = new St.BoxLayout({style_class: `island-ctl-row${active ? ' island-power-on' : ''}`, x_expand: true});
+            const row = new St.BoxLayout({style_class: `island-ctl-row${active ? ' island-ctl-row-active' : ''}`, x_expand: true});
             const body = new St.Button({style_class: 'island-ctl-row-body', can_focus: Boolean(onClick), reactive: Boolean(onClick), x_expand: true});
             const line = new St.BoxLayout({x_expand: true, style_class: 'island-ctl-row-line'});
             if (glyph) {
@@ -268,6 +273,9 @@ class ControlsPage extends Page {
             if (detail)
                 names.add_child(label(detail, `island-ctl-row-detail${tone === 'bad' ? ' island-ctl-bad' : ''}`, {x_align: Clutter.ActorAlign.START}));
             line.add_child(names);
+            // The one in use is lit softly and ticked (a switch is the accent's; a choice from a list is not).
+            if (active && !right)
+                line.add_child(new St.Icon({gicon: icon('island-check-symbolic'), icon_size: 14, y_align: Clutter.ActorAlign.CENTER}));
             body.set_child(line);
             if (onClick)
                 body.connect('clicked', () => onClick());
@@ -409,7 +417,8 @@ class ControlsPage extends Page {
             return {text: network.ssid, detail, tone: failed ? 'bad' : '', active: network.active, glyph: 'island-wifi-symbolic',
                 glyphOpacity: SIGNAL_OPACITY[signalBars(network.signal)], right, onClick: () => this._join(network)};
         });
-        this._rows(this._wifiList, rows, wifi.available ? (wifi.enabled ? 'No networks in range' : 'Wi-Fi is off') : 'This computer has no Wi-Fi');
+        this._rows(this._wifiList, rows, wifi.available ? (wifi.enabled ? 'No networks in range' : 'Wi-Fi is off') : 'This computer has no Wi-Fi',
+            'island-wifi-off-symbolic');
     }
 
     // ---- Bluetooth
@@ -446,7 +455,7 @@ class ControlsPage extends Page {
         }));
         this._rows(this._btList, bluetooth.powered ? rows : [], bluetooth.available
             ? (bluetooth.powered ? 'No paired devices: pair one in Settings' : 'Bluetooth is off')
-            : 'This computer has no Bluetooth');
+            : 'This computer has no Bluetooth', 'island-bluetooth-off-symbolic');
     }
 
     // ---- Sound
@@ -471,9 +480,9 @@ class ControlsPage extends Page {
     _syncSound() {
         const audio = this._audio;
         this._rows(this._outputList, audio.outputs.map(output => ({text: output.name, detail: output.detail, active: output.active,
-            onClick: () => audio.activate(output.id)})), 'No sound output');
+            onClick: () => audio.activate(output.id)})), 'No sound output', 'island-speaker-off-symbolic');
         this._rows(this._inputList, audio.inputs.map(input => ({text: input.name, detail: input.detail, active: input.active,
-            onClick: () => audio.activateInput(input.id)})), 'No microphone');
+            onClick: () => audio.activateInput(input.id)})), 'No microphone', 'island-mic-off-symbolic');
         this._outputLevel.card.visible = audio.hasOutput;
         this._level(this._outputLevel, audio.volume, audio.muted, audio.iconName);
         this._inputLevel.card.visible = audio.hasInput;

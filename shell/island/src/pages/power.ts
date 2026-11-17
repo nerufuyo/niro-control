@@ -156,29 +156,39 @@ class PowerPage extends Page {
     _buildModes() {
         const card = new St.BoxLayout({...VERTICAL, style_class: 'island-power-card island-power-modes', y_expand: true});
         card.add_child(label('Power mode', 'island-power-label', {x_align: Clutter.ActorAlign.START}));
+        // Beside the battery: three buttons one above the other. Alone (no battery): one row of three.
         this._modes = new St.BoxLayout({...VERTICAL, style_class: 'island-power-segments'});
+        this._modesRow = new St.BoxLayout({style_class: 'island-power-segments island-power-segments-row', x_expand: true, y_expand: true,
+            y_align: Clutter.ActorAlign.CENTER, visible: false});
         card.add_child(this._modes);
+        card.add_child(this._modesRow);
         this._modeCard = card;
         return card;
     }
 
-    /** One button per profile the computer offers, the one in use lit. Rebuilt only when the list changes. */
+    /** One button per profile the computer offers, the one in use lit, in both layouts (see `_buildModes`). Rebuilt only when
+     * the list changes. */
     _syncModes() {
         const profiles = this._profiles;
         this._modeCard.visible = profiles.available;
+        const alone = !this._battery.available;
+        this._modes.visible = !alone;
+        this._modesRow.visible = alone;
         const key = profiles.profiles.join(',');
         if (key !== this._modeKey) {
             this._modeKey = key;
-            this._modes.destroy_all_children();
             this._modeButtons.clear();
-            for (const name of profiles.profiles) {
-                const button = new St.Button({style_class: 'island-power-segment', can_focus: true, x_expand: true, label: PROFILE_NAMES[name] ?? name});
-                button.connect('clicked', () => profiles.set(name));
-                this._modeButtons.set(name, button);
-                this._modes.add_child(button);
+            for (const box of [this._modes, this._modesRow]) {
+                box.destroy_all_children();
+                for (const name of profiles.profiles) {
+                    const button = new St.Button({style_class: 'island-power-segment', can_focus: true, x_expand: true, label: PROFILE_NAMES[name] ?? name});
+                    button.connect('clicked', () => profiles.set(name));
+                    this._modeButtons.set(`${box === this._modes ? 'column' : 'row'}:${name}`, [name, button]);
+                    box.add_child(button);
+                }
             }
         }
-        for (const [name, button] of this._modeButtons) {
+        for (const [name, button] of this._modeButtons.values()) {
             button.set_style_class_name(`island-power-segment${name === profiles.active ? ' island-power-segment-on' : ''}`);
             button.checked = name === profiles.active;
         }
