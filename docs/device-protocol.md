@@ -66,20 +66,25 @@ Unpair: either side forgets the key. The daemon's `Forget(device_id)` also close
 
 ## Connection
 
-WebSocket on a port the daemon picks (advertised with the mDNS service), over plain TCP. TLS is not used:
-there is no certificate a LAN device could check. Instead every frame is sealed.
+Plain TCP on a port the daemon picks (advertised with the mDNS service). A frame is a 2-byte big-endian length
+and that many bytes. (WebSocket was dropped: its handshake needs SHA-1 and a library, and every frame is
+sealed anyway. The same frames can run over a USB serial cable later.) TLS is not used either: there is no
+certificate a LAN device could check.
 
-1. Device connects and sends `hello` `{v, device_id, nonce_d}` (clear).
-2. Daemon answers `challenge` `{daemon_id, nonce_s}`.
-3. Both compute `session_key = HKDF-SHA256(device_key, nonce_d || nonce_s, "niro-device v1")`.
-4. Device proves it with `auth` `{mac = HMAC-SHA256(session_key, "device" || nonce_s)}`; the daemon
-   answers `ready` `{mac = HMAC-SHA256(session_key, "daemon" || nonce_d)}`. A wrong MAC closes the socket,
-   with a rate limit per address like phone sharing has.
-5. From here every WebSocket message is `ChaCha20-Poly1305`, nonce = a per-direction 64-bit counter. A repeat
-   or a gap closes the connection.
+1. Device sends `hello` `{v, device_id, nonce}` (clear JSON, `nonce` is 16 random bytes in hex).
+2. If the device is not paired the daemon closes the connection and answers nothing. Otherwise it answers
+   `challenge` `{daemon_id, nonce}`.
+3. Both derive `HKDF-SHA256(ikm = device_key, salt = nonce_device | nonce_daemon)` into three keys, one per
+   direction (`niro-device v1 d2s` and `s2d`) and one for the MAC (`mac`).
+4. Device sends `auth` `{mac = HMAC-SHA256(mac_key, "device" | nonce_daemon)}`; the daemon checks it in
+   constant time and answers `ready` `{mac = HMAC-SHA256(mac_key, "daemon" | nonce_device)}`.
+5. From here every frame is ChaCha20-Poly1305 over `[type][data]` (`0` JSON control message, `1` Opus audio),
+   with a 64-bit counter as the nonce, one counter per direction. A frame that is changed, repeated,
+   dropped or reordered fails to open and the connection ends.
 
-A device whose key the daemon does not know is closed after `hello` and does not learn whether it was
-paired before.
+Limits: a handshake frame is at most 512 bytes and a sealed one carries at most 16 KiB; a larger length is
+refused before any of it is read. The daemon gives a handshake a few seconds, and refuses addresses that are
+not on a local network.
 
 ## Messages
 
@@ -132,7 +137,7 @@ meetings, battery. Which kinds reach the device is a per-device setting in the p
 
 ## Device firmware (not started)
 
-ESP-IDF on ESP32-S3: Wi-Fi with BLE provisioning (as the board has now), mDNS, pairing, the WebSocket client,
+ESP-IDF on ESP32-S3: Wi-Fi with BLE provisioning (as the board has now), mDNS, pairing, the TCP client,
 Opus, I2S, the display and the buttons. The pin map comes from the current firmware, so it is read from
 a **backup of the board first**.
 
@@ -145,4 +150,4 @@ a **backup of the board first**.
 - **[open]** Wake word on the device, or button only. A button is the first version.
 - **[open]** Speaker output: Opus from the PC (needs TTS on the PC) or text only at first.
 - **[open]** Several PCs for one device, or strictly one.
-- **[open]** USB serial framing: the same sealed messages with length prefixes.
+- **[open]** USB serial: the same frames, with a way to tell where one starts if a byte is lost.
