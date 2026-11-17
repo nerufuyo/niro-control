@@ -12,10 +12,15 @@ import GObject from 'gi://GObject';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 
-import {VERTICAL} from '../compat.js';
+import {VERTICAL, px} from '../compat.js';
 import {CODE_KEEP_MS, codeKept, deviceStatus, formatCode, formatLeft} from '../niroDeviceRules.js';
+import {GREETING_MS, baseMood, greetingFor, summarize} from '../niroMascotRules.js';
+import {SlimeView} from '../slimeView.js';
 import {iconButton, label, pillButton} from '../widgets.js';
 import {Page} from './page.js';
+
+/** Niro's size beside the list, in CSS pixels. */
+const SLIME_SIZE = 108;
 
 export const NiroDevicePage = GObject.registerClass(
 class NiroDevicePage extends Page {
@@ -34,6 +39,11 @@ class NiroDevicePage extends Page {
         this._codeSeenOpen = false;
         this._shown = '';
 
+        // Niro the slime beside the list: it shows the mood of what is paired, and boings when it is poked.
+        this._slime = new SlimeView(SLIME_SIZE, {mood: 'curious'});
+        this._slime.y_align = Clutter.ActorAlign.END;
+        this._summary = null;
+        this._greeting = null;
         const column = new St.BoxLayout({...VERTICAL, style_class: 'island-nd', x_expand: true, y_expand: true});
         const header = new St.BoxLayout({style_class: 'island-nd-header'});
         header.add_child(label('Niro Device', 'island-nd-title', {x_expand: true}));
@@ -51,8 +61,12 @@ class NiroDevicePage extends Page {
         });
         scroll.set_child(this._list);
         column.add_child(scroll);
-        this.add_child(column);
+        const row = new St.BoxLayout({style_class: 'island-nd-row-of', x_expand: true, y_expand: true});
+        row.add_child(new St.Bin({style_class: 'island-nd-slime', child: this._slime, y_align: Clutter.ActorAlign.END}));
+        row.add_child(column);
+        this.add_child(row);
 
+        this._slime.paused = true;
         this.watch(['niroDevices', 'niroPairing', 'niroRequest'], () => this._update());
         this._update();
     }
@@ -67,7 +81,29 @@ class NiroDevicePage extends Page {
     }
 
     onActivate() {
+        this._slime.paused = false;
         this._tick();
+    }
+
+    /** Off screen, the slime holds still and costs nothing. */
+    onDeactivate() {
+        this._slime.paused = true;
+    }
+
+    /** Its mood, from what is paired: a short greeting first when something just changed. */
+    _feelings() {
+        const {niroDevices, niroPairing, niroRequest} = this.daemon.state;
+        const facts = summarize({devices: niroDevices, pairing: niroPairing, request: niroRequest});
+        const greeting = greetingFor(this._summary, facts);
+        this._summary = facts;
+        if (greeting) {
+            this._greeting = greeting;
+            this.later('greeting', GREETING_MS, () => {
+                this._greeting = null;
+                this._slime.mood = baseMood(this._summary);
+            });
+        }
+        this._slime.mood = this._greeting ?? baseMood(facts);
     }
 
     /** Add a device, or give the code up. */
@@ -115,6 +151,7 @@ class NiroDevicePage extends Page {
         this._shown = shown;
 
         this._action.label = pairing.active ? 'Cancel' : 'Add a device';
+        this._feelings();
         this._list.destroy_all_children();
         this._countdown = null;
 

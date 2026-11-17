@@ -69,8 +69,23 @@ Add it to `face_mood_t` in `face.h`, give it a pose in `pose_for` in `face.c` (a
 `face_draw`), add its name to `face_name`, and look at it with `face_preview sheet`. To send it from the daemon, add the name to the `Face`
 enum in `crates/island-daemon/src/device/proto.rs`.
 
+## In the island
+
+The same slime lives in the island, drawn with Cairo from the same poses and the same spring (`shell/island/src/slime.ts`, `slimeDraw.ts`,
+`slimeView.ts`). It follows the island's own rule for its characters, to cost nothing while it is still:
+
+- **On the Niro Device page** it sits beside the list and shows what is paired: curious with no device, listening while a code is open, alert
+  (red) while a device asks to be allowed, in love for a moment when one is paired, happy when one comes online, sad when they are all away,
+  sleepy when a battery is low, calm otherwise. Poke it and it boings.
+- **As a look for the assistant**: Settings → Assistant → Shape → *Slime* (with the colour *Sky* it is Niro's blue). The bot then wears it wherever
+  it appears, with the island's own gestures.
+
+It draws only while it moves: a calm slime is asleep between its blinks and acts, one that is not on screen (the page is not shown, the island is
+closed) draws nothing and wakes no timer, and with animations off in GNOME it holds still. Measured in a headless GNOME Shell: with the page open
+and the slime calm, about 9 frames a second at 0.9 ms each (under 1% of one core); with the island closed, no frames and no wake-ups.
+
 ## What is not known yet
 
 - How fast it runs **on the board**. On the PC a frame draws in about 0.2 ms; the ESP32-S3 has no hardware square root or division, so it
   will be far slower, and the figure has not been measured. The firmware logs `face: N fps, drawing a frame takes M ms` every five seconds.
-- How it **looks on the screen**: the panel's colours, contrast and orientation (see the README). The pictures above are the PC's.
+- How it **looks in a real session**: the island was seen in a headless GNOME Shell, not on your screen; and how it looks on the board's panel: the panel's colours, contrast and orientation (see the README). The pictures above are the PC's.

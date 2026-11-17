@@ -1293,6 +1293,8 @@
 #islandIsland.island-translucent .island-device-card { background-color: rgba(255, 255, 255, 0.08); }
 /* Niro Device page: the code to type, a device asking, and the paired devices, a card each. */
 .island-nd { spacing: 8px; }
+.island-nd-row-of { spacing: 12px; }
+.island-nd-slime { padding: 0 0 2px 0; }
 .island-nd-header { spacing: 8px; }
 .island-nd-title { font-size: 15px; font-weight: 600; letter-spacing: -0.1px; }
 .island-nd-list { spacing: 6px; }
