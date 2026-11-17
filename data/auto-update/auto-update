@@ -1,0 +1,8 @@
+#!/bin/sh
+# Run by niro-control-update.timer, as root: installs a newer niro-control from the package repositories, and nothing else.
+# Nothing newer (or no repository added, see the README) is not an error. A new version is loaded by GNOME Shell at the next login.
+set -eu
+if command -v dnf >/dev/null 2>&1; then
+    exec dnf -y --refresh upgrade niro-control
+fi
+echo "niro-control-update: dnf is not installed, nothing to do" >&2

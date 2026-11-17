@@ -1,0 +1,10 @@
+[Unit]
+Description=Update Niro Control from its package repository
+Documentation=https://github.com/nerufuyo/niro-control#updating
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/niro-control/auto-update
+Nice=10
