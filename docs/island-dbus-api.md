@@ -9,7 +9,7 @@ milliseconds unless the name says `_us` (microseconds).
 Methods that read what the user copied (`Clipboard1.GetText` and `Search`), steer the
 assistant (every `Assistant1` method but `ClearChat`), answer an AI agent
 (`Agents1.Resolve` and `SetPresent`), change an AI's settings (`Agents1.SetHooked`) or share
-with a phone (`Share1.Start`, `Stop` and `Answer`) answer GNOME Shell only, where the extension runs; any other caller gets
+with a phone (`Share1.Start`, `Stop` and `Answer`), pair a device (every `Devices1` method) answer GNOME Shell only, where the extension runs; any other caller gets
 `org.freedesktop.DBus.Error.AccessDenied`.
 
 `island-daemon --version`, `island-daemon --doctor` (what works: the service, speech
@@ -180,6 +180,21 @@ place); `GET t/<id>` a picture's preview (the extension's own, in
 a `Content-Length`, answered `201 {name}` or `400 incomplete`, `403
 not-allowed`, `409 shelf-full`, `411 length`, `413 too-big` or
 `session-full`, `507 disk`. Every other request is `404 Not found`.
+
+## org.niro.island.Devices1
+
+The Niro Devices paired with this user's Niro, and the pairing code. See [device-protocol.md](device-protocol.md); the
+socket a device connects to is not built yet, so a code can be opened but no device can use it.
+Every method answers GNOME Shell only.
+
+| Member | Signature | |
+|---|---|---|
+| `StartPairing()` | `s` | Opens a pairing code (6 digits, two minutes, five tries, works once) and returns it for the island to show. Another code opened before is closed. The code is only ever returned here; no property holds it, because any program on the bus can read a property. |
+| `CancelPairing()` | | Closes the code. |
+| `Rename(s device_id, s name)` | | A name is 1 to 64 characters without control characters. `InvalidArgs` when the name is not acceptable or no such device is paired. |
+| `Forget(s device_id)` | | The device's key stops working. `InvalidArgs` when no such device is paired. |
+| `Devices` | `s` | `[{device_id, name, paired_at_ms}]`; never a key. Kept in `~/.local/share/island/devices.json`. |
+| `Pairing` | `s` | `{active, expires_at_ms}`: whether a code is open, and when it ends. `active` turns false by itself when the time is up, the tries are used or a device paired, with `PropertiesChanged`. Never the code. |
 
 ## org.niro.island.Clipboard1
 

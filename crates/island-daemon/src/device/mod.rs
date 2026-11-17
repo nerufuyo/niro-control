@@ -2,18 +2,20 @@
 // Copyright (C) 2026 zickrian
 
 //! Niro Devices: assistants with a screen, a microphone and a speaker that pair with this user's Niro.
-//! See `docs/device-protocol.md`. This is the first piece: the messages, the pairing code's life and the
-//! list of paired devices. The pairing key exchange (PAKE), the socket and the D-Bus interface come next,
-//! so nothing here is wired into the daemon yet.
+//! See `docs/device-protocol.md`. Here are the messages, the pairing code's life, the list of paired
+//! devices, the SRP side of pairing and the `Devices1` D-Bus service that holds them. The socket the
+//! devices connect to comes next; until then no device can reach the daemon.
 
-// Not wired into the daemon yet (see above); each part is tested on its own.
+// The messages and the SRP client wait for the socket that will use them.
 #![allow(dead_code, unused_imports)]
 
 mod pair;
 mod paired;
 mod proto;
+mod service;
 mod srp;
 
 pub use self::pair::{Pairing, Refused};
 pub use self::paired::{Paired, PairedDevices};
 pub use self::proto::{FromDevice, ToDevice};
+pub use self::service::{DeviceService, run};
