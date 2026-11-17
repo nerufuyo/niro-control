@@ -80,6 +80,19 @@ built for the CPU only.
 On Fedora, if the extensions do not show up after logging in, enable them once: `gnome-extensions enable dock@niro.local`
 (and `island@`, `search@`, `blur@`, `corners@`, `emoji@`, `emulator@`). The package sets them on by default through dconf.
 
+## Updating
+
+The island tells you when a newer version is out (Settings → Island → About; it asks GitHub for the latest release once a day and sends nothing but the request; turn it off there). It never downloads or runs anything itself: it says where the new version is.
+
+On **Fedora**, add the package repository once, then update like any package (GNOME Software shows it too):
+
+```sh
+sudo curl -o /etc/yum.repos.d/niro-control.repo https://nerufuyo.github.io/niro-control/niro-control.repo
+sudo dnf install niro-control        # later: sudo dnf upgrade niro-control
+```
+
+The repository is **not signed**: its packages are as trustworthy as the GitHub account that publishes them, the same as a package downloaded from the [releases](https://github.com/nerufuyo/niro-control/releases). Log out and back in after an update: GNOME Shell loads a new version of an extension only at login. On Ubuntu/Debian, download the `.deb` from the releases and open it.
+
 ## Repository layout
 
 ```
