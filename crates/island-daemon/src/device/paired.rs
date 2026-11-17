@@ -86,6 +86,12 @@ impl PairedDevices {
             .is_some_and(|device| device.key.as_bytes().ct_eq(key.as_bytes()).into())
     }
 
+    /// Whether `key` (as bytes) is this device's key.
+    #[cfg(test)]
+    pub fn key_matches_bytes(&self, device_id: &str, key: &[u8; 32]) -> bool {
+        self.key_matches(device_id, &hex(key))
+    }
+
     /// Renames a device; true when it was paired.
     pub fn rename(&mut self, device_id: &str, name: &str) -> bool {
         match self

@@ -51,6 +51,12 @@ impl Pairing {
         &self.code
     }
 
+    /// How many tries have been made.
+    #[cfg(test)]
+    pub fn tries(&self) -> u8 {
+        self.tries
+    }
+
     /// Seconds left, for the island's countdown.
     pub fn seconds_left(&self, now: Instant) -> u64 {
         self.expires.saturating_duration_since(now).as_secs()
