@@ -40,10 +40,13 @@ libc = "0.2"
 log = "0.4"
 # Names the shelf's previews as the extension does (the URI's MD5); no security rides on it.
 md5 = "0.8"
+num-bigint = { version = "0.4", default-features = false }
 # Phone sharing's QR code, as modules only: the extension draws them.
 qrcode = { version = "0.14", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = { version = "0.10", default-features = false }
+srp = { version = "0.6", default-features = false }
 # Compares phone sharing's secret token in constant time.
 subtle = "2"
 # Edits Codex's config.toml in place, keeping its comments and layout.

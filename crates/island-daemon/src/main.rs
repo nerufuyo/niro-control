@@ -11,6 +11,7 @@ mod calendar;
 mod caller;
 mod clipboard;
 mod clock;
+mod device;
 mod eds;
 mod http;
 mod login_env;

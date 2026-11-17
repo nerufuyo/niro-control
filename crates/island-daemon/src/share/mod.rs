@@ -11,6 +11,9 @@ mod net;
 mod server;
 mod session;
 
+/// The kernel's random bytes and their hex form, for what else needs a secret (Niro Devices).
+pub(crate) use self::session::{hex, random};
+
 use std::path::PathBuf;
 use std::sync::Arc;
 
