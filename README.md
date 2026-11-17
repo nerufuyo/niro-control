@@ -2,11 +2,14 @@
 
 <p align="center"><img src="data/icons/hicolor/scalable/apps/org.niro.Control.svg" width="96" alt="Niro Control icon"></p>
 
+<p align="center"><img src="docs/images/niro-mascot-moods.png" width="640" alt="Niro, the mascot: a little blue slime in twelve moods"></p>
+<p align="center"><sub>Niro, the mascot: a slime that feels what your desktop is doing.</sub></p>
+
 **One look for the whole GNOME desktop.** A top-bar island, a macOS-style dock, an application search, window blur and
 rounded corners, a tiling layout manager, an emoji picker, and a control panel that sets them all from one place. One repository, one package.
 
 Runs on **Fedora 45 (GNOME Shell 51)** and **Ubuntu 24.04 (GNOME Shell 46)**, on Wayland. The extensions declare GNOME Shell 46 to 51.
-Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.1.0** ([releases](https://github.com/nerufuyo/niro-control/releases)).
+Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.2.0** ([releases](https://github.com/nerufuyo/niro-control/releases)).
 
 ## What you get
 
@@ -20,10 +23,20 @@ Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from t
 | **Tile** | A window layout manager for GNOME, off until you switch it on (`Super+Alt+G`): ten layouts (Dwindle, Master left/right, Center master, Grid, Three columns, Horizontal and Vertical split, Scrolling, Monocle), a layout for each workspace and monitor, rules per application (float, tile, send to a workspace), a quick switcher (`Super+Alt+Space`), directional focus and swap, drag a window to a cell of the layout shown as a preview, resize by pulling an edge, profiles, and the `niro-tile` command line. The panel's Tiling module has Overview, Layouts, Workspaces, Window Rules, Appearance, Shortcuts, Monitors, Profiles and Advanced. |
 | **Emoji, Emulator** | An emoji picker on `Super+.` or `Super+;` with every emoji, 179 kaomoji and about 1,100 text symbols (arrows, maths, Greek, currency, box drawing, accents…), searched by name in English or Indonesian, with its settings in the panel's Search page; keeps the Android Emulator window on top. |
 | **Profiles** | Save the whole desktop as a profile and switch with one action: four built-ins (Everyday, Deep Work, Creative, Gaming), preview before applying, backups, rollback, import and export. |
-| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 200 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
+| **Niro Device** | An ESP32-S3 assistant with a small screen that belongs to one user's Niro: paired with a 6-digit code (it is never sent over the network), then connected over the same Wi-Fi with every frame sealed. It shows notifications and Niro's face. Firmware in [`firmware/niro-device`](firmware/niro-device/README.md), protocol in [`docs/device-protocol.md`](docs/device-protocol.md); the island has a page for it (off until you switch it on in Settings → Island). Voice questions and answers are not built yet. |
+| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 201 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
 
 Opacity, blur, blur strength, accent and tint are set once, in **Look**, and the island, dock, search and windows follow.
 Light and dark appearance both work, and the panel adapts to narrow windows.
+
+## Niro, the mascot
+
+Niro is a small slime (a nod to Rimuru's slime form) that lives in two places and means the same thing in both:
+
+- **On the Niro Device's screen**, with its own face for each state: idle, listening, thinking, speaking, happy, alert, sleepy, sad, curious, love, plus waking and searching for Wi-Fi. The daemon can set the mood with `Devices1.Face`. It is drawn by the firmware (anti-aliased, with a jelly body) and previewed on a PC with `firmware/niro-device/test/host`.
+- **In the island**, on the Niro Device page, where it mirrors your real device: curious with no device, listening while a pairing code is open, alert when a device asks to join, in love for a moment once paired, happy when it comes online, sad when every device is off, sleepy when the battery is low. Poke it and it boings. It is also a ninth **Slime** shape for the island's assistant (Settings → Assistant → Shape; best in colour Sky).
+
+It costs nothing when it is not in view: no frames and no timers while the island is closed or the page is off, and under 1% of a core while it is on screen and calm. Notes on how it is drawn and tested are in [`firmware/niro-device/MASCOT.md`](firmware/niro-device/MASCOT.md).
 
 ## Screenshots
 
@@ -115,6 +128,7 @@ shell/blur/     window blur (from Blur my Shell, GPL)                  blur@niro
 shell/corners/  rounded corners (from Rounded Window Corners, GPL)     corners@niro.local
 shell/emoji/    emoji picker (from Emoji Copy, GPL)                    emoji@niro.local
 crates/         Rust programs behind the island: daemon, shelf window, speech recognition
+firmware/       the Niro Device firmware (ESP-IDF, ESP32-S3) and its host tests
 control/        the control panel (TypeScript on GJS) and the shared schema org.niro.control
 data/           systemd unit, D-Bus services, fonts, dconf defaults
 packaging/      the Debian package
@@ -141,7 +155,7 @@ for how the parts talk to each other and where to change things.
 
 A personal desktop project, shared as it is. Tested on Ubuntu 24.04 (GNOME 46, Wayland, NVIDIA) and Fedora 45 (GNOME 51, Wayland):
 on Fedora, all eight extensions enable in a real headless GNOME Shell 51 and the node and GJS tests pass.
-The Fedora `.rpm` is installed and used daily on the maintainer's Fedora 45 desktop. Not run on real hardware: a laptop battery, a Wi-Fi adapter and a screen backlight (the island's battery card, Wi-Fi list and brightness slider were tested with stand-ins), opencode itself (its alerts and its Go-plan limits were tested against the same messages and a local server, not against a real opencode), and the Ubuntu package since the Fedora work began. `docs/UAT.md` is the checklist for a full session.
+The Fedora `.rpm` is installed and used daily on the maintainer's Fedora 45 desktop. Not run on real hardware: a laptop battery, a Wi-Fi adapter and a screen backlight (the island's battery card, Wi-Fi list and brightness slider were tested with stand-ins), opencode itself (its alerts and its Go-plan limits were tested against the same messages and a local server, not against a real opencode), and the Ubuntu package since the Fedora work began. The Niro Device's pairing, reconnection and notifications have run on a real board; its mascot firmware and the island's Niro Device page were tested on a PC and in a headless Shell, not yet on the board's own panel. `docs/UAT.md` is the checklist for a full session.
 The island's TypeScript still carries `// @ts-nocheck`: converted from JavaScript, to be typed file by file.
 
 ## Credits and licence

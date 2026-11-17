@@ -9,7 +9,7 @@ milliseconds unless the name says `_us` (microseconds).
 Methods that read what the user copied (`Clipboard1.GetText` and `Search`), steer the
 assistant (every `Assistant1` method but `ClearChat`), answer an AI agent
 (`Agents1.Resolve` and `SetPresent`), change an AI's settings (`Agents1.SetHooked`) or share
-with a phone (`Share1.Start`, `Stop` and `Answer`) answer GNOME Shell only, where the extension runs; any other caller gets
+with a phone (`Share1.Start`, `Stop` and `Answer`), pair a device (every `Devices1` method) answer GNOME Shell only, where the extension runs; any other caller gets
 `org.freedesktop.DBus.Error.AccessDenied`.
 
 `island-daemon --version`, `island-daemon --doctor` (what works: the service, speech
@@ -180,6 +180,26 @@ place); `GET t/<id>` a picture's preview (the extension's own, in
 a `Content-Length`, answered `201 {name}` or `400 incomplete`, `403
 not-allowed`, `409 shelf-full`, `411 length`, `413 too-big` or
 `session-full`, `507 disk`. Every other request is `404 Not found`.
+
+## org.niro.island.Devices1
+
+The Niro Devices paired with this user's Niro, and the pairing code. See [device-protocol.md](device-protocol.md).
+The daemon listens for devices (a TCP port it picks, announced as `_niro-device._tcp` through Avahi) only while a
+device is paired or a code is open, and only takes connections from the local network. Every method answers GNOME
+Shell only.
+
+| Member | Signature | |
+|---|---|---|
+| `StartPairing()` | `s` | Opens a pairing code (6 digits, two minutes, five tries, works once) and returns it for the island to show. Another code opened before is closed. The code is only ever returned here; no property holds it, because any program on the bus can read a property. |
+| `CancelPairing()` | | Closes the code. |
+| `Answer(b allow)` | | The user's answer to a device that asks to pair (`Request`). Unanswered for a minute, it is refused. `InvalidArgs` when no device waits. |
+| `Rename(s device_id, s name)` | | A name is 1 to 64 characters without control characters. `InvalidArgs` when the name is not acceptable or no such device is paired. |
+| `Forget(s device_id)` | | The device's key stops working and it is told to disconnect. `InvalidArgs` when no such device is paired. |
+| `Notify(s kind, s title, s body, b urgent)` | `u` | Shows a notification on every connected device and returns how many it was sent to. `kind` is `agent`, `reminder`, `meeting`, `battery` or `system`; `InvalidArgs` otherwise. |
+| `Face(s name)` | `u` | Sets the face on every connected device and returns how many it reached. `name` is `idle`, `listening`, `thinking`, `speaking`, `happy`, `alert`, `sleepy`, `sad`, `curious` or `love`; `InvalidArgs` otherwise. |
+| `Devices` | `s` | `[{device_id, name, paired_at_ms, online, status}]`, `status` being what the device last said (`battery`, `charging`, `temp_c`, `rssi`, `fw`) or null; never a key. Kept in `~/.local/share/island/devices.json`. |
+| `Pairing` | `s` | `{active, expires_at_ms}`: whether a code is open, and when it ends. `active` turns false by itself when the time is up, the tries are used or a device paired, with `PropertiesChanged`. Never the code. |
+| `Request` | `s` | `{pending, device_id?, name?}`: a device that typed the right code and waits for `Answer`. |
 
 ## org.niro.island.Clipboard1
 

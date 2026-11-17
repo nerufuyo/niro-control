@@ -446,7 +446,7 @@ mod tests {
 
     #[test]
     fn shares_the_users_sign_in() {
-        let root = std::env::temp_dir().join(format!("island-agy-login-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("island-agy-share-{}", std::process::id()));
         let (user, island) = (root.join("user"), root.join("island"));
         std::fs::create_dir_all(user.join(LOGIN).parent().unwrap()).unwrap();
         // Not signed in yet: nothing to link.

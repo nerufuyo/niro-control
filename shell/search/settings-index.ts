@@ -593,6 +593,16 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "island.niro-device-page",
+  "menu": "Island",
+  "group": "Pages and Features",
+  "title": "The Niro Device page",
+  "help": "Shows the Niro Device page: pair an assistant with a screen, a microphone and a speaker by a code, allow it, and see which are online with their…",
+  "key": "niro-device-page",
+  "kind": "switch",
+  "managed": false
+ },
+ {
   "id": "island.agent-alerts-claude",
   "menu": "Island",
   "group": "AI Agents",

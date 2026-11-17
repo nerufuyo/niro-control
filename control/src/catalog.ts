@@ -1044,6 +1044,20 @@ export const CATALOG: Item[] = [
   "kind": "switch"
  },
  {
+  "id": "island.niro-device-page",
+  "menu": "Island",
+  "group": "Pages and Features",
+  "title": "The Niro Device page",
+  "help": "Shows the Niro Device page: pair an assistant with a screen, a microphone and a speaker by a code, allow it, and see which are online with their…",
+  "detail": "Shows the Niro Device page: pair an assistant with a screen, a microphone and a speaker by a code, allow it, and see which are online with their battery. Off until you turn it on; island-daemon listens for devices only once one is paired or a code is open.",
+  "source": "island",
+  "key": "niro-device-page",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
   "id": "island.agent-alerts-claude",
   "menu": "Island",
   "group": "AI Agents",
@@ -1580,6 +1594,10 @@ export const CATALOG: Item[] = [
    {
     "value": "ghost",
     "label": "Ghost"
+   },
+   {
+    "value": "slime",
+    "label": "Slime"
    }
   ]
  },

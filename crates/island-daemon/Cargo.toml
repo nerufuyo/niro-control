@@ -16,20 +16,26 @@ path = "src/main.rs"
 island-core.workspace = true
 
 anyhow.workspace = true
+chacha20poly1305.workspace = true
 chrono.workspace = true
 dirs.workspace = true
 env_logger.workspace = true
 futures-util.workspace = true
+hkdf.workspace = true
+hmac.workspace = true
 httparse.workspace = true
 image.workspace = true
 inotify.workspace = true
 libc.workspace = true
 log.workspace = true
 md5.workspace = true
+num-bigint.workspace = true
 qrcode.workspace = true
 serde.workspace = true
 # Keeps the keys of Claude Code's settings.json in their order when its hooks are changed.
 serde_json = { workspace = true, features = ["preserve_order"] }
+sha2.workspace = true
+srp.workspace = true
 subtle.workspace = true
 tokio.workspace = true
 toml_edit.workspace = true
