@@ -14,5 +14,5 @@ export NIRO_EXT_ROOT="$P/share/gnome-shell/extensions" XDG_DATA_DIRS="$P/share:$
 export LC_ALL=C.UTF-8 LANGUAGE=C   # the tests grep English output
 export GSETTINGS_BACKEND=memory   # the extensions are enabled by the test; the real dconf is never written
 export DAEMON="${DAEMON:-$PWD/target/release/island-daemon}"
-rc=0; for t in "${@:-gtk3Probe niroSync appearance headless tile}"; do for n in $t; do echo "=== $n"; tests/shell/$n.sh || rc=1; done; done
+rc=0; for t in "${@:-gtk3Probe niroSync appearance headless tile controls}"; do for n in $t; do echo "=== $n"; tests/shell/$n.sh || rc=1; done; done
 exit $rc

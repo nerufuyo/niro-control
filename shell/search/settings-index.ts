@@ -613,6 +613,16 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "island.agent-alerts-opencode",
+  "menu": "Island",
+  "group": "AI Agents",
+  "title": "Know when opencode needs you or is done",
+  "help": "When on, Island puts a small plugin (niro-island.js) in opencode's plugins folder, so the island tells you when opencode needs a permission, asks a…",
+  "key": "agent-alerts-opencode",
+  "kind": "switch",
+  "managed": false
+ },
+ {
   "id": "island.gnome-banners",
   "menu": "Island",
   "group": "Alerts",
@@ -1009,6 +1019,16 @@ export const INDEX = [
   "title": "Show Grok's usage",
   "help": "",
   "key": "usage-grok",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "island.usage-opencode",
+  "menu": "Island",
+  "group": "AI Usage",
+  "title": "Show opencode's usage (Go plan)",
+  "help": "The 5-hour, weekly and monthly limits of an OpenCode Go plan, read with the plan's API key that opencode keeps once you sign in to it (opencode auth…",
+  "key": "usage-opencode",
   "kind": "switch",
   "managed": false
  },

@@ -275,6 +275,11 @@
       <summary>Answer Codex from the island</summary>
       <description>When on, Island adds hooks to Codex's hooks.json so it hears when Codex needs you or is done; off removes them.</description>
     </key>
+    <key name="agent-alerts-opencode" type="b">
+      <default>false</default>
+      <summary>Know when opencode needs you or is done</summary>
+      <description>When on, Island puts a small plugin (niro-island.js) in opencode's plugins folder, so the island tells you when opencode needs a permission, asks a question or is done; off removes it. opencode's own questions and permissions stay in opencode. Off until you turn it on.</description>
+    </key>
     <key name="agents-announced" type="as">
       <default>[]</default>
       <summary>AI agents already told they are connected</summary>
@@ -508,6 +513,11 @@
     <key name="usage-grok" type="b">
       <default>true</default>
       <summary>Show Grok's usage</summary>
+    </key>
+    <key name="usage-opencode" type="b">
+      <default>true</default>
+      <summary>Show opencode's usage (Go plan)</summary>
+      <description>The 5-hour, weekly and monthly limits of an OpenCode Go plan, read with the plan's API key that opencode keeps once you sign in to it (opencode auth login). Shows only with that sign-in. opencode documents no usage service: this asks the one its own console uses, and says so when it cannot read it.</description>
     </key>
     <key name="usage-deepseek" type="b">
       <default>false</default>

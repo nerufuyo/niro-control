@@ -60,6 +60,7 @@ Island,Pages and Features,"The Apps page, timing the application in front",switc
 Island,Pages and Features,The Devices page,switch,,false,Shows the Devices page: each connected Bluetooth device with its battery.,devices-page,island.devices-page
 Island,AI Agents,Answer Claude Code from the island,switch,,true,"When on, Island adds a hook to Claude Code's settings so it hears when Claude needs you or is done; off removes it.",agent-alerts-claude,island.agent-alerts-claude
 Island,AI Agents,Answer Codex from the island,switch,,true,"When on, Island adds hooks to Codex's hooks.json so it hears when Codex needs you or is done; off removes them.",agent-alerts-codex,island.agent-alerts-codex
+Island,AI Agents,Know when opencode needs you or is done,switch,,false,"When on, Island puts a small plugin (niro-island.js) in opencode's plugins folder, so the island tells you when opencode needs a permission, asks a…",agent-alerts-opencode,island.agent-alerts-opencode
 Island,Alerts,Show GNOME's own notification banners instead of the island's,switch,,false,Off (the default): GNOME's own notification banners are hidden and the island shows the notifications.,gnome-banners,island.gnome-banners
 Island,Shortcuts,What Super+V (GNOME's calendar shortcut) opens,select,Island / Calendar / None / Gnome,calendar,"""island"": the island's clipboard history.",super-v,island.super-v
 Island,Music,Briefly show the new song when the track changes,switch,,false,,track-peek,island.track-peek
@@ -100,6 +101,7 @@ Island,AI Usage,Show AI plan usage,switch,,true,"A Usage page and warnings for C
 Island,AI Usage,Show Claude's usage,switch,,true,,usage-claude,island.usage-claude
 Island,AI Usage,Show ChatGPT's usage,switch,,true,,usage-codex,island.usage-codex
 Island,AI Usage,Show Grok's usage,switch,,true,,usage-grok,island.usage-grok
+Island,AI Usage,Show opencode's usage (Go plan),switch,,true,"The 5-hour, weekly and monthly limits of an OpenCode Go plan, read with the plan's API key that opencode keeps once you sign in to it (opencode auth…",usage-opencode,island.usage-opencode
 Island,AI Usage,Show DeepSeek's balance,switch,,false,"The money left on your DeepSeek API account, read with an API key that you add in Settings (Island, AI Usage).",usage-deepseek,island.usage-deepseek
 Island,AI Usage,Warn at this share of a limit (%),slider,50–99,80,,usage-warn,island.usage-warn
 Island,AI Usage,Warn again at this share of a limit (%),slider,50–100,95,,usage-critical,island.usage-critical

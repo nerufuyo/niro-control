@@ -206,6 +206,21 @@ pub fn signed_in() -> bool {
         .is_some_and(|entries| !entries.is_empty())
 }
 
+/// The API key of the user's OpenCode Go plan: the "opencode-go" sign-in of `auth.json` (`opencode auth login`), when it is an API
+/// key. Read for the Usage page only, and never shown or logged.
+pub fn go_key() -> Option<String> {
+    go_key_in(&read_auth(&user_auth()))
+}
+
+fn go_key_in(auth: &Value) -> Option<String> {
+    let entry = &auth["opencode-go"];
+    if entry["type"].as_str() != Some("api") {
+        return None;
+    }
+    let key = entry["key"].as_str()?.trim();
+    (!key.is_empty()).then(|| key.to_owned())
+}
+
 /// The user's sign-ins, as opencode reads them from OPENCODE_AUTH_CONTENT.
 fn sign_ins() -> String {
     usable_sign_ins(&read_auth(&user_auth())).to_string()
@@ -1082,6 +1097,20 @@ mod tests {
             || name == "HOME"
             || name.starts_with("OPENCODE_")));
         assert!(!passed.iter().any(|name| name == "OPENCODE_CONFIG"));
+    }
+
+    #[test]
+    fn the_go_key_is_the_api_key_of_the_go_sign_in() {
+        let auth = serde_json::json!({
+            "opencode-go": {"type": "api", "key": " sk-go-123 "},
+            "opencode": {"type": "api", "key": "sk-zen"},
+        });
+        assert_eq!(go_key_in(&auth).as_deref(), Some("sk-go-123"));
+        // Not an API key, empty, or another provider's: none.
+        assert_eq!(go_key_in(&serde_json::json!({"opencode-go": {"type": "oauth", "access": "x"}})), None);
+        assert_eq!(go_key_in(&serde_json::json!({"opencode-go": {"type": "api", "key": "  "}})), None);
+        assert_eq!(go_key_in(&serde_json::json!({"opencode": {"type": "api", "key": "sk-zen"}})), None);
+        assert_eq!(go_key_in(&Value::Null), None);
     }
 
     #[test]

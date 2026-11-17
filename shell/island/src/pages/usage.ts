@@ -21,7 +21,7 @@ import {Page} from './page.js';
 /** A limit warns (an alert) and then turns red at these shares; Settings may move them (see `setMarks`). */
 const MARKS = {warn: 80, critical: 95};
 /** Each provider's colour, for its bars. */
-const ACCENTS = {claude: [0.85, 0.47, 0.34], codex: [0.06, 0.64, 0.5], grok: [0.93, 0.94, 0.96], deepseek: [0.3, 0.42, 1]};
+const ACCENTS = {claude: [0.85, 0.47, 0.34], codex: [0.06, 0.64, 0.5], grok: [0.93, 0.94, 0.96], deepseek: [0.3, 0.42, 1], opencode: [0.2, 0.78, 0.68]};
 const FALLBACK = Palette.BLUE;
 /** How far a scroll goes before it moves to the next provider. */
 const WHEEL_STEP = 1;

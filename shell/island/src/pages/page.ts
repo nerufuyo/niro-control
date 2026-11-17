@@ -48,6 +48,11 @@ export const Page = GObject.registerClass({
         this.connect('destroy', () => this._onPageDestroy());
     }
 
+    /** The least height a page that needs more room than the usual ones keeps, whatever Settings → Size says; 0 for the rest. */
+    get minHeight() {
+        return 0;
+    }
+
     /** Its height in CSS pixels: taller with Settings → Size on Large. */
     get pageHeight() {
         return this._pageHeight;

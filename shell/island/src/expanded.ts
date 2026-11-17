@@ -377,7 +377,7 @@ export const ExpandedView = GObject.registerClass({
             return;
         this._large = large;
         for (const page of this._pages)
-            page.pageHeight = large ? LARGE_PAGE_HEIGHT : PAGE_HEIGHT;
+            page.pageHeight = Math.max(page.minHeight ?? 0, large ? LARGE_PAGE_HEIGHT : PAGE_HEIGHT);
         this._syncWidth();
         this.syncHeight();
     }

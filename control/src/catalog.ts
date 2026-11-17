@@ -1072,6 +1072,20 @@ export const CATALOG: Item[] = [
   "kind": "switch"
  },
  {
+  "id": "island.agent-alerts-opencode",
+  "menu": "Island",
+  "group": "AI Agents",
+  "title": "Know when opencode needs you or is done",
+  "help": "When on, Island puts a small plugin (niro-island.js) in opencode's plugins folder, so the island tells you when opencode needs a permission, asks a…",
+  "detail": "When on, Island puts a small plugin (niro-island.js) in opencode's plugins folder, so the island tells you when opencode needs a permission, asks a question or is done; off removes it. opencode's own questions and permissions stay in opencode. Off until you turn it on.",
+  "source": "island",
+  "key": "agent-alerts-opencode",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
   "id": "island.gnome-banners",
   "menu": "Island",
   "group": "Alerts",
@@ -1713,6 +1727,24 @@ export const CATALOG: Item[] = [
   "detail": "",
   "source": "island",
   "key": "usage-grok",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch",
+  "depends": {
+   "id": "island.usage-enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "island.usage-opencode",
+  "menu": "Island",
+  "group": "AI Usage",
+  "title": "Show opencode's usage (Go plan)",
+  "help": "The 5-hour, weekly and monthly limits of an OpenCode Go plan, read with the plan's API key that opencode keeps once you sign in to it (opencode auth…",
+  "detail": "The 5-hour, weekly and monthly limits of an OpenCode Go plan, read with the plan's API key that opencode keeps once you sign in to it (opencode auth login). Shows only with that sign-in. opencode documents no usage service: this asks the one its own console uses, and says so when it cannot read it.",
+  "source": "island",
+  "key": "usage-opencode",
   "type": "b",
   "default": "true",
   "unit": "",

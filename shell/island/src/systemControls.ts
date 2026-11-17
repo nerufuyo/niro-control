@@ -1,8 +1,8 @@
 // @ts-nocheck: written for the island, which is not typed yet
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-// What the Controls page sets, each behind a small object the page only reads and tells: the screen's brightness, Bluetooth, the
-// Wi-Fi networks, the power profile and the airplane mode. They use what GNOME itself uses (the settings daemon, GnomeBluetooth,
+// What the Controls and Power pages set and show, each behind a small object the page only reads and tells: the screen's brightness,
+// Bluetooth, the Wi-Fi networks, the power profile, the battery and the airplane mode. They use what GNOME itself uses (the settings daemon, GnomeBluetooth,
 // NetworkManager through nmcli, power-profiles-daemon), so the island and the Quick Settings always agree.
 //
 // Each has `available` (does this computer have it at all), a `changed` signal, and `destroy()`.
@@ -12,6 +12,8 @@ import GLib from 'gi://GLib';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as Signals from 'resource:///org/gnome/shell/misc/signals.js';
+
+import {batteryState, orderedProfiles, parseWifiList, wifiFailure} from './powerRules.js';
 
 const SETTINGS_DAEMON = 'org.gnome.SettingsDaemon.Power';
 const POWER_PATH = '/org/gnome/SettingsDaemon/Power';
@@ -127,7 +129,7 @@ export class PowerProfiles extends Signals.EventEmitter {
     _read() {
         const active = this._proxy.get_cached_property('ActiveProfile')?.deep_unpack() ?? '';
         const list = this._proxy.get_cached_property('Profiles')?.deep_unpack() ?? [];
-        this.profiles = list.map(entry => entry.Profile?.deep_unpack?.() ?? entry.Profile).filter(Boolean);
+        this.profiles = orderedProfiles(list.map(entry => entry.Profile?.deep_unpack?.() ?? entry.Profile).filter(Boolean));
         this.active = active;
         this.available = this.profiles.length > 1;
         this.emit('changed');
@@ -136,9 +138,17 @@ export class PowerProfiles extends Signals.EventEmitter {
     /** The profile after the one in use. */
     next() {
         const at = this.profiles.indexOf(this.active);
-        const target = this.profiles[(at + 1) % this.profiles.length];
+        this.set(this.profiles[(at + 1) % this.profiles.length]);
+    }
+
+    /** Switches to `name` (one of `profiles`). */
+    set(name) {
+        if (!this.profiles.includes(name))
+            return;
+        this.active = name;
+        this.emit('changed');
         this._proxy?.get_connection().call(this._name, this._path, 'org.freedesktop.DBus.Properties', 'Set',
-            new GLib.Variant('(ssv)', [this._name, 'ActiveProfile', new GLib.Variant('s', target)]), null, Gio.DBusCallFlags.NONE, -1, null, null);
+            new GLib.Variant('(ssv)', [this._name, 'ActiveProfile', new GLib.Variant('s', name)]), null, Gio.DBusCallFlags.NONE, -1, null, null);
     }
 
     destroy() {
@@ -149,60 +159,156 @@ export class PowerProfiles extends Signals.EventEmitter {
     }
 }
 
-/** Wi-Fi: the radio and the networks in range (through nmcli: no network library to carry, the same service as GNOME's). */
+/** The laptop's battery, from UPower's display device (the one GNOME's own menu reads): the level, what it is doing, how long it
+ * lasts or takes to fill, and its health. `available` is false on a computer with no battery. Emits `changed` only when
+ * something it shows did. */
+export class Battery extends Signals.EventEmitter {
+    constructor() {
+        super();
+        this.available = false;
+        this.percent = 0;
+        this.state = 'unknown';
+        this.timeToFull = 0;
+        this.timeToEmpty = 0;
+        this.rate = 0;
+        /** The battery's capacity against what it was built for, in percent; 0 when UPower does not say. */
+        this.health = 0;
+        this._proxy = null;
+        this._seen = '';
+        const name = 'org.freedesktop.UPower';
+        Gio.DBusProxy.new_for_bus(Gio.BusType.SYSTEM, Gio.DBusProxyFlags.NONE, null, name, '/org/freedesktop/UPower/devices/DisplayDevice',
+            'org.freedesktop.UPower.Device', null, (_o, result) => {
+                try {
+                    this._proxy = Gio.DBusProxy.new_for_bus_finish(result);
+                } catch (_e) {
+                    return;
+                }
+                if (this._destroyed || !this._proxy.get_name_owner())
+                    return;
+                this._changedId = this._proxy.connect('g-properties-changed', () => this._read());
+                this._read();
+                this.readHealth();
+            });
+    }
+
+    _prop(name, fallback) {
+        return this._proxy?.get_cached_property(name)?.deepUnpack() ?? fallback;
+    }
+
+    _read() {
+        const present = this._prop('IsPresent', false);
+        const percent = this._prop('Percentage', 0);
+        const state = batteryState(this._prop('State', 0));
+        const timeToFull = Number(this._prop('TimeToFull', 0));
+        const timeToEmpty = Number(this._prop('TimeToEmpty', 0));
+        const rate = this._prop('EnergyRate', 0);
+        // The power draw wobbles with every read: a tenth of a watt is all the card shows.
+        const seen = JSON.stringify([present, Math.round(percent), state, Math.round(timeToFull / 60), Math.round(timeToEmpty / 60), Math.round(rate * 10), this.health]);
+        if (seen === this._seen)
+            return;
+        this._seen = seen;
+        Object.assign(this, {available: Boolean(present), percent: Math.round(percent), state, timeToFull, timeToEmpty, rate});
+        this.emit('changed');
+    }
+
+    /** Reads the health of the first battery UPower lists (its `Capacity`: what it holds now of what it was built to hold). */
+    readHealth() {
+        Gio.DBus.system.call('org.freedesktop.UPower', '/org/freedesktop/UPower', 'org.freedesktop.UPower', 'EnumerateDevices', null,
+            new GLib.VariantType('(ao)'), Gio.DBusCallFlags.NONE, -1, null, (bus, result) => {
+                let path;
+                try {
+                    [path] = bus.call_finish(result).deepUnpack()[0].filter(entry => /battery_/.test(entry));
+                } catch (_e) {
+                    return;
+                }
+                if (!path || this._destroyed)
+                    return;
+                bus.call('org.freedesktop.UPower', path, 'org.freedesktop.DBus.Properties', 'Get',
+                    new GLib.Variant('(ss)', ['org.freedesktop.UPower.Device', 'Capacity']), null, Gio.DBusCallFlags.NONE, -1, null, (b, res) => {
+                        try {
+                            const capacity = b.call_finish(res).deepUnpack()[0].deepUnpack();
+                            if (!this._destroyed && capacity > 0 && Math.round(capacity) !== this.health) {
+                                this.health = Math.round(capacity);
+                                this._seen = '';
+                                this._read();
+                            }
+                        } catch (_e) { /* no capacity to show */ }
+                    });
+            });
+    }
+
+    destroy() {
+        this._destroyed = true;
+        this.disconnectAll();
+        if (this._proxy && this._changedId)
+            this._proxy.disconnect(this._changedId);
+    }
+}
+
+/** Wi-Fi: the radio and the networks in range, and joining one (through nmcli: no network library to carry, the same service as
+ * GNOME's). `connecting` names the network being joined; `error` is {ssid, message, wrongPassword} for the last that failed. */
 export class WifiNetworks extends Signals.EventEmitter {
     constructor() {
         super();
         this.available = false;
         this.enabled = false;
         this.networks = [];
+        /** Names NetworkManager has a saved connection for: joined with no password asked. */
+        this.known = new Set();
+        this.connecting = '';
+        this.error = null;
+        this._device = '';
         this.refresh();
     }
 
-    _run(argv) {
+    /** Runs `argv`: {ok, out, err}. Never throws. */
+    _exec(argv) {
         return new Promise(resolve => {
             try {
-                const proc = Gio.Subprocess.new(argv, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
+                const proc = Gio.Subprocess.new(argv, Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
                 proc.communicate_utf8_async(null, null, (p, result) => {
                     try {
-                        resolve(p.get_successful() ? p.communicate_utf8_finish(result)[1] : null);
-                    } catch (_e) {
-                        resolve(null);
+                        const [, out, err] = p.communicate_utf8_finish(result);
+                        resolve({ok: p.get_successful(), out: out ?? '', err: err ?? ''});
+                    } catch (e) {
+                        resolve({ok: false, out: '', err: e.message});
                     }
                 });
-            } catch (_e) {
-                resolve(null);
+            } catch (e) {
+                resolve({ok: false, out: '', err: e.message});
             }
         });
     }
 
-    /** Reads the radio and the list again. */
-    async refresh() {
-        const hasWifi = await this._run(['nmcli', '-t', '-f', 'TYPE', 'device']);
-        if (this._destroyed)
+    async _run(argv) {
+        const {ok, out} = await this._exec(argv);
+        return ok ? out : null;
+    }
+
+    /** Reads the radio and the list again; `rescan` asks the adapter to look afresh first (the list is its last look). */
+    async refresh({rescan = false} = {}) {
+        // Reads started one after another may end out of turn: only the newest says what is there.
+        const turn = (this._turn = (this._turn ?? 0) + 1);
+        const devices = await this._run(['nmcli', '-t', '-f', 'DEVICE,TYPE', 'device']);
+        if (this._destroyed || turn !== this._turn)
             return;
-        this.available = Boolean(hasWifi?.split('\n').includes('wifi'));
+        const wifi = (devices ?? '').split('\n').map(line => line.split(':')).find(([, type]) => type === 'wifi');
+        this.available = Boolean(wifi);
+        this._device = wifi?.[0] ?? '';
         if (!this.available) {
             this.emit('changed');
             return;
         }
         this.enabled = (await this._run(['nmcli', 'radio', 'wifi']))?.trim() === 'enabled';
+        if (this.enabled && rescan)
+            await this._exec(['nmcli', 'device', 'wifi', 'rescan']);
         const list = this.enabled ? await this._run(['nmcli', '-t', '-f', 'IN-USE,SSID,SIGNAL,SECURITY', 'device', 'wifi', 'list']) : '';
-        if (this._destroyed)
+        const saved = await this._run(['nmcli', '-t', '-f', 'NAME,TYPE', 'connection', 'show']);
+        if (this._destroyed || turn !== this._turn)
             return;
-        const seen = new Map();
-        for (const line of (list ?? '').split('\n')) {
-            // nmcli escapes ':' inside a field as '\:'.
-            const fields = line.split(/(?<!\\):/).map(field => field.replace(/\\:/g, ':'));
-            const [inUse, ssid, signal, security] = fields;
-            if (!ssid)
-                continue;
-            const entry = {ssid, signal: Number(signal) || 0, secure: Boolean(security && security !== '--'), active: inUse === '*'};
-            const known = seen.get(ssid);
-            if (!known || entry.active || entry.signal > known.signal)
-                seen.set(ssid, entry);
-        }
-        this.networks = [...seen.values()].sort((a, b) => b.active - a.active || b.signal - a.signal);
+        this.known = new Set((saved ?? '').split('\n').map(line => line.split(/(?<!\\):/)).filter(([, type]) => type === '802-11-wireless')
+            .map(([name]) => name.replace(/\\:/g, ':')));
+        this.networks = parseWifiList(list);
         this.emit('changed');
     }
 
@@ -212,18 +318,51 @@ export class WifiNetworks extends Signals.EventEmitter {
         this._run(['nmcli', 'radio', 'wifi', on ? 'on' : 'off']).then(() => this.refresh());
     }
 
-    /** Joins a network NetworkManager already knows (or an open one); a new secured one needs its password: GNOME's own settings. */
-    connect(network) {
-        if (network.secure) {
-            this._run(['nmcli', '-t', '-f', 'NAME', 'connection', 'show']).then(names => {
-                if (names?.split('\n').includes(network.ssid))
-                    this._run(['nmcli', 'connection', 'up', network.ssid]).then(() => this.refresh());
-                else
-                    GLib.spawn_command_line_async('gnome-control-center wifi');
-            });
-            return;
+    /** Joins `network`. A saved one or an open one goes at once; a new secured one needs `password`, and with none given this
+     * answers 'needs-password' so the page can ask. Resolves 'connected', 'failed' (see `error`), 'needs-password' or 'busy'. */
+    async connect(network, password = null) {
+        if (this.connecting)
+            return 'busy';
+        const saved = this.known.has(network.ssid);
+        if (network.secure && !saved && password === null)
+            return 'needs-password';
+        this.connecting = network.ssid;
+        this.error = null;
+        this.emit('changed');
+        let argv;
+        if (saved)
+            argv = ['nmcli', '--wait', '25', 'connection', 'up', 'id', network.ssid];
+        else if (!network.secure)
+            argv = ['nmcli', '--wait', '25', 'device', 'wifi', 'connect', network.ssid];
+        else
+            argv = ['nmcli', '--wait', '25', 'device', 'wifi', 'connect', network.ssid, 'password', password];
+        const result = await this._exec(argv);
+        this.connecting = '';
+        if (!result.ok) {
+            this.error = {ssid: network.ssid, ...wifiFailure(result.err)};
+            // A connection this try made and that never worked would only be tried again, with the same password.
+            if (!saved)
+                await this._exec(['nmcli', 'connection', 'delete', 'id', network.ssid]);
         }
-        this._run(['nmcli', 'device', 'wifi', 'connect', network.ssid]).then(() => this.refresh());
+        if (!this._destroyed)
+            await this.refresh();
+        return result.ok ? 'connected' : 'failed';
+    }
+
+    /** Leaves the network joined now (it stays saved, and is not joined again by itself until asked). */
+    async disconnect() {
+        if (this._device)
+            await this._exec(['nmcli', 'device', 'disconnect', this._device]);
+        if (!this._destroyed)
+            await this.refresh();
+    }
+
+    /** Forgets a saved network: the next join asks for its password again. */
+    async forget(ssid) {
+        await this._exec(['nmcli', 'connection', 'delete', 'id', ssid]);
+        this.error = null;
+        if (!this._destroyed)
+            await this.refresh();
     }
 
     destroy() {
