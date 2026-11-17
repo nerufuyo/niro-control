@@ -726,7 +726,7 @@ export function update(version, open, packaged = false) {
         icon: 'software-update-available-symbolic',
         motion: 'bounce',
         title: `Island ${version} is out`,
-        subtitle: packaged ? 'Update its package to get it' : 'Update in a click; your things stay',
+        subtitle: packaged ? 'Update its package to get it' : 'Download it from GitHub; your things stay',
         tone: 'good',
         action: {label: 'Update', callback: open},
         duration: REMINDER_DURATION,

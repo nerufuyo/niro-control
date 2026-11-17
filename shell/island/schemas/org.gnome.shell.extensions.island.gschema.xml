@@ -111,9 +111,9 @@
       <description>From LRCLIB, by the song's title, artist and length.</description>
     </key>
     <key name="check-updates" type="b">
-      <default>false</default>
+      <default>true</default>
       <summary>Say when a newer Island is out</summary>
-      <description>Island asks GitHub for its latest release at most once a day.</description>
+      <description>Island asks GitHub (github.com/nerufuyo/niro-control) for its latest release at most once a day. Only the request itself is sent, nothing about you or your computer. It never downloads or runs anything: it says where the new version is.</description>
     </key>
     <key name="update-shown" type="s">
       <default>''</default>

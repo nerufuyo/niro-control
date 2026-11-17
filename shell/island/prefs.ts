@@ -74,8 +74,8 @@ export default class IslandPreferences extends ExtensionPreferences {
         // Whether a newer Island is out, as island-daemon last found, and the switch for asking.
         for (const row of updateRows(settings, window, this.metadata['version-name'] ?? '', this.path))
             about.add(row);
-        about.add(link('Website', 'Features, installing and updating', 'https://github.com/zickrian/isle'));
-        about.add(link('Report a problem', 'On GitHub; paste the report below in it', 'https://github.com/zickrian/isle/issues/new/choose'));
+        about.add(link('Website', 'Features, installing and updating', 'https://github.com/nerufuyo/niro-control'));
+        about.add(link('Report a problem', 'On GitHub; paste the report below in it', 'https://github.com/nerufuyo/niro-control/issues/new'));
         const report = new Adw.ActionRow({title: 'Copy a bug report', subtitle: 'What’s installed, what works, and recent activity, ready to paste into a report',
             activatable: true});
         report.add_suffix(new Gtk.Image({icon_name: 'edit-copy-symbolic'}));
@@ -1702,23 +1702,11 @@ function confirm(window, {heading, body, action}, onYes) {
         dialog.present();
 }
 
-/** Where updating is explained, and the command that updates a one-line install. */
-const UPDATE_HELP = 'https://github.com/zickrian/isle/blob/main/docs/install.md#updating';
-const INSTALL_COMMAND = 'curl -fsSL https://raw.githubusercontent.com/zickrian/isle/main/get.sh | bash';
-const RELEASES = 'https://github.com/zickrian/isle/releases/latest';
-/** Installs version `$1` with that release's own get.sh (no sudo), appending to the log `$2`: first who runs
- * it ("island-update-pid <pid> <boot id>"), last "island-update-done <exit status>". */
-const UPDATE_SCRIPT = 'exec >>"$2" 2>&1 </dev/null; ' +
-    'echo "island-update-pid $$ $(cat /proc/sys/kernel/random/boot_id 2>/dev/null)"; set -o pipefail; ' +
-    'curl -fsSL --retry 2 "https://raw.githubusercontent.com/zickrian/isle/v$1/get.sh" | ISLAND_VERSION="$1" bash; ' +
-    'echo "island-update-done $?"';
-/** The update's log; its first line names the version ("island-update 1.5.0"). */
-const UPDATE_LOG = GLib.build_filenamev([GLib.get_user_cache_dir(), 'island', 'update.log']);
-/** Longest a started update may take to say who runs it before it counts as never started. */
-const UPDATE_START_US = 60 * 1000000;
-/** What the installer's output may say about its session; the rest of Settings' own environment is not passed. */
-const UPDATE_ENV = ['PATH', 'HOME', 'LANG', 'DBUS_SESSION_BUS_ADDRESS', 'XDG_RUNTIME_DIR', 'XDG_DATA_DIRS',
-    'XDG_SESSION_TYPE', 'XDG_CURRENT_DESKTOP'];
+/** Where updating is explained, the releases, and the command that updates an installed package. Island never runs a script it
+ * downloads: it says where the new version is, and the package manager installs it. */
+const UPDATE_HELP = 'https://github.com/nerufuyo/niro-control#updating';
+const RELEASES = 'https://github.com/nerufuyo/niro-control/releases/latest';
+const UPDATE_COMMAND = 'sudo dnf upgrade niro-control';
 
 /** Whether version `a` ("1.3.0") is newer than `b`, number by number (as island-daemon's updates.rs). */
 function isNewer(a, b) {
@@ -1752,92 +1740,6 @@ function versionIn(dir) {
     }
 }
 
-/** Why the installer stopped, in plain words: from its own "Island: …" line or a program's error, a known
- * reason; anything else is said as a try again (the details stay in the installer's log). */
-function updateFailure(output) {
-    const escapes = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, 'g');
-    // Not Island's markers, nor the steps ("==> Downloading").
-    const lines = output.split('\n').map(line => line.replace(escapes, '').trim())
-        .filter(line => line && !/^island-update(-pid|-done)? /.test(line) && !line.startsWith('==>'));
-    const all = lines.join('\n');
-    const reasons = [
-        // curl: no such host, refused, timed out, TLS or the connection dropped.
-        [/could not reach GitHub|^curl: \((6|7|28|35|56)\)/m, 'Island couldn’t reach GitHub; check the internet connection'],
-        [/GitHub limits how often/, 'GitHub limits how often it is asked; try again in an hour'],
-        [/GitHub answered|^curl: \(22\)/m, 'GitHub had a problem just now; try again in a while'],
-        [/no release .*was found/, 'That version isn’t on GitHub yet; try again later'],
-        [/damaged|checksum|unexpected layout|download failed/, 'The download didn’t come through whole; try again'],
-        [/made for GNOME Shell (\d+ to \d+)/, 'This version of Island doesn’t support this GNOME yet; nothing was changed'],
-        [/No space left on device|Disk quota exceeded/, 'The disk is full; free some space and try again'],
-        [/Permission denied|Read-only file system/, 'Island couldn’t write its files; try again'],
-        [/please install (\S+) first/, null],
-        // Failures another try won't fix as it is: no build for this kind of computer, or one install at a time.
-        [/no ready-built Island for/, 'There’s no ready-made Island for this computer; build it from source instead'],
-        [/another install of Island is running/, 'Another install of Island is running; wait for it, then try again'],
-        // Settings' own line when the installer couldn't be started at all.
-        [/the update didn.t start/, 'The update didn’t start; try again'],
-    ];
-    for (const [pattern, words] of reasons) {
-        const found = pattern.exec(all);
-        if (found)
-            return words ?? `Install ${found[1]}, then try again`;
-    }
-    return lines.length ? 'The update didn’t finish; try again' : 'the installer stopped';
-}
-
-/** The last update per its log, {version, text, done: exit status or null, running}, or null. Running: its
- * installer is alive in this boot, or it just started and hasn't named its pid yet. */
-function readUpdateLog() {
-    try {
-        const file = Gio.File.new_for_path(UPDATE_LOG);
-        const text = new TextDecoder().decode(file.load_contents(null)[1]);
-        const version = /^island-update (\S+)/.exec(text)?.[1];
-        if (!version)
-            return null;
-        const done = /^island-update-done (\d+)$/m.exec(text);
-        const [, pid, boot] = /^island-update-pid (\d+) ?(\S*)$/m.exec(text) ?? [];
-        const at = file.query_info('time::modified', Gio.FileQueryInfoFlags.NONE, null).get_modification_date_time().to_unix_usec();
-        let running = false;
-        if (!done && pid) {
-            const [, thisBoot] = GLib.file_get_contents('/proc/sys/kernel/random/boot_id');
-            const cmdline = `/proc/${pid}/cmdline`;
-            running = boot === new TextDecoder().decode(thisBoot).trim() && GLib.file_test(cmdline, GLib.FileTest.EXISTS) &&
-                new TextDecoder().decode(GLib.file_get_contents(cmdline)[1]).includes('island-installer');
-        } else if (!done) {
-            running = GLib.get_real_time() - at < UPDATE_START_US;
-        }
-        return {version, text, done: done ? Number(done[1]) : null, running, at};
-    } catch {
-        return null;
-    }
-}
-
-/** Runs the installer for `version` on its own, as a unit of the user's systemd (else a process of its own),
- * so closing Settings doesn't stop it half way; its output goes to UPDATE_LOG. */
-function startUpdate(version) {
-    GLib.mkdir_with_parents(GLib.path_get_dirname(UPDATE_LOG), 0o700);
-    GLib.file_set_contents(UPDATE_LOG, `island-update ${version}\n`);
-    const script = ['bash', '-c', UPDATE_SCRIPT, 'island-installer', version, UPDATE_LOG];
-    const run = argv => Gio.Subprocess.new(argv, Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE);
-    if (GLib.find_program_in_path('systemd-run')) {
-        const env = UPDATE_ENV.filter(name => GLib.getenv(name)).map(name => `--setenv=${name}=${GLib.getenv(name)}`);
-        // systemd reads "$$" in a command as a "$": written twice, the shell gets its own pid.
-        const escaped = script.map(arg => arg.split('$$').join('$$$$'));
-        const unit = run(['systemd-run', '--user', '--collect', '--quiet', `--unit=island-update-${GLib.get_real_time()}`,
-            ...env, ...escaped]);
-        // No user systemd (some containers, other inits): run it directly.
-        unit.wait_check_async(null, (proc, result) => {
-            try {
-                proc.wait_check_finish(result);
-            } catch {
-                run(script);
-            }
-        });
-    } else {
-        run(script);
-    }
-}
-
 /** Logs out as GNOME's own menu does, asking first; GNOME Shell loads the new Island at the next login. */
 function logOut() {
     Gio.DBus.session.call('org.gnome.SessionManager', '/org/gnome/SessionManager', 'org.gnome.SessionManager',
@@ -1850,23 +1752,22 @@ function logOut() {
         });
 }
 
-/** The About page's update status and the switch to ask GitHub, following what island-daemon last found (its
- * updates.json). A one-line install updates in a click; a package says how its kind updates. */
+/** The About page's update status and the switch to ask GitHub, following what island-daemon last found (its updates.json). A
+ * new version is not fetched or run from here: on Fedora the row offers the dnf command that updates the package (once the
+ * repository is added, see the README), and always the page to download it from; the new one is loaded at the next login. */
 function updateRows(settings, window, version, dir) {
-    const packaged = dir.startsWith('/usr/');
-    // Its words come from the installer's output and GitHub too: shown as they are, never as markup.
+    // Its words come from GitHub too: shown as they are, never as markup.
     const status = new Adw.ActionRow({use_markup: false});
     const icon = new Gtk.Image({valign: Gtk.Align.CENTER});
-    const spinner = new Gtk.Spinner({valign: Gtk.Align.CENTER, spinning: true, visible: false});
     status.add_prefix(icon);
-    status.add_prefix(spinner);
     const button = (label, css) => new Gtk.Button({label, valign: Gtk.Align.CENTER, css_classes: css, visible: false});
     const how = button('How', ['flat']);
     how.connect('clicked', () => new Gtk.UriLauncher({uri: UPDATE_HELP}).launch(window, null, null));
+    const rpm = GLib.file_test('/etc/fedora-release', GLib.FileTest.EXISTS) || GLib.file_test('/etc/redhat-release', GLib.FileTest.EXISTS);
     const copy = button('Copy command', []);
-    copy.tooltip_text = INSTALL_COMMAND;
+    copy.tooltip_text = UPDATE_COMMAND;
     copy.connect('clicked', () => {
-        window.get_display().get_clipboard().set(INSTALL_COMMAND);
+        window.get_display().get_clipboard().set(UPDATE_COMMAND);
         copy.label = 'Copied';
         GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
             copy.label = 'Copy command';
@@ -1875,25 +1776,20 @@ function updateRows(settings, window, version, dir) {
     });
     const download = button('Download', []);
     download.connect('clicked', () => new Gtk.UriLauncher({uri: RELEASES}).launch(window, null, null));
-    const update = button('Update', ['suggested-action']);
     const logOutButton = button('Log Out', ['suggested-action']);
     logOutButton.connect('clicked', () => logOut());
-    for (const suffix of [how, copy, download, update, logOutButton])
+    const all = [how, copy, download, logOutButton];
+    for (const suffix of all)
         status.add_suffix(suffix);
     const check = switchRow(settings, 'check-updates', 'Check for new versions', 'Asks GitHub once a day; nothing else is sent');
 
     const file = Gio.File.new_for_path(GLib.build_filenamev([GLib.get_user_data_dir(), 'island', 'updates.json']));
-    let updating = false;
-    /** The timer looking at a running update again (see `sync`). */
-    let watching = 0;
     const show = (iconName, css, title, subtitle, buttons = []) => {
         icon.icon_name = iconName;
         icon.css_classes = css;
-        icon.visible = !updating;
-        spinner.visible = updating;
         status.title = title;
         status.subtitle = subtitle;
-        for (const suffix of [how, copy, download, update, logOutButton])
+        for (const suffix of all)
             suffix.visible = buttons.includes(suffix);
     };
     const readChecked = () => {
@@ -1906,50 +1802,20 @@ function updateRows(settings, window, version, dir) {
     const sync = () => {
         const checked = readChecked();
         const on = settings.get_boolean('check-updates');
-        const {version: installed, at: installedAt} = versionIn(dir);
+        const {version: installed} = versionIn(dir);
         const newer = on && Boolean(checked?.latest) && isNewer(checked.latest, version);
-        // The last update, also one started before Settings was closed and opened again.
-        const last = readUpdateLog();
-        updating = Boolean(last?.running);
-        // Failed or cut off (a logout or restart ended it). Not when its version is in place (the extension
-        // goes in whole, after the programs: what stopped came after) or any install came since (a terminal).
-        const failed = last && !last.running && last.done !== 0 && !packaged && last.version === checked?.latest &&
-            installed !== last.version && !(installedAt > last.at);
-        // While it runs, looked at again now and then: an installer ended by a logout says nothing more.
-        if (updating && !watching) {
-            watching = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 3, () => {
-                sync();
-                if (updating)
-                    return GLib.SOURCE_CONTINUE;
-                watching = 0;
-                return GLib.SOURCE_REMOVE;
-            });
-        }
-        if (updating) {
-            show(null, [], `Updating to Island ${last.version}…`, 'Downloading and installing; Settings can be closed');
-        } else if (failed) {
-            // Before "installed": one that stopped half way may have put part of it in place.
-            update.label = 'Try Again';
-            const why = (last.done === null ? 'it was cut off before it finished' : updateFailure(last.text)).replace(/\.+$/, '');
-            show('dialog-warning-symbolic', ['warning'], 'Couldn’t update',
-                `${why[0].toUpperCase()}${why.slice(1)}. Or paste the command in a terminal`, [copy, update]);
-        } else if (installed && isNewer(installed, version)) {
-            // Installed, here or from a terminal: the shell runs the old one until the next login.
+        if (installed && isNewer(installed, version)) {
+            // Installed (by the package manager or by hand): the shell runs the old one until the next login.
             show('object-select-symbolic', ['success'], `Island ${installed} is installed`,
                 'Log out and back in to finish', [logOutButton]);
         } else if (!on) {
             show('software-update-available-symbolic', ['dim-label'], 'Not checking for new versions',
                 'Turn it on below to hear when one is out');
-        } else if (newer && packaged) {
-            const arch = GLib.file_test('/etc/arch-release', GLib.FileTest.EXISTS);
-            show('software-update-available-symbolic', ['accent'], `Island ${checked.latest} is out`, arch
-                ? 'Update it the way you installed it from the AUR, then log out and back in'
-                : `Download its .${GLib.file_test('/etc/debian_version', GLib.FileTest.EXISTS) ? 'deb' : 'rpm'} and open it to install, then log out and back in`,
-            arch ? [how] : [how, download]);
         } else if (newer) {
-            update.label = 'Update';
-            show('software-update-available-symbolic', ['accent'], `Island ${checked.latest} is out`,
-                'Your tasks, events and settings stay', [update]);
+            show('software-update-available-symbolic', ['accent'], `Island ${checked.latest} is out`, rpm
+                ? 'Update the package (copy the command), or download it, then log out and back in'
+                : 'Download its package and open it to install, then log out and back in',
+            rpm ? [how, copy, download] : [how, download]);
         } else if (checked?.at_ms && checked.latest) {
             // Only once GitHub answered: a look that failed stamps the time too, with no version.
             show('object-select-symbolic', ['success'], 'You’re up to date', `Checked ${checkedWhen(checked.at_ms)}`);
@@ -1957,33 +1823,13 @@ function updateRows(settings, window, version, dir) {
             show('software-update-available-symbolic', ['dim-label'], 'Not checked yet', 'Island asks GitHub once a day');
         }
     };
-    update.connect('clicked', () => {
-        const latest = readChecked()?.latest;
-        // Never two at once: one may still run from before Settings was opened again.
-        if (!latest || updating || readUpdateLog()?.running)
-            return;
-        try {
-            startUpdate(latest);
-        } catch (e) {
-            console.warn(`Island: could not start the update: ${e.message}`);
-            GLib.file_set_contents(UPDATE_LOG, `island-update ${latest}\nIsland: the update didn’t start\nisland-update-done 1\n`);
-        }
-        sync();
-    });
-    // island-daemon writes updates.json after each look (switched on, or once a day), the installer its log as it
-    // goes: the row follows while open.
-    const monitors = [file, Gio.File.new_for_path(UPDATE_LOG)].map(watched => {
-        const monitor = watched.monitor_file(Gio.FileMonitorFlags.NONE, null);
-        monitor.connect('changed', () => sync());
-        return monitor;
-    });
+    // island-daemon writes updates.json after each look (switched on, or once a day): the row follows while open.
+    const monitor = file.monitor_file(Gio.FileMonitorFlags.NONE, null);
+    monitor.connect('changed', () => sync());
     const changed = settings.connect('changed::check-updates', () => sync());
     window.connect('close-request', () => {
-        monitors.forEach(monitor => monitor.cancel());
+        monitor.cancel();
         settings.disconnect(changed);
-        if (watching)
-            GLib.Source.remove(watching);
-        watching = 0;
         return false;
     });
     sync();
