@@ -72,21 +72,33 @@ const Meter = GObject.registerClass(class Meter extends St.Widget {
     }
 });
 
-/** One cell: a name and its value over a bar (the bar is left out for plain readings). */
-function makeCell(name, withBar = true) {
-    const box = new St.BoxLayout({...VERTICAL, style_class: 'island-sys-cell', x_expand: true});
-    const top = new St.BoxLayout({style_class: 'island-sys-top'});
-    top.add_child(label(name, 'island-sys-name', {x_expand: true}));
-    const value = label('–', 'island-sys-value');
-    top.add_child(value);
-    box.add_child(top);
-    let meter = null;
-    if (withBar) {
-        meter = new Meter();
-        box.add_child(meter);
-    }
-    return {box, value, meter};
+/** One card: its name, its reading big, a bar and a line of detail under it. */
+function makeCard(name) {
+    const box = new St.BoxLayout({...VERTICAL, style_class: 'island-sys-card', x_expand: true, y_expand: true});
+    box.add_child(label(name, 'island-sys-name', {x_align: Clutter.ActorAlign.START}));
+    const value = label('–', 'island-sys-value', {x_align: Clutter.ActorAlign.START});
+    box.add_child(value);
+    const meter = new Meter();
+    box.add_child(meter);
+    const detail = label('', 'island-sys-detail', {x_align: Clutter.ActorAlign.START});
+    box.add_child(detail);
+    return {box, value, meter, detail};
 }
+
+/** One direction of the network: an arrow and its name, and the speed. */
+function makeFlow(arrow, name) {
+    const box = new St.BoxLayout({style_class: 'island-sys-flow', x_expand: true});
+    box.add_child(label(arrow, 'island-sys-arrow', {y_align: Clutter.ActorAlign.CENTER}));
+    const text = new St.BoxLayout({...VERTICAL, y_align: Clutter.ActorAlign.CENTER, x_expand: true});
+    text.add_child(label(name, 'island-sys-name', {x_align: Clutter.ActorAlign.START}));
+    const value = label('–', 'island-sys-speed', {x_align: Clutter.ActorAlign.START});
+    text.add_child(value);
+    box.add_child(text);
+    return {box, value};
+}
+
+/** The page's own height, in CSS pixels: the cards and the network under them. */
+export const SYSTEM_HEIGHT = 176;
 
 export const SystemPage = GObject.registerClass(
 class SystemPage extends Page {
@@ -94,31 +106,31 @@ class SystemPage extends Page {
         super._init(daemon, {
             style_class: 'island-page island-sys',
             layout_manager: new Clutter.BoxLayout({orientation: Clutter.Orientation.VERTICAL}),
-            height,
+            height: Math.max(height, SYSTEM_HEIGHT),
         });
         this.name = 'system';
         this._cpuPrev = null;
         this._netPrev = null;
         this._tempPath = findCpuTempPath();
+        this._threads = GLib.get_num_processors?.() ?? 0;
 
-        this._cells = {
-            cpu: makeCell('CPU'),
-            mem: makeCell('Memory'),
-            swap: makeCell('Swap'),
-            temp: makeCell('Temperature'),
-            down: makeCell('Download', false),
-            up: makeCell('Upload', false),
-        };
-        const rows = [['cpu', 'mem'], ['swap', 'temp'], ['down', 'up']];
-        const grid = new St.BoxLayout({...VERTICAL, style_class: 'island-sys-grid', y_expand: true});
-        for (const pair of rows) {
-            const row = new St.BoxLayout({style_class: 'island-sys-row', x_expand: true});
-            for (const key of pair)
-                row.add_child(this._cells[key].box);
-            grid.add_child(row);
-        }
+        // Four equal cards over one strip for the network.
+        const layout = new Clutter.GridLayout({column_homogeneous: true, column_spacing: 8, row_spacing: 8});
+        const grid = new St.Widget({layout_manager: layout, x_expand: true, y_expand: true});
+        this._cells = {cpu: makeCard('CPU'), mem: makeCard('Memory'), swap: makeCard('Swap'), temp: makeCard('Temperature')};
+        ['cpu', 'mem', 'swap', 'temp'].forEach((key, column) => layout.attach(this._cells[key].box, column, 0, 1, 1));
+        this._flows = {down: makeFlow('↓', 'Download'), up: makeFlow('↑', 'Upload')};
+        const network = new St.BoxLayout({style_class: 'island-sys-network', x_expand: true});
+        network.add_child(this._flows.down.box);
+        network.add_child(new St.Widget({style_class: 'island-sys-divider', y_expand: true}));
+        network.add_child(this._flows.up.box);
+        layout.attach(network, 0, 1, 4, 1);
         this.add_child(grid);
         this._sample();
+    }
+
+    get minHeight() {
+        return SYSTEM_HEIGHT;
     }
 
     onActivate() {
@@ -154,6 +166,7 @@ class SystemPage extends Page {
                 const usage = 1 - dIdle / dTotal;
                 this._cells.cpu.value.text = `${Math.round(usage * 100)}%`;
                 this._cells.cpu.meter.share = usage;
+                this._cells.cpu.detail.text = this._threads ? `${this._threads} threads` : 'Processor';
             }
         }
         this._cpuPrev = {total, idle};
@@ -168,15 +181,18 @@ class SystemPage extends Page {
         }
         if (info.MemTotal) {
             const used = info.MemTotal - (info.MemAvailable ?? info.MemFree);
-            this._cells.mem.value.text = `${(used / 1048576).toFixed(1)} / ${(info.MemTotal / 1048576).toFixed(0)} GB`;
+            this._cells.mem.value.text = `${(used / 1048576).toFixed(1)} GB`;
+            this._cells.mem.detail.text = `of ${(info.MemTotal / 1048576).toFixed(0)} GB`;
             this._cells.mem.meter.share = used / info.MemTotal;
         }
         if (info.SwapTotal) {
             const used = info.SwapTotal - info.SwapFree;
-            this._cells.swap.value.text = `${(used / 1048576).toFixed(1)} / ${(info.SwapTotal / 1048576).toFixed(0)} GB`;
+            this._cells.swap.value.text = `${(used / 1048576).toFixed(1)} GB`;
+            this._cells.swap.detail.text = `of ${(info.SwapTotal / 1048576).toFixed(0)} GB`;
             this._cells.swap.meter.share = used / info.SwapTotal;
         } else {
-            this._cells.swap.value.text = 'off';
+            this._cells.swap.value.text = 'Off';
+            this._cells.swap.detail.text = 'No swap';
             this._cells.swap.meter.share = 0;
         }
     }
@@ -184,12 +200,14 @@ class SystemPage extends Page {
     _sampleTemp() {
         if (!this._tempPath) {
             this._cells.temp.value.text = 'n/a';
+            this._cells.temp.detail.text = 'No sensor';
             return;
         }
         const celsius = Number(readText(this._tempPath)) / 1000;
         if (!Number.isFinite(celsius) || celsius <= 0)
             return;
         this._cells.temp.value.text = `${Math.round(celsius)}°C`;
+        this._cells.temp.detail.text = 'Processor';
         // Bar: 30 °C empty to 95 °C full.
         this._cells.temp.meter.share = (celsius - 30) / 65;
     }
@@ -208,8 +226,8 @@ class SystemPage extends Page {
         if (this._netPrev) {
             const dt = now - this._netPrev.time;
             if (dt > 0) {
-                this._cells.down.value.text = formatSpeed(Math.max(0, (rx - this._netPrev.rx) / dt));
-                this._cells.up.value.text = formatSpeed(Math.max(0, (tx - this._netPrev.tx) / dt));
+                this._flows.down.value.text = formatSpeed(Math.max(0, (rx - this._netPrev.rx) / dt));
+                this._flows.up.value.text = formatSpeed(Math.max(0, (tx - this._netPrev.tx) / dt));
             }
         }
         this._netPrev = {rx, tx, time: now};

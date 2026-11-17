@@ -208,7 +208,8 @@ export class NiroSync {
         GLib.mkdir_with_parents(dir, 0o755);
         const path = GLib.build_filenamev([dir, 'accent.css']);
         const css = `.island-pill-accent, .island-sys-fill, .island-privacy-dot.screenShare { background-color: ${accent}; }
-.island-power-on, .island-power-segment-on, .island-power-segment-on:hover { background-color: ${accent}; color: #ffffff; }
+.island-power-on, .island-power-segment-on, .island-power-segment-on:hover, .island-power-tile-on, .island-power-tile-on:hover { background-color: ${accent}; color: #ffffff; }
+.island-start-pill, .island-start-pill:hover { background-color: ${accent}; }
 .island-power-danger { color: ${accent}; }
 `;
         GLib.file_set_contents(path, css);

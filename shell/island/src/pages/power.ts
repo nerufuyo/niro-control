@@ -19,6 +19,13 @@ import {Page} from './page.js';
 export const POWER_HEIGHT = 196;
 
 // [text, icon, command, asks for confirmation]
+/** What each power mode means, for the tiles shown when the computer has no battery to share the page with. */
+const MODE_NOTES = {
+    'power-saver': ['island-battery-symbolic', 'Quieter, uses less power'],
+    'balanced': ['island-gauge', 'The everyday default'],
+    'performance': ['island-bolt', 'Full speed, more heat and noise'],
+};
+
 const ACTIONS = [
     ['Lock', 'island-lock-symbolic', 'loginctl lock-session', false],
     ['Sleep', 'island-moon', 'systemctl suspend', false],
@@ -180,17 +187,34 @@ class PowerPage extends Page {
             this._modeButtons.clear();
             for (const box of [this._modes, this._modesRow]) {
                 box.destroy_all_children();
+                const tiles = box === this._modesRow;
                 for (const name of profiles.profiles) {
-                    const button = new St.Button({style_class: 'island-power-segment', can_focus: true, x_expand: true, label: PROFILE_NAMES[name] ?? name});
+                    let button;
+                    if (tiles) {
+                        // A tile: an icon, the name and what it means.
+                        const [iconName, note] = MODE_NOTES[name] ?? ['island-gauge', ''];
+                        button = new St.Button({style_class: 'island-power-tile', can_focus: true, x_expand: true, y_expand: true,
+                            accessible_name: PROFILE_NAMES[name] ?? name});
+                        const inside = new St.BoxLayout({...VERTICAL, x_expand: true});
+                        inside.add_child(new St.Icon({gicon: icon(iconName), icon_size: 18, x_align: Clutter.ActorAlign.START}));
+                        inside.add_child(new St.Widget({y_expand: true}));
+                        inside.add_child(label(PROFILE_NAMES[name] ?? name, 'island-power-tile-title', {x_align: Clutter.ActorAlign.START}));
+                        inside.add_child(label(note, 'island-power-tile-note', {x_align: Clutter.ActorAlign.START}));
+                        button.set_child(inside);
+                    } else {
+                        button = new St.Button({style_class: 'island-power-segment', can_focus: true, x_expand: true, label: PROFILE_NAMES[name] ?? name});
+                    }
                     button.connect('clicked', () => profiles.set(name));
-                    this._modeButtons.set(`${box === this._modes ? 'column' : 'row'}:${name}`, [name, button]);
+                    this._modeButtons.set(`${tiles ? 'row' : 'column'}:${name}`, [name, button, tiles]);
                     box.add_child(button);
                 }
             }
         }
-        for (const [name, button] of this._modeButtons.values()) {
-            button.set_style_class_name(`island-power-segment${name === profiles.active ? ' island-power-segment-on' : ''}`);
-            button.checked = name === profiles.active;
+        for (const [name, button, tile] of this._modeButtons.values()) {
+            const on = name === profiles.active;
+            const base = tile ? 'island-power-tile' : 'island-power-segment';
+            button.set_style_class_name(`${base}${on ? ` ${base}-on` : ''}`);
+            button.checked = on;
         }
     }
 
