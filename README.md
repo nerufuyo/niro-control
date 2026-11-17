@@ -3,16 +3,16 @@
 <p align="center"><img src="data/icons/hicolor/scalable/apps/org.niro.Control.svg" width="96" alt="Niro Control icon"></p>
 
 **One look for the whole GNOME desktop.** A top-bar island, a macOS-style dock, an application search, window blur and
-rounded corners, and a control panel that sets them all from one place. One repository, one `.deb`.
+rounded corners, a tiling layout manager, an emoji picker, and a control panel that sets them all from one place. One repository, one package.
 
 Runs on **Fedora 45 (GNOME Shell 51)** and **Ubuntu 24.04 (GNOME Shell 46)**, on Wayland. The extensions declare GNOME Shell 46 to 51.
-Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built by `make install` from the same tree.
+Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.1.0** ([releases](https://github.com/nerufuyo/niro-control/releases)).
 
 ## What you get
 
 | Part | What it does |
 |---|---|
-| **Island** | A notch on the top bar that opens into music with synced lyrics, calls, a focus timer, quick controls (thick volume and brightness sliders, Wi-Fi with its password asked on the spot, Bluetooth, Night Light…), reminders, a clipboard and file shelf, calendar, notifications, system stats, a battery card for laptops with the power mode and session controls, AI usage (Claude, ChatGPT Plus or Pro, Grok and an opencode Go plan through their sign-ins, and the balance of a DeepSeek API account with its key), alerts when Claude Code, Codex or opencode needs you or is done, and a voice assistant. Alerts for volume, battery, Bluetooth, meetings and more. |
+| **Island** | A notch on the top bar that opens into music with synced lyrics, calls, a focus timer, quick controls (thick volume and brightness sliders, Wi-Fi with its password asked on the spot, Bluetooth, Night Light…), reminders, a clipboard and file shelf, calendar, notifications, system stats, a battery card for laptops with the power mode and session controls, AI usage (Claude, ChatGPT Plus or Pro, Grok and an opencode Go plan through their sign-ins, and the balance of a DeepSeek API account with its key, every provider in its own column so all the numbers are in view at once), alerts when Claude Code, Codex or opencode needs you or is done, and a voice assistant. Alerts for volume, battery, Bluetooth, meetings and more. |
 | **Dock** | A dock with icon magnification, window previews, genie minimise (a pinned app's window becomes a thumbnail at the dock's end as on macOS, an unpinned app's icon becomes its overview), running indicators, auto-hide (also over full-screen apps, brought back by the screen edge) four positions, and its size and icons your own: icon size, spacing and padding, any installed icon theme, tiles (rounded, circle, glass), muted or grey icons. |
 | **Search** | `Super+Space`: a command palette for applications, a calculator, unit conversion, open windows, every Niro setting, profiles, system actions (lock, Do Not Disturb, suspend, log out…) and the island's clipboard history. One typed action registry, also on D-Bus. |
 | **Window blur** | Frosted glass behind application windows, with one strength and opacity for everything. |
@@ -50,6 +50,15 @@ One shared look with glass for backgrounds and solid text: presets, safe mode, a
 | ![Compatibility](reports/ui/compatibility.png) | ![Settings](reports/ui/gtk/settings-dark-on.png) |
 
 ## Install
+
+On **Fedora**, from the package repository (the quickest, and it keeps you up to date; see [Updating](#updating) for what to know about it):
+
+```sh
+sudo curl -o /etc/yum.repos.d/niro-control.repo https://nerufuyo.github.io/niro-control/niro-control.repo
+sudo dnf install niro-control
+```
+
+Or build it from this repository (Fedora and Ubuntu/Debian):
 
 ```sh
 git clone https://github.com/nerufuyo/niro-control.git
@@ -116,9 +125,10 @@ docs/           maintenance notes, the island's guide and D-Bus API, the list of
 | | |
 |---|---|
 | `make test` | build the TypeScript; run the node tests, the GJS tests (every setting binds, writes and resets), and the Rust tests |
-| `make test-shell` | a headless GNOME Shell against this checkout, no installed package needed: extensions load, search, appearance, blur rules |
+| `make test-shell` | a headless GNOME Shell against this checkout, no installed package needed: extensions load, search, appearance, blur rules, tiling, and the island's Controls and Power pages (with a stand-in `nmcli` and a battery the test sets) |
 | `make test-dbus` | every D-Bus call the island makes against the real `island-daemon` |
-| `make deb` | build `out/niro-control_<version>+git<commits>_amd64.deb` |
+| `make rpm` / `make deb` | build `out/niro-control-<version>-<commits>.<dist>.<arch>.rpm` / `out/niro-control_<version>+git<commits>_amd64.deb` |
+| `scripts/set-version.sh X.Y.Z`, `scripts/release.sh` | raise the version in every place it is kept; publish a GitHub release with the RPM and the dnf repository (see [`docs/MAINTAINING.md`](docs/MAINTAINING.md)) |
 | `make catalog` | regenerate the control panel's settings catalog from the schemas |
 | `make lint` | check the dock's code with Biome |
 
@@ -129,7 +139,7 @@ for how the parts talk to each other and where to change things.
 
 A personal desktop project, shared as it is. Tested on Ubuntu 24.04 (GNOME 46, Wayland, NVIDIA) and Fedora 45 (GNOME 51, Wayland):
 on Fedora, all eight extensions enable in a real headless GNOME Shell 51 and the node and GJS tests pass.
-The Fedora `.rpm` has not yet been installed and used in a full session; `docs/UAT.md` is the checklist for that.
+The Fedora `.rpm` is installed and used daily on the maintainer's Fedora 45 desktop. Not run on real hardware: a laptop battery, a Wi-Fi adapter and a screen backlight (the island's battery card, Wi-Fi list and brightness slider were tested with stand-ins), opencode itself (its alerts and its Go-plan limits were tested against the same messages and a local server, not against a real opencode), and the Ubuntu package since the Fedora work began. `docs/UAT.md` is the checklist for a full session.
 The island's TypeScript still carries `// @ts-nocheck`: converted from JavaScript, to be typed file by file.
 
 ## Credits and licence

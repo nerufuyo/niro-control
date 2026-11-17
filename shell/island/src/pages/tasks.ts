@@ -10,7 +10,7 @@ import GObject from 'gi://GObject';
 import St from 'gi://St';
 
 import {VERTICAL} from '../compat.js';
-import {iconButton, label, wrapLines} from '../widgets.js';
+import {icon, iconButton, label, wrapLines} from '../widgets.js';
 import {Page} from './page.js';
 
 /** How long the dot takes to pop into the ring. */
@@ -108,10 +108,17 @@ class TasksPage extends Page {
         this._scroll.set_child(this._list);
         this._newRow = this._buildNewRow();
         // Under the new row when there are none.
-        this._empty = label('', 'island-reminders-empty', {x_align: Clutter.ActorAlign.CENTER, y_expand: true});
+        this._empty = label('', 'island-reminders-empty', {x_align: Clutter.ActorAlign.CENTER});
+        // An icon over the words and a hint, in the middle of the room the list leaves.
+        this._emptyBox = new St.BoxLayout({...VERTICAL, style_class: 'island-reminders-none', x_expand: true, y_expand: true,
+            x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER});
+        this._emptyBox.add_child(new St.Icon({gicon: icon('island-tasks'), icon_size: 22, x_align: Clutter.ActorAlign.CENTER,
+            style_class: 'island-reminders-none-icon'}));
+        this._emptyBox.add_child(this._empty);
+        this._emptyBox.add_child(label('Type in the field above, or press +', 'island-reminders-hint', {x_align: Clutter.ActorAlign.CENTER}));
         const middle = new St.Widget({layout_manager: new Clutter.BinLayout(), x_expand: true, y_expand: true});
         middle.add_child(this._scroll);
-        middle.add_child(this._empty);
+        middle.add_child(this._emptyBox);
         column.add_child(middle);
         this.add_child(column);
 
@@ -209,6 +216,8 @@ class TasksPage extends Page {
         this._gone = new Set(open.filter(task => this._gone.has(task.id)).map(task => task.id));
         const shown = open.filter(task => !this._gone.has(task.id)).sort((a, b) => a.id - b.id);
         this._count.text = String(shown.length);
+        // A count of none says nothing the empty list does not.
+        this._count.visible = shown.length > 0;
 
         // The field stays in place, with what is typed in it and its focus, while the rows above it are
         // rebuilt: taking it off the stage, even for a moment, would drop the keyboard focus.
@@ -249,7 +258,7 @@ class TasksPage extends Page {
             previous = row;
         }
         this._known = new Set(shown.map(task => task.id));
-        this._empty.visible = shown.length === 0;
+        this._emptyBox.visible = shown.length === 0;
         this._empty.text = tasks.length > shown.length ? 'All done' : 'No reminders';
     }
 
