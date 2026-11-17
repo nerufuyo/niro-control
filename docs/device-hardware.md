@@ -51,6 +51,11 @@ The display:
 - **The amplifier and the microphone parts** are unknown (a MEMS microphone and an I2S amplifier would fit).
 - **GPIO 2** as the charge status is inferred from the log and the PCB, not read from the code.
 
+## Firmware
+
+The firmware for this board is in [`firmware/niro-device`](../firmware/niro-device/README.md). It has been built, and tested against the
+daemon on a PC, but has not been run on the board.
+
 ## Flashing
 
 - To enter the bootloader: hold BOOT (GPIO 0) **while plugging the USB cable in**. Pressing BOOT after the board has

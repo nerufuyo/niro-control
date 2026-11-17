@@ -47,7 +47,10 @@ secret, only who to talk to.
      verifier from the code the user typed. The **daemon is the SRP client**: it knows the code from the island.
      (After pairing the network roles are as before: the daemon listens and the device connects.)
    - Parameters, as `esp_srp` fixes them: the 3072-bit group with `g = 5`, SHA-512, `x = H(salt | H("niro-device:" code))`,
-     `u = H(PAD(A) | PAD(B))` padded to 384 bytes, `K = H(S)` (64 bytes).
+     `u = H(PAD(A) | PAD(B))` padded to 384 bytes, `K = H(S)` (64 bytes), `S` at its minimal length (tested against `esp_srp.c` itself over 1200 sessions).
+   - The device makes the salt whole (16 bytes) and the verifier from it, and gives both to `esp_srp`
+     (`firmware/niro-device/main/srp_device.c`): `esp_srp_srv_pubkey` makes its own salt at minimal length, so one
+     salt in 256 is 15 bytes long where the code reads 16, and the pairing then fails by chance.
    - The `srp` crate disagrees with `esp_srp` on `u` (unpadded), on the key (raw `S`) and on the proofs, so the
      daemon uses only its arithmetic and follows `esp_srp.c` for the rest (`device/srp.rs`). The proofs M1 and M2 are
      not used: both sides hold `K`, and step 4 confirms it.
@@ -98,7 +101,7 @@ JSON text frames for control; binary frames for audio. `t` is the type.
 | `listen.stop` | | The user let go, or the device's own end-of-speech fired. |
 | *(binary)* | Opus frame, 20 ms | Audio, only between `listen.start` and `listen.stop`. |
 | `button` | `id`, `action: press\|long\|release` | A button the daemon may bind to something. |
-| `status` | `battery`, `charging`, `temp_c`, `rssi`, `fw` | Every 30 s and when something changes. |
+| `status` | `battery`, `charging`, `temp_c`, `rssi`, `fw` | Every 30 s and when something changes. `battery` is 0 to 100, or 255 when the device does not read it. |
 | `ack` | `id` | A notification was shown or dismissed. |
 | `ping` | | Keep-alive, every 15 s. |
 
@@ -114,6 +117,10 @@ JSON text frames for control; binary frames for audio. `t` is the type.
 | `config` | `volume`, `brightness`, `language` | Set by the user in the panel, kept by the device. |
 | `pong` | | |
 | `bye` | `reason` | The daemon is closing (`forgotten`, `shutdown`). |
+
+While pairing, before the connection is sealed, the daemon also sends `pair.a` and `pair.done`, and `pair.denied` when the user
+does not allow the device: a device that typed the wrong code is not told anything, the connection is simply closed, so the two can
+be told apart.
 
 Notifications come from what the daemon already has: `Alert` and the agent hooks (`Agents1`), reminders,
 meetings, battery. Which kinds reach the device is a per-device setting in the panel.
@@ -143,9 +150,6 @@ a **backup of the board first**.
 
 ## Open questions
 
-- **[open]** Whether `esp_srp` writes `S` with its minimal length (assumed) or padded to 384 bytes before hashing:
-  the source shows `esp_mpi_to_bin`, whose padding is not in the files read. One real pairing settles it; a
-  wrong guess makes the two keys differ now and then, never silently succeed.
 - **[open]** The `srp` crate has had no independent audit; the daemon uses only its modular arithmetic.
 - **[open]** Wake word on the device, or button only. A button is the first version.
 - **[open]** Speaker output: Opus from the PC (needs TTS on the PC) or text only at first.

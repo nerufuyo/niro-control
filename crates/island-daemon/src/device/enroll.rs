@@ -4,8 +4,8 @@
 //! Pairing over the socket, the daemon's side. The user typed the code on the device; the island shows it.
 //! The device made a salt and `B` from it (see `srp.rs`), so both ends reach the same key `K` only when they
 //! hold the same code. Each proves it with a MAC over `K`, the user is asked to allow the device, and only
-//! then does the long-term device key travel, sealed with a key from `K`. A wrong code, a refusal or a
-//! timeout ends the connection with no key given.
+//! then does the long-term device key travel, sealed with a key from `K`. A wrong code ends the connection without a
+//! word; a refusal says `pair.denied` first; a timeout ends it. No key is given in any of them.
 
 use std::future::Future;
 
@@ -97,12 +97,16 @@ where
         .verify_slice(&proof)
         .map_err(|_| Error::Auth)?;
 
-    let device_key = approve(Offer {
+    let Some(device_key) = approve(Offer {
         device_id: hello.device_id,
         name: hello.name,
     })
     .await
-    .ok_or(Error::Declined)?;
+    else {
+        // Said, so the device can tell a refusal from a wrong code (which gets no word at all).
+        let _ = write_clear(&mut stream, &Clear::PairDenied).await;
+        return Err(Error::Declined);
+    };
 
     let mut secret = Vec::with_capacity(48);
     secret.extend_from_slice(&daemon_id);
