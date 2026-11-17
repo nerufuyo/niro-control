@@ -228,7 +228,7 @@ Click the gear right of the clock in the open island (or Island's gear in the
   under **AI Agents**, a switch for each of Claude Code and Codex that is
   installed (on by default; none listed when neither is).
 - **About:** the version and whether it is up to date (with how to update,
-  and the switch for asking GitHub once a day), help, a bug report to copy
+  and the switch for asking GitHub every six hours), help, a bug report to copy
   (`island-daemon --report`), and resetting every setting.
 
 ## Voice assistant
