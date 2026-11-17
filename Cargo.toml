@@ -29,10 +29,13 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "serd
 dirs = "6"
 # Plain log lines: the journal adds the time, and filters are simple module names.
 env_logger = { version = "0.11", default-features = false }
+chacha20poly1305 = { version = "0.10", default-features = false, features = ["alloc"] }
 futures-util = { version = "0.3", default-features = false, features = ["std"] }
 gdk4-x11 = "0.11"
 gtk4 = { version = "0.11", features = ["v4_12"] }
 # Phone sharing's tiny HTTP server reads request heads with it; nothing else of a web stack.
+hkdf = "0.12"
+hmac = "0.12"
 httparse = "1"
 image = { version = "0.25", default-features = false, features = ["png"] }
 inotify = { version = "0.11", default-features = false, features = ["stream"] }

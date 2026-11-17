@@ -16,10 +16,13 @@ path = "src/main.rs"
 island-core.workspace = true
 
 anyhow.workspace = true
+chacha20poly1305.workspace = true
 chrono.workspace = true
 dirs.workspace = true
 env_logger.workspace = true
 futures-util.workspace = true
+hkdf.workspace = true
+hmac.workspace = true
 httparse.workspace = true
 image.workspace = true
 inotify.workspace = true

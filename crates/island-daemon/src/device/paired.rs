@@ -24,9 +24,34 @@ pub struct Paired {
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct PairedDevices {
     pub devices: Vec<Paired>,
+    /// This daemon's own id (16 random bytes in hex), made once; a device stores it to know whom it paired with.
+    #[serde(default)]
+    pub daemon_id: String,
 }
 
 impl PairedDevices {
+    /// This daemon's id, made on first use. True in the second value when it was just made (save the list).
+    pub fn ensure_daemon_id(&mut self) -> (String, bool) {
+        let fresh = self.daemon_id.len() != 32;
+        if fresh {
+            self.daemon_id = hex(&random::<16>());
+        }
+        (self.daemon_id.clone(), fresh)
+    }
+
+    /// The 32-byte key of a paired device, if it is paired and its stored key is well formed.
+    pub fn key_bytes(&self, device_id: &str) -> Option<[u8; 32]> {
+        let key = self.find(device_id)?.key.as_bytes();
+        let mut out = [0u8; 32];
+        if key.len() != 64 {
+            return None;
+        }
+        for (byte, pair) in out.iter_mut().zip(key.chunks(2)) {
+            *byte = u8::from_str_radix(std::str::from_utf8(pair).ok()?, 16).ok()?;
+        }
+        Some(out)
+    }
+
     /// Pairs a device and returns its new key. A device already paired gets a new key, and the old one
     /// stops working: pairing again is how a lost key is replaced.
     pub fn add(&mut self, device_id: &str, name: &str, now_ms: i64) -> String {
@@ -129,6 +154,26 @@ mod tests {
         assert!(!devices.rename("other", "x"));
         assert_eq!(devices.find(MAC).map(|d| d.name.as_str()), Some("Kitchen"));
         assert!(devices.key_matches(MAC, &key));
+    }
+
+    #[test]
+    fn a_key_comes_back_as_bytes() {
+        let mut devices = PairedDevices::default();
+        let key = devices.add(MAC, "Desk", 1);
+        let bytes = devices.key_bytes(MAC).expect("key");
+        assert_eq!(hex(&bytes), key);
+        assert_eq!(devices.key_bytes("other"), None);
+    }
+
+    #[test]
+    fn the_daemon_id_is_made_once() {
+        let mut devices = PairedDevices::default();
+        let (first, fresh) = devices.ensure_daemon_id();
+        assert!(fresh);
+        assert_eq!(first.len(), 32);
+        let (second, fresh) = devices.ensure_daemon_id();
+        assert!(!fresh);
+        assert_eq!(first, second);
     }
 
     #[test]
