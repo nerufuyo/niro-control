@@ -37,6 +37,12 @@ test('a device online says its battery when it told, and that it charges', () =>
     assert.equal(deviceStatus({online: true, status: {fw: '0.1.0'}}), 'Online');
 });
 
+test('a battery the device does not read (255) is not shown as a level', () => {
+    assert.equal(deviceStatus({online: true, status: {battery: 255, charging: false}}), 'Online');
+    assert.equal(deviceStatus({online: true, status: {battery: 100, charging: false}}), 'Online · 100%');
+    assert.equal(deviceStatus({online: true, status: {battery: 101, charging: false}}), 'Online');
+});
+
 test('a code handed over before the island hears it is open is kept', () => {
     const base = {code: '123456', seenOpen: false, now: 1000, until: 126000};
     assert.deepEqual(codeKept({...base, open: false}), {code: '123456', seenOpen: false});

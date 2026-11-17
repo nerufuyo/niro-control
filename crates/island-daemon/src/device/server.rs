@@ -420,4 +420,160 @@ mod tests {
         ));
         let _ = std::fs::remove_dir_all(dir);
     }
+
+    /// The firmware's own `link.c` and `pair.c`, built for the PC (`firmware/niro-device/test/host/build.sh`), as the device and
+    /// this server as the daemon, over a real socket: the two implementations of the protocol must agree on every label and
+    /// every byte. `NIRO_DEVICE_SIM=<dir>/device_sim dbus-run-session -- cargo test -p island-daemon -- --ignored firmware_e2e`
+    #[tokio::test]
+    #[ignore = "needs a session bus and the device_sim build: set NIRO_DEVICE_SIM"]
+    async fn firmware_e2e() {
+        use std::process::Stdio;
+        use tokio::io::{AsyncBufReadExt, BufReader};
+        use tokio::process::Command;
+
+        let sim = std::env::var("NIRO_DEVICE_SIM").expect("NIRO_DEVICE_SIM");
+        let dir = std::env::temp_dir().join(format!("niro-devices-fw-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        let service = DeviceService::with_store(Store::at(dir.join("devices.json")));
+        let bus = zbus::connection::Builder::session()
+            .unwrap()
+            .serve_at("/org/niro/island/DevicesFw", service)
+            .unwrap()
+            .build()
+            .await
+            .unwrap();
+        let iface = bus
+            .object_server()
+            .interface::<_, DeviceService>("/org/niro/island/DevicesFw")
+            .await
+            .unwrap();
+        tokio::spawn(super::super::service::run(iface.clone()));
+        tokio::spawn(run(iface.clone()));
+
+        let code = iface.get_mut().await.open_pairing();
+        let port = loop {
+            if let Some(port) = iface.get().await.port {
+                break port;
+            }
+            sleep(Duration::from_millis(50)).await;
+        };
+        let host = crate::share::lan().expect("a network").ip.to_string();
+        let port = port.to_string();
+        let device = |args: Vec<String>| {
+            Command::new(&sim)
+                .args(args)
+                .stdout(Stdio::piped())
+                .kill_on_drop(true)
+                .spawn()
+                .expect("device_sim starts")
+        };
+        // The device's answer: its first line.
+        async fn first_line(child: &mut tokio::process::Child) -> String {
+            let out = child.stdout.take().unwrap();
+            let mut lines = BufReader::new(out).lines();
+            tokio::time::timeout(Duration::from_secs(60), lines.next_line())
+                .await
+                .expect("an answer in time")
+                .unwrap()
+                .unwrap_or_default()
+        }
+        let pair_args = |code: &str| ["pair", &host, &port, code, "10:b4:1d:e9:9d:34", "Niro Device 9D34"].map(String::from).to_vec();
+
+        // A wrong code is dropped at once (PAIR_CODE is 2), and the user is never asked.
+        let mut wrong = device(pair_args("000000"));
+        assert_eq!(first_line(&mut wrong).await, "FAIL 2");
+        assert!(iface.get().await.request.is_none());
+
+        // The right code: the user is asked and denies (PAIR_DENIED is 3), and no key is given.
+        let mut denied = device(pair_args(&code));
+        let asking = async {
+            loop {
+                if iface.get().await.request.is_some() {
+                    return;
+                }
+                sleep(Duration::from_millis(50)).await;
+            }
+        };
+        let (line, ()) = tokio::join!(first_line(&mut denied), async {
+            asking.await;
+            assert!(iface.get_mut().await.answer_request(false));
+        });
+        assert_eq!(line, "FAIL 3");
+        assert!(iface.get().await.devices.devices.is_empty());
+
+        // And allowed.
+        let mut paired = device(pair_args(&code));
+        let asking = async {
+            loop {
+                let pending = iface.get().await.request.as_ref().map(|p| p.offer.clone());
+                if let Some(offer) = pending {
+                    return offer;
+                }
+                sleep(Duration::from_millis(50)).await;
+            }
+        };
+        let (line, offer) = tokio::join!(first_line(&mut paired), async {
+            let offer = asking.await;
+            assert!(iface.get_mut().await.answer_request(true));
+            offer
+        });
+        assert_eq!((offer.device_id.as_str(), offer.name.as_str()), ("10:b4:1d:e9:9d:34", "Niro Device 9D34"));
+        let mut parts = line.split_whitespace();
+        assert_eq!(parts.next(), Some("OK"), "{line}");
+        let (daemon_id, key) = (parts.next().unwrap().to_owned(), parts.next().unwrap().to_owned());
+        assert_eq!(daemon_id, iface.get_mut().await.daemon_id());
+        assert!(iface.get().await.devices.key_matches("10:b4:1d:e9:9d:34", &key));
+
+        // Back with the key: let in, answered, its status kept, sent a notification, told to go when forgotten.
+        let mut connected = device(["hello", &host, &port, &key, "10:b4:1d:e9:9d:34"].map(String::from).to_vec());
+        let mut lines = BufReader::new(connected.stdout.take().unwrap()).lines();
+        async fn next_line(lines: &mut tokio::io::Lines<BufReader<tokio::process::ChildStdout>>) -> String {
+            tokio::time::timeout(Duration::from_secs(20), lines.next_line()).await.expect("a line in time").unwrap().unwrap_or_default()
+        }
+        assert_eq!(next_line(&mut lines).await, "CONNECTED");
+        assert_eq!(next_line(&mut lines).await, "MSG {\"t\":\"pong\"}");
+        let listed = loop {
+            let listed = iface.get().await.devices_json();
+            if listed.contains("\"battery\":255") {
+                break listed;
+            }
+            sleep(Duration::from_millis(50)).await;
+        };
+        assert!(listed.contains("\"online\":true"), "{listed}");
+        let sent = iface.get().await.broadcast(&ToDevice::Notify {
+            id: 1,
+            kind: super::super::proto::Kind::Agent,
+            title: "Claude Code".into(),
+            body: "Needs you".into(),
+            urgent: true,
+            expire_ms: 30_000,
+        });
+        assert_eq!(sent, 1);
+        let notification = next_line(&mut lines).await;
+        assert!(notification.contains("\"title\":\"Claude Code\"") && notification.contains("\"urgent\":true"), "{notification}");
+        iface.get_mut().await.forget_for_test("10:b4:1d:e9:9d:34");
+        assert!(next_line(&mut lines).await.contains("\"t\":\"bye\""));
+        assert_eq!(next_line(&mut lines).await, "END");
+
+        // With nothing paired and no code open the daemon stops listening; a new code brings it back, on a new port.
+        for _ in 0..100 {
+            if iface.get().await.port.is_none() {
+                break;
+            }
+            sleep(Duration::from_millis(50)).await;
+        }
+        assert!(iface.get().await.port.is_none(), "it should stop listening");
+        iface.get_mut().await.open_pairing();
+        let port = loop {
+            if let Some(port) = iface.get().await.port {
+                break port.to_string();
+            }
+            sleep(Duration::from_millis(50)).await;
+        };
+        // A device the daemon does not know is closed without an answer.
+        let mut stranger = device(["hello", &host, &port, &key, "aa:bb:cc:dd:ee:ff"].map(String::from).to_vec());
+        assert_eq!(first_line(&mut stranger).await, "REFUSED");
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }

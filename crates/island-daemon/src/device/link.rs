@@ -87,6 +87,10 @@ pub(super) enum Clear {
     PairProof { mac: String },
     #[serde(rename = "pair.done")]
     PairDone { mac: String, sealed: String },
+    /// The user did not allow the device (or did not answer): said before the connection closes, so a device can
+    /// tell a refusal from a wrong code, which is a connection closed without a word.
+    #[serde(rename = "pair.denied")]
+    PairDenied,
 }
 
 /// What a sealed frame holds.

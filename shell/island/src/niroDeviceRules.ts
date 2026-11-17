@@ -19,7 +19,8 @@ export function deviceStatus(device) {
     if (!device.online)
         return 'Offline';
     const battery = device.status?.battery;
-    if (typeof battery !== 'number')
+    // A device that does not read its battery says 255.
+    if (typeof battery !== 'number' || battery > 100)
         return 'Online';
     return `Online · ${battery}%${device.status.charging ? ' · charging' : ''}`;
 }
