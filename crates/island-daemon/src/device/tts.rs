@@ -19,6 +19,12 @@ const FRAME: usize = 320;
 const MAX_SAMPLES: usize = 60 * 16_000;
 const MAKING: Duration = Duration::from_secs(20);
 
+/// Niro's voice is a slime's: light, young and soft, neither a man's nor a woman's. espeak-ng cannot be anyone in particular;
+/// a higher pitch, a gentle female variant and an unhurried pace come closest to that.
+const SPEED: &str = "152";
+const PITCH: &str = "74";
+const VARIANT: &str = "+f3";
+
 /// The espeak-ng voice for a language: the device's if it gave one, else this computer's (`LANG`), else English.
 fn voice(language: &str) -> String {
     let from = |text: &str| -> Option<String> {
@@ -33,7 +39,7 @@ fn voice(language: &str) -> String {
 /// The speech as frames for the speaker; `None` when there is no espeak-ng, or it did not make any.
 pub async fn speak(text: &str, language: &str) -> Option<Vec<Vec<u8>>> {
     let child = Command::new("espeak-ng")
-        .args(["--stdout", "-s", "165", "-v", &voice(language), "--"])
+        .args(["--stdout", "-s", SPEED, "-p", PITCH, "-v", &format!("{}{}", voice(language), VARIANT), "--"])
         .arg(text)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())

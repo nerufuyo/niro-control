@@ -58,6 +58,10 @@ pub enum FromDevice {
         #[serde(default = "pcm")]
         codec: String,
         rate: u32,
+        /// Empty: a question, until `listen.stop`. `wake`: the device is waiting for the keyword and sends its microphone
+        /// until it says `listen.stop`; the daemon finds the utterances.
+        #[serde(default)]
+        mode: String,
     },
     #[serde(rename = "listen.stop")]
     ListenStop,
@@ -106,6 +110,8 @@ pub enum ToDevice {
         volume: u8,
         brightness: u8,
         language: String,
+        /// Whether to wait for "Momo Niro" and send the microphone for it.
+        wake: bool,
     },
     #[serde(rename = "pong")]
     Pong,
