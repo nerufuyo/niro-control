@@ -20,6 +20,8 @@ void draw_eye(uint16_t *px, float cx, float cy, float hx, float hy, float r, flo
               float circ_y, float circ_r, rgb_t colour, float alpha);
 /** A filled circle. */
 void draw_circle(uint16_t *px, float cx, float cy, float radius, rgb_t colour, float alpha);
+/** A ring of the given radius (to the middle of its stroke) and thickness. */
+void draw_ring(uint16_t *px, float cx, float cy, float r, float thick, rgb_t colour, float alpha);
 /** A filled ellipse. */
 void draw_ellipse(uint16_t *px, float cx, float cy, float rx, float ry, rgb_t colour, float alpha);
 /** A stroke along a circular arc bulging down (`sag` > 0, a smile) or up (< 0) over the chord from (x0, y) to (x1, y), `sag`

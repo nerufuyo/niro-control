@@ -22,6 +22,7 @@ mod service;
 mod srp;
 mod tts;
 mod voice;
+mod wake;
 
 pub use self::voice::set_assistant;
 pub use self::feed::{from_agent, from_system, push, run as feed};

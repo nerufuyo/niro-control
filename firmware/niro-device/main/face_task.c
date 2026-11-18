@@ -10,6 +10,7 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "gfx.h"
+#include "hud.h"
 
 static SemaphoreHandle_t lock;  // held while a frame is built and sent, and while the face's state is changed
 static volatile bool active;
@@ -21,6 +22,7 @@ static void task(void *arg) {
     int64_t last = esp_timer_get_time();
     int64_t report = last, draw_us = 0;
     int frames = 0;
+    int64_t drawn_prev = last;
     for (;;) {
         if (active) {
             xSemaphoreTake(lock, portMAX_DELAY);
@@ -31,8 +33,10 @@ static void task(void *arg) {
                 uint16_t *canvas = gfx_canvas();
                 int64_t drawn = esp_timer_get_time();
                 face_draw(canvas);
+                hud_draw(canvas, (int)((now - drawn_prev) / 1000), face_get(), caption[0] != 0);
                 draw_us += esp_timer_get_time() - drawn;
                 frames++;
+                drawn_prev = now;
                 if (caption[0]) {
                     int width = (int)strlen(caption) * 12;
                     draw_text(canvas, (240 - width) / 2, 218, 2, (rgb_t){190, 220, 255}, .95f, caption);

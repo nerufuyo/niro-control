@@ -241,7 +241,13 @@ impl DeviceService {
             volume: device.volume,
             brightness: device.brightness,
             language: device.language.clone(),
+            wake: device.wake,
         })
+    }
+
+    /// Whether a device may wait for the keyword (and send its microphone for it).
+    pub(super) fn wants_wake(&self, device_id: &str) -> bool {
+        self.devices.find(device_id).is_some_and(|device| device.wake)
     }
 
     /// The language a device's questions are heard in when it names none.
@@ -343,6 +349,7 @@ impl DeviceService {
                     "volume": device.volume,
                     "brightness": device.brightness,
                     "language": device.language,
+                    "wake": device.wake,
                 })
             })
             .collect();
@@ -465,6 +472,27 @@ impl DeviceService {
             return Err(fdo::Error::InvalidArgs("a language is codes like `id,en`".into()));
         }
         if !self.devices.set_config(device_id, volume as u8, brightness as u8, language) {
+            return Err(fdo::Error::InvalidArgs(format!("no device `{device_id}` is paired")));
+        }
+        self.store.save(&self.devices);
+        if let Some(config) = self.config_for(device_id) {
+            self.send_to(device_id, &config);
+        }
+        Ok(self.devices_changed(&emitter).await?)
+    }
+
+    /// Turns waiting for "Momo Niro" on or off for a device; it is told at once. While it is on the device sends its
+    /// microphone to this computer, which listens for the keyword and keeps nothing. GNOME Shell only.
+    async fn set_wake(
+        &mut self,
+        device_id: &str,
+        on: bool,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] connection: &Connection,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> fdo::Result<()> {
+        crate::caller::shell_only(connection, &header).await?;
+        if !self.devices.set_wake(device_id, on) {
             return Err(fdo::Error::InvalidArgs(format!("no device `{device_id}` is paired")));
         }
         self.store.save(&self.devices);

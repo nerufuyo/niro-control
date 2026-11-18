@@ -30,6 +30,13 @@ pub struct Paired {
     /// The language it listens and speaks (codes like `id,en`; empty: this computer's).
     #[serde(default)]
     pub language: String,
+    /// Whether it waits for the keyword "Momo Niro" (its microphone is sent to this computer meanwhile). On by default.
+    #[serde(default = "default_wake")]
+    pub wake: bool,
+}
+
+fn default_wake() -> bool {
+    true
 }
 
 fn default_volume() -> u8 {
@@ -85,6 +92,7 @@ impl PairedDevices {
             muted: Vec::new(),
             volume: default_volume(),
             brightness: default_brightness(),
+            wake: true,
             language: String::new(),
         });
         key
@@ -142,6 +150,15 @@ impl PairedDevices {
         device.volume = volume;
         device.brightness = brightness;
         device.language = language.to_owned();
+        true
+    }
+
+    /// Turns waiting for the keyword on or off; true when the device was paired.
+    pub fn set_wake(&mut self, device_id: &str, on: bool) -> bool {
+        let Some(device) = self.devices.iter_mut().find(|device| device.device_id == device_id) else {
+            return false;
+        };
+        device.wake = on;
         true
     }
 

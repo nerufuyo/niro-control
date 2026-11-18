@@ -1,6 +1,7 @@
 // The Niro Device: an assistant with a screen and three buttons that pairs with one user's Niro by a code and then
 // shows its notifications. See docs/device-protocol.md, docs/device-hardware.md.
 #include <stdio.h>
+#include <math.h>
 #include <string.h>
 
 #include "board.h"
@@ -20,6 +21,7 @@
 #include "adpcm.h"
 #include "mic.h"
 #include "spk.h"
+#include "hud.h"
 #include "lwip/sockets.h"
 #include "net.h"
 #include "pair.h"
@@ -30,6 +32,8 @@ static const char *TAG = "niro";
 #define FIRMWARE "0.1.0"
 
 static QueueHandle_t buttons;
+static bool wake_on;          // the daemon wants the microphone sent, to wait for "Momo Niro" (its `config` says so)
+static int64_t think_until;   // a question was asked and no answer has come: give up on it at this time
 static char device_id[18];    // the MAC, as the daemon is told it
 static char device_name[24];  // "Niro Device 9D34"
 
@@ -123,6 +127,9 @@ static void config_in(const char *json) {
     const cJSON *brightness = msg ? cJSON_GetObjectItem(msg, "brightness") : NULL;
     if (cJSON_IsNumber(volume)) spk_set_volume(volume->valueint);
     if (cJSON_IsNumber(brightness)) gfx_backlight(brightness->valueint);
+    // A daemon from before the keyword says nothing of it: the microphone is then only for the button.
+    const cJSON *wake = msg ? cJSON_GetObjectItem(msg, "wake") : NULL;
+    wake_on = cJSON_IsTrue(wake);
     cJSON_Delete(msg);
 }
 
@@ -171,7 +178,7 @@ static int talk(link_t *link) {
         sleep_ms(2000);
         return 0;
     }
-    mood(FACE_LISTENING, "LISTENING");
+    mood(FACE_LISTENING, NULL);  // the sound bars under the face say it
     if (link_send(link, "{\"t\":\"listen.start\",\"lang\":\"\",\"codec\":\"adpcm\",\"rate\":16000}") != 0) {
         mic_stop();
         return -1;
@@ -191,6 +198,7 @@ static int talk(link_t *link) {
     mic_stop();
     if (rc == 0 && link_send(link, "{\"t\":\"listen.stop\"}") != 0) rc = -1;
     mood(FACE_THINKING, "THINKING");
+    think_until = now_ms() + 30000;
     xQueueReset(buttons);
     return rc;
 }
@@ -242,8 +250,51 @@ static void serve(const uint8_t daemon_id[16], const uint8_t key[32]) {
     int64_t up_since = 0;
     char answer[1100];
     int page = 0, pages = 1;
+    // Waiting for the keyword: the microphone goes to the daemon, which listens for "Momo Niro". It is not sent while the
+    // speaker is talking (or the device would hear itself), nor while the button is asking.
+    bool streaming = false, mic_ok = true;
+    int64_t mute_until = 0, last_hud = 0;
+    wake_on = false;
+    think_until = 0;
     for (;;) {
         int64_t now = now_ms();
+        if (now - last_hud >= 2000) {
+            hud_status(battery_percent(), battery_charging(), net_rssi(), wake_on, streaming);
+            last_hud = now;
+        }
+        if (think_until && now > think_until) {
+            think_until = 0;
+            mood(FACE_CURIOUS, "NO ANSWER");
+            connected_at = now - 1000;  // calm again in a few seconds
+        }
+        bool want = wake_on && mic_ok && now >= mute_until;
+        if (want && !streaming) {
+            if (mic_init() == 0 && mic_start() == 0 &&
+                link_send(&link, "{\"t\":\"listen.start\",\"lang\":\"\",\"codec\":\"adpcm\",\"rate\":16000,\"mode\":\"wake\"}") == 0) {
+                streaming = true;
+                hud_status(battery_percent(), battery_charging(), net_rssi(), wake_on, true);
+            } else {
+                mic_stop();
+                mic_ok = false;
+            }
+        } else if (!want && streaming) {
+            mic_stop();
+            streaming = false;
+            hud_status(battery_percent(), battery_charging(), net_rssi(), wake_on, false);
+            if (link_send(&link, "{\"t\":\"listen.stop\"}") != 0) break;
+        }
+        if (streaming) {
+            int16_t room[320];  // 20 ms
+            int n = mic_read(room, 320, 30);
+            if (n > 0) {
+                int64_t sum = 0;
+                for (int i = 0; i < n; i++) sum += (int32_t)room[i] * room[i];
+                hud_level(sqrtf((float)(sum / n)) / 2500.f);
+                uint8_t packed[3 + 160];
+                static adpcm_t room_coder;
+                if (link_send_audio(&link, packed, adpcm_encode(&room_coder, room, (size_t)n, packed)) != 0) break;
+            }
+        }
         if (connected_at && now - connected_at > 4000) {
             connected_at = 0;
             mood(FACE_IDLE, NULL);
@@ -267,6 +318,11 @@ static void serve(const uint8_t daemon_id[16], const uint8_t key[32]) {
             else if (now - up_since >= 300) {
                 face_task_poke();
                 notifying = answering = false;
+                if (streaming) {
+                    mic_stop();
+                    streaming = false;
+                    if (link_send(&link, "{\"t\":\"listen.stop\"}") != 0) break;
+                }
                 if (talk(&link) != 0) break;
                 up_since = 0;
                 last_ping = 0;
@@ -277,18 +333,24 @@ static void serve(const uint8_t daemon_id[16], const uint8_t key[32]) {
         }
         char text[LINK_PAYLOAD_MAX + 1];
         size_t len = 0;
-        int got = link_recv(&link, text, sizeof text, &len, 200);
+        int got = link_recv(&link, text, sizeof text, &len, streaming ? 5 : 200);
         if (got < 0) break;
         if (got == 2) {
             // A frame of speech: played as it comes, which also keeps the daemon from sending faster than it is heard.
             static int16_t speech[480];
             int n = adpcm_decode((const uint8_t *)text, len, speech, 480);
             if (n > 0 && spk_init() == 0) spk_play(speech, (size_t)n);
+            mute_until = now_ms() + 1500;
+            think_until = 0;
             face_task_poke();
         } else if (got == 1 && len) {
             int kind = kind_of(text);
             if (kind == 2) break;
-            if (kind == 5) spk_stop();
+            if (kind == 5) {
+                spk_stop();
+                mute_until = now_ms() + 1200;  // the room is still ringing a little
+            }
+            if (kind == 3 || kind == 4) think_until = 0;
             if (kind == 6) config_in(text);
             face_task_poke();
             if (kind == 3 && !notifying) {
