@@ -97,7 +97,7 @@ JSON text frames for control; binary frames for audio. `t` is the type.
 
 | `t` | Fields | Meaning |
 |---|---|---|
-| `listen.start` | `lang`, `codec`, `rate: 16000` | The user asked (hold UP). Audio frames follow. `codec` is `adpcm` (what the firmware sends: IMA ADPCM, 4 bits a sample, 20 ms = 163 bytes a frame, 64 kbit/s; the frame is a 3-byte header, the predictor and the step index, then the samples; `device/adpcm.rs` and `firmware/niro-device/main/adpcm.c` are the same code and are tested against each other) or `pcm` (16-bit little-endian samples, 640 bytes a frame); `opus` may come later. |
+| `listen.start` | `lang`, `codec`, `rate: 16000`, `mode` | With `mode: "wake"` the device is waiting for the keyword "Momo Niro" (only when its `config` has `wake: true`): it sends its microphone until `listen.stop`, never while its speaker is talking, and the daemon cuts the audio into utterances (an energy gate), turns each one of up to 8 s into words, and acts on one that holds the keyword: what follows it is the question; the keyword alone wakes the device (`face listening`) and the next utterance, within 8 s, is the question. Nothing is kept. Without `mode`: the user asked (hold UP). Audio frames follow. `codec` is `adpcm` (what the firmware sends: IMA ADPCM, 4 bits a sample, 20 ms = 163 bytes a frame, 64 kbit/s; the frame is a 3-byte header, the predictor and the step index, then the samples; `device/adpcm.rs` and `firmware/niro-device/main/adpcm.c` are the same code and are tested against each other) or `pcm` (16-bit little-endian samples, 640 bytes a frame); `opus` may come later. |
 | `listen.stop` | | The user let go (or 15 s passed). The daemon turns the audio into words (whisper), asks the assistant and sends `face`, `stt` and `answer`. A tap under a third of a second is answered "I did not catch that". One question at a time per connection; the longest is 30 s. |
 | *(binary)* | PCM (or Opus) frame, 20 ms | Audio, only between `listen.start` and `listen.stop`. |
 | `button` | `id`, `action: press\|long` | BOOT (1) and DOWN (2) with nothing on the screen (UP, 0, is for talking). The daemon raises `Devices1.Button`; the island plays or skips the music, or starts the focus timer. |
@@ -115,7 +115,7 @@ JSON text frames for control; binary frames for audio. `t` is the type.
 | `audio.end` | | The speech is over. |
 | `notify` | `id`, `kind`, `title`, `body`, `urgency`, `expire_ms` | An alert. `kind`: `agent`, `reminder`, `meeting`, `battery`, `system`. |
 | `face` | `name` | The mood of the mascot, a slime (see `firmware/niro-device/MASCOT.md`): `idle`, `listening`, `thinking`, `speaking`, `happy`, `alert`, `sleepy`, `sad`, `curious`, `love`. The device also has moods of its own for what it is doing (waking, searching for Wi-Fi). |
-| `config` | `volume`, `brightness`, `language` | Set by the user in the panel (`Devices1.SetConfig`), kept by the daemon and sent when the device connects and when they change. The device applies the volume (0 is mute) and the backlight. |
+| `config` | `volume`, `brightness`, `language`, `wake` | Set by the user in the panel (`Devices1.SetConfig`), kept by the daemon and sent when the device connects and when they change. The device applies the volume (0 is mute) and the backlight. |
 | `pong` | | |
 | `bye` | `reason` | The daemon is closing (`forgotten`, `shutdown`). |
 

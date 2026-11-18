@@ -1,12 +1,12 @@
 # Niro Control
 
-<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control 1.4.0: one look for the whole GNOME desktop"></p>
+<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control 1.5.0: one look for the whole GNOME desktop"></p>
 
 **One look for the whole GNOME desktop.** A top-bar island, a macOS-style dock, an application search, window blur and
 rounded corners, a tiling layout manager, an emoji picker, and a control panel that sets them all from one place. One repository, one package.
 
 Runs on **Fedora 45 (GNOME Shell 51)** and **Ubuntu 24.04 (GNOME Shell 46)**, on Wayland. The extensions declare GNOME Shell 46 to 51.
-Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.4.0** ([releases](https://github.com/nerufuyo/niro-control/releases)).
+Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.5.0** ([releases](https://github.com/nerufuyo/niro-control/releases)).
 
 ## What you get
 

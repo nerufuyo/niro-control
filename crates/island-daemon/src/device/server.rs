@@ -251,6 +251,9 @@ async fn session(iface: &InterfaceRef<DeviceService>, link: Link<TcpStream>) {
         let _ = reply_to.send(ToDevice::Face { name: super::proto::Face::Sleepy });
     }
     let mut heard: Option<Heard> = None;
+    // While it waits for its keyword the device sends its microphone: cut into utterances, each looked at once.
+    let mut waiting: Option<(super::wake::Cutter, bool)> = None;
+    let awake = super::wake::Awake::default();
     let busy = Busy::default();
     changed(iface).await;
     info!("{device_id} connected");
@@ -281,14 +284,34 @@ async fn session(iface: &InterfaceRef<DeviceService>, link: Link<TcpStream>) {
                         let service = iface.get().await;
                         let _ = service.devices_changed(iface.signal_emitter()).await;
                     }
-                    Incoming::Control(FromDevice::ListenStart { lang, codec, rate }) => {
-                        let lang = if lang.is_empty() { iface.get().await.language_for(&device_id) } else { lang };
-                        heard = Heard::begin(&lang, &codec, rate);
+                    Incoming::Control(FromDevice::ListenStart { lang, codec, rate, mode }) => {
+                        if mode == "wake" {
+                            heard = None;
+                            waiting = (matches!(codec.as_str(), "pcm" | "adpcm") && rate == 16_000 && iface.get().await.wants_wake(&device_id))
+                                .then(|| (super::wake::Cutter::default(), codec == "adpcm"));
+                        } else {
+                            let lang = if lang.is_empty() { iface.get().await.language_for(&device_id) } else { lang };
+                            waiting = None;
+                            heard = Heard::begin(&lang, &codec, rate);
+                        }
                     }
                     Incoming::Audio(frame) => {
                         if let Some(heard) = heard.as_mut() {
                             heard.push(&frame);
+                        } else if let Some((cutter, adpcm)) = waiting.as_mut() {
+                            let samples = if *adpcm {
+                                super::adpcm::decode(&frame).unwrap_or_default()
+                            } else {
+                                frame.chunks_exact(2).map(|pair| i16::from_le_bytes([pair[0], pair[1]])).collect()
+                            };
+                            if let Some(utterance) = cutter.push(&samples) {
+                                let lang = iface.get().await.language_for(&device_id);
+                                voice::hear(utterance, lang, &busy, &awake, reply_to.clone(), voice::assistant());
+                            }
                         }
+                    }
+                    Incoming::Control(FromDevice::ListenStop) if waiting.is_some() && heard.is_none() => {
+                        waiting = None;
                     }
                     Incoming::Control(FromDevice::ListenStop) => {
                         if let Some(heard) = heard.take() {
@@ -418,7 +441,7 @@ mod tests {
             .unwrap();
         device.send(&FromDevice::Ping).await.unwrap();
         // The settings the user chose come first, as it connects; then the answer to the ping.
-        assert_eq!(device.receive().await.unwrap(), ToDevice::Config { volume: 70, brightness: 100, language: String::new() });
+        assert_eq!(device.receive().await.unwrap(), ToDevice::Config { volume: 70, brightness: 100, language: String::new(), wake: true });
         assert_eq!(device.receive().await.unwrap(), ToDevice::Pong);
         let listed = iface.get().await.devices_json();
         assert!(listed.contains("\"online\":true"), "{listed}");
@@ -567,7 +590,7 @@ mod tests {
             tokio::time::timeout(Duration::from_secs(20), lines.next_line()).await.expect("a line in time").unwrap().unwrap_or_default()
         }
         assert_eq!(next_line(&mut lines).await, "CONNECTED");
-        assert_eq!(next_line(&mut lines).await, "MSG {\"t\":\"config\",\"volume\":70,\"brightness\":100,\"language\":\"\"}");
+        assert_eq!(next_line(&mut lines).await, "MSG {\"t\":\"config\",\"volume\":70,\"brightness\":100,\"language\":\"\",\"wake\":true}");
         assert_eq!(next_line(&mut lines).await, "MSG {\"t\":\"pong\"}");
         let listed = loop {
             let listed = iface.get().await.devices_json();

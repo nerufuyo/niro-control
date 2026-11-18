@@ -91,6 +91,10 @@ impl Busy {
         !self.0.swap(true, Ordering::SeqCst)
     }
 
+    fn is_taken(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+
     fn free(&self) {
         self.0.store(false, Ordering::SeqCst);
     }
@@ -133,6 +137,82 @@ fn answer_with<F, Fut, S, Spoken>(
     });
 }
 
+/// An utterance heard while the device waits for its keyword: nothing happens unless it holds "Momo Niro". What follows
+/// the keyword is the question; the keyword alone wakes the device, and the next utterance is the question.
+pub fn hear(utterance: Vec<i16>, lang: String, busy: &Busy, awake: &super::wake::Awake, outbox: UnboundedSender<ToDevice>, assistant: Option<UnboundedSender<Command>>) {
+    hear_with(
+        utterance,
+        lang,
+        busy,
+        awake,
+        outbox,
+        assistant,
+        |audio, lang| async move { crate::assistant::transcribe(&audio, &lang).await },
+        |text, lang| async move { super::tts::speak(&text, &lang).await },
+    );
+}
+
+#[allow(clippy::too_many_arguments)]
+fn hear_with<F, Fut, S, Spoken>(
+    utterance: Vec<i16>,
+    lang: String,
+    busy: &Busy,
+    awake: &super::wake::Awake,
+    outbox: UnboundedSender<ToDevice>,
+    assistant: Option<UnboundedSender<Command>>,
+    transcribe: F,
+    speak: S,
+) where
+    F: FnOnce(Vec<i16>, String) -> Fut + Send + 'static,
+    Fut: Future<Output = anyhow::Result<String>> + Send,
+    S: FnOnce(String, String) -> Spoken + Send + 'static,
+    Spoken: Future<Output = Option<Vec<Vec<u8>>>> + Send,
+{
+    // One at a time; what is said while the last is being answered is let go.
+    if !busy.take() {
+        return;
+    }
+    let (busy, awake) = (busy.clone(), awake.clone());
+    tokio::spawn(async move {
+        let text = match timeout(HEARING, transcribe(utterance, lang.clone())).await {
+            Ok(Ok(text)) => text.trim().to_owned(),
+            Ok(Err(err)) => {
+                debug!("could not hear a device's room: {err:#}");
+                String::new()
+            }
+            Err(_) => String::new(),
+        };
+        let was_awake = awake.take();
+        let question = match super::wake::after_keyword(&text) {
+            Some(rest) => Some(rest),
+            None if was_awake => Some(text),
+            None => None,
+        };
+        match question {
+            None => {}
+            Some(question) if question.chars().filter(|c| c.is_alphanumeric()).count() < 2 => {
+                // Only the keyword: it is listening.
+                awake.wake();
+                say_face(&outbox, Face::Listening);
+                // Nothing said in time: back to calm.
+                let (awake, busy_after, outbox) = (awake.clone(), busy.clone(), outbox.clone());
+                tokio::spawn(async move {
+                    tokio::time::sleep(super::wake::AWAKE + Duration::from_millis(500)).await;
+                    if !awake.active() && !busy_after.is_taken() {
+                        say_face(&outbox, Face::Idle);
+                    }
+                });
+            }
+            Some(question) => {
+                say_face(&outbox, Face::Thinking);
+                let words = ask(question, lang, &outbox, assistant, speak).await;
+                say_face(&outbox, if words { Face::Happy } else { Face::Curious });
+            }
+        }
+        busy.free();
+    });
+}
+
 /// The whole turn; whether it ended in an answer.
 async fn reply<F, Fut, S, Spoken>(
     heard: Heard,
@@ -169,6 +249,21 @@ where
         say(outbox, NOTHING_HEARD);
         return false;
     }
+    ask(text, lang, outbox, assistant, speak).await
+}
+
+/// What was said goes to the assistant, and its answer back to the device, written and spoken; whether it answered.
+async fn ask<S, Spoken>(
+    text: String,
+    lang: String,
+    outbox: &UnboundedSender<ToDevice>,
+    assistant: Option<UnboundedSender<Command>>,
+    speak: S,
+) -> bool
+where
+    S: FnOnce(String, String) -> Spoken,
+    Spoken: Future<Output = Option<Vec<Vec<u8>>>>,
+{
     debug!("a device asked: {} characters", text.chars().count());
     let _ = outbox.send(ToDevice::Stt { text: text.clone(), r#final: true });
     let Some(assistant) = assistant else {
@@ -272,6 +367,46 @@ mod tests {
             all.push(message);
         }
         all
+    }
+
+    async fn overheard(words: &'static str, awake: &super::super::wake::Awake) -> Vec<ToDevice> {
+        let (outbox, mut out) = unbounded_channel();
+        let busy = Busy::default();
+        let (ask, mut commands) = unbounded_channel();
+        tokio::spawn(async move {
+            while let Some(Command::FromDevice(text, reply)) = commands.recv().await {
+                let _ = reply.send(format!("You said: {text}"));
+            }
+        });
+        hear_with(vec![1; 8000], String::new(), &busy, awake, outbox, Some(ask), move |_, _| async move { Ok(words.to_owned()) }, |_, _| async { None });
+        let mut all = Vec::new();
+        while let Ok(Some(message)) = timeout(Duration::from_millis(300), out.recv()).await {
+            all.push(message);
+        }
+        all
+    }
+
+    #[tokio::test]
+    async fn the_keyword_and_a_question_in_one_breath_is_answered() {
+        let all = overheard("Momo Niro, what is two and two", &super::super::wake::Awake::default()).await;
+        assert!(all.iter().any(|m| matches!(m, ToDevice::Answer { text, .. } if text == "You said: what is two and two")), "{all:?}");
+    }
+
+    #[tokio::test]
+    async fn the_keyword_alone_wakes_it_and_the_next_thing_said_is_the_question() {
+        let awake = super::super::wake::Awake::default();
+        let all = overheard("momo niro", &awake).await;
+        assert_eq!(all, [ToDevice::Face { name: Face::Listening }]);
+        let all = overheard("what time is it", &awake).await;
+        assert!(all.iter().any(|m| matches!(m, ToDevice::Answer { text, .. } if text == "You said: what time is it")), "{all:?}");
+        // Awake lasted one question.
+        assert!(overheard("and the weather", &awake).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn talk_without_the_keyword_is_not_heard_at_all() {
+        let all = overheard("so then I told him the memo was late", &super::super::wake::Awake::default()).await;
+        assert!(all.is_empty(), "{all:?}");
     }
 
     #[test]
