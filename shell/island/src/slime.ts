@@ -27,11 +27,11 @@ const POSES = {
     thinking: {eyeRy: 12, lid: 0.1, mouthHw: 7, curve: -0.1, browL: 0.8, tipDx: 9, mouthDy: 25},
     speaking: {mouthHw: 13, curve: 0.3, open: 0.3, eyeRx: 10, tip: 0.85},
     alert: {sq: -0.16, eyeRx: 12, eyeRy: 18, eyeDy: -8, tilt: -0.4, mouthHw: 11, curve: -0.7, open: 0.25, mouthDy: 28, warm: 1, tip: 1},
-    waking: {sq: 0.3, shut: 1, curve: 0.1, tip: 0.2, dim: 0.3, mouthHw: 6},
+    waking: {sq: 0.04, shut: 1, curve: 0.1, tip: 0.55, dim: 0.12, mouthHw: 6},
     searching: {eyeRy: 12.5, mouthHw: 6, curve: -0.15, tip: 0.6, mouthDy: 25, dim: 0.1},
     curious: {tipDx: -10, browR: 0.9, tilt: -0.1, mouthHw: 7, curve: 0.5, eyeRy: 14.5, tip: 1},
-    sleepy: {sq: 0.27, shut: 1, mouthHw: 5, curve: 0, tip: 0.3, dim: 0.35, eyeDy: 2},
-    sad: {sq: 0.2, eyeRy: 12, tilt: -0.85, mouthHw: 9, curve: -0.6, mouthDy: 27, tip: 0.35, dim: 0.28, eyeDy: 2},
+    sleepy: {sq: 0.03, shut: 1, mouthHw: 5, curve: 0, tip: 0.5, dim: 0.15, eyeDy: 1},
+    sad: {sq: 0.04, eyeRy: 12.5, tilt: -0.85, mouthHw: 9, curve: -0.6, mouthDy: 26, tip: 0.5, tipDx: -3, dim: 0.12, eyeDy: 1},
     love: {sq: 0.03, blush: 1, mouthHw: 15, curve: 1, mouthDy: 23, tip: 1},
 };
 
