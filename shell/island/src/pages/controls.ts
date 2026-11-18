@@ -148,7 +148,8 @@ class ControlsPage extends Page {
         for (const [view, tab] of this._tabs)
             tab.set_style_class_name(`island-pill island-pill-small island-ctl-tab${view === name ? ' island-power-on' : ''}`);
         if (name === 'wifi')
-            this._wifi.refresh({rescan: true});
+            // A scan on an adapter that is joined stalls its traffic for a moment: look afresh only when not joined (Rescan is there to ask).
+            this._wifi.refresh({rescan: !this._wifi.networks.some(network => network.active)});
         this._sync();
     }
 
@@ -336,7 +337,7 @@ class ControlsPage extends Page {
         if (network.active || this._wifi.connecting)
             return;
         this._cancelPrompt();
-        const result = await this._wifi.connect(network);
+        const result = await this._wifi.join(network);
         if (result === 'needs-password')
             this._askPassword(network);
     }
@@ -357,7 +358,7 @@ class ControlsPage extends Page {
         if (!network || !password || this._wifi.connecting)
             return;
         this._promptJoin.label = 'Joining…';
-        const result = await this._wifi.connect(network, password);
+        const result = await this._wifi.join(network, password);
         this._promptJoin.label = 'Join';
         if (this._promptNetwork !== network)
             return;
@@ -403,7 +404,7 @@ class ControlsPage extends Page {
                 detail = saved ? 'Saved' : network.secure ? 'Secured' : 'Open';
             let right = null;
             if (network.active) {
-                right = pillButton('Disconnect', 'island-pill-small island-ctl-row-action', () => wifi.disconnect());
+                right = pillButton('Disconnect', 'island-pill-small island-ctl-row-action', () => wifi.leave());
             } else if (failed && saved) {
                 right = pillButton('Forget', 'island-pill-small island-ctl-row-action', () => wifi.forget(network.ssid));
             } else {
