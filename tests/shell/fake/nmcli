@@ -3,10 +3,14 @@
 import json, os, sys
 S = os.environ["NMCLI_FAKE_STATE"]
 st = json.load(open(S)) if os.path.exists(S) else {"active": "Home", "saved": ["Home"], "log": []}
+# Each saved connection: the network it is for, whether its password sits in a login's keyring (agent-owned: nmcli alone cannot use it) and whether it joins by itself.
+meta = st.setdefault("meta", {})
+for n in st["saved"]: meta.setdefault(n, {"ssid": n, "agent": False, "auto": True})
 nets = [("Home", 82, "WPA2"), ("Cafe Latte", 64, "WPA2"), ("Guest", 48, "--"), ("Kantor-5G", 91, "WPA2"), ("Tetangga", 31, "WPA2"), ("Warung", 22, "WPA2")]
 a = [x for x in sys.argv[1:] if x not in ("--wait", "25", "-t")]
 def save():
-    st["log"].append(" ".join(sys.argv[1:])); json.dump(st, open(S, "w"))
+    st["log"].append(" ".join(sys.argv[1:]))
+    tmp = S + "." + str(os.getpid()); json.dump(st, open(tmp, "w")); os.replace(tmp, S)   # whole or not at all: commands run side by side
 if "device" in a and "list" in a:
     for n, sig, sec in nets:
         print(("*" if n == st["active"] else " ") + ":" + n + ":" + str(sig) + ":" + sec)
@@ -14,9 +18,16 @@ elif a[:2] == ["DEVICE,TYPE", "device"] or ("DEVICE,TYPE" in a):
     print("wlan0:wifi\nlo:loopback")
 elif a[:2] == ["radio", "wifi"]:
     print("enabled")
-elif "NAME,TYPE" in a:
-    for n in st["saved"]: print(n + ":802-11-wireless")
-    print("Wired:802-3-ethernet")
+elif "NAME,UUID,TYPE" in a:
+    for n in st["saved"]: print(n.replace(":", "\\:") + ":u-" + n + ":802-11-wireless")
+    print("Wired:u-wired:802-3-ethernet")
+elif a[:1] == ["-g"] and "uuid" in a:
+    print(meta[a[a.index("uuid") + 1][2:]]["ssid"])
+elif a[:3] == ["connection", "modify", "id"]:
+    m = meta[a[3]]
+    if "wifi-sec.psk" in a: m["agent"] = False; m["psk"] = a[a.index("wifi-sec.psk") + 1]
+    if "connection.autoconnect" in a: m["auto"] = a[a.index("connection.autoconnect") + 1] == "yes"
+    save()
 elif "rescan" in a:
     pass
 elif "wifi" in a and "connect" in a:
@@ -25,9 +36,12 @@ elif "wifi" in a and "connect" in a:
     sec = [x[2] for x in nets if x[0] == ssid]
     if sec and sec[0] != "--" and pw != "correct":
         sys.stderr.write("Error: Connection activation failed: (7) Secrets were required, but not provided.\n"); st["saved"].append(ssid); save(); sys.exit(4)
-    st["saved"] = sorted(set(st["saved"] + [ssid])); st["active"] = ssid; save()
+    st["saved"] = sorted(set(st["saved"] + [ssid])); meta.setdefault(ssid, {"ssid": ssid, "agent": False, "auto": False}); st["active"] = ssid; save()
 elif a[:2] == ["connection", "up"]:
-    st["active"] = a[3]; save()
+    m = meta[a[3]]
+    if m["agent"] or ("psk" in m and m["psk"] != "correct"):
+        sys.stderr.write("Error: Connection activation failed: (7) Secrets were required, but not provided.\n"); save(); sys.exit(4)
+    st["active"] = m["ssid"]; save()
 elif a[:2] == ["connection", "delete"]:
     st["saved"] = [x for x in st["saved"] if x != a[3]]; save()
 elif a[:2] == ["device", "disconnect"]:
