@@ -1711,6 +1711,10 @@ function confirm(window, {heading, body, action}, onYes) {
 const UPDATE_HELP = 'https://github.com/nerufuyo/niro-control#updating';
 const RELEASES = 'https://github.com/nerufuyo/niro-control/releases/latest';
 const UPDATE_COMMAND = 'sudo dnf upgrade niro-control';
+/** The repository's one-time setup, and the update itself (run as root through pkexec: polkit action org.niro.control.update-now). */
+const REPO_URL = 'https://nerufuyo.github.io/niro-control/niro-control.repo';
+const REPO_FILE = '/etc/yum.repos.d/niro-control.repo';
+const UPDATE_SCRIPT = '/usr/libexec/niro-control/auto-update';
 
 /** Whether version `a` ("1.3.0") is newer than `b`, number by number (as island-daemon's updates.rs). */
 function isNewer(a, b) {
@@ -1820,10 +1824,12 @@ function updateRows(settings, window, version, dir) {
     const how = button('How', ['flat']);
     how.connect('clicked', () => new Gtk.UriLauncher({uri: UPDATE_HELP}).launch(window, null, null));
     const rpm = GLib.file_test('/etc/fedora-release', GLib.FileTest.EXISTS) || GLib.file_test('/etc/redhat-release', GLib.FileTest.EXISTS);
+    const repoAdded = () => GLib.file_test(REPO_FILE, GLib.FileTest.EXISTS);
+    // Without the repository dnf has nothing to update from: the command to copy adds it first.
+    const command = () => (repoAdded() ? UPDATE_COMMAND : `sudo curl -o ${REPO_FILE} ${REPO_URL} && sudo dnf install niro-control`);
     const copy = button('Copy command', []);
-    copy.tooltip_text = UPDATE_COMMAND;
     copy.connect('clicked', () => {
-        window.get_display().get_clipboard().set(UPDATE_COMMAND);
+        window.get_display().get_clipboard().set(command());
         copy.label = 'Copied';
         GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
             copy.label = 'Copy command';
@@ -1834,10 +1840,51 @@ function updateRows(settings, window, version, dir) {
     download.connect('clicked', () => new Gtk.UriLauncher({uri: RELEASES}).launch(window, null, null));
     const logOutButton = button('Log Out', ['suggested-action']);
     logOutButton.connect('clicked', () => logOut());
-    const all = [how, copy, download, logOutButton];
+    // Looks now, then follows updates.json (the daemon writes it after each look).
+    const checkNow = button('Check now', ['flat']);
+    checkNow.connect('clicked', () => {
+        checkNow.label = 'Checking…';
+        checkNow.sensitive = false;
+        Gio.DBus.session.call('org.niro.island.Daemon', '/org/niro/island/Daemon', 'org.niro.island.Updates1', 'Check', null, null,
+            Gio.DBusCallFlags.NO_AUTO_START, 3000, null, (bus, result) => {
+                try { bus.call_finish(result); } catch { /* the daemon is not running: nothing to look with */ }
+                // A look takes a moment (the file changes when it is done); the button comes back by itself if nothing did.
+                GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 8, () => {
+                    checkNow.label = 'Check now';
+                    checkNow.sensitive = true;
+                    return GLib.SOURCE_REMOVE;
+                });
+            });
+    });
+    // Installs the newer package: the one-package script as root, which asks the user to authenticate (and only with the repository added).
+    const updateNow = button('Update now', ['suggested-action']);
+    updateNow.connect('clicked', () => {
+        updateNow.label = 'Updating…';
+        updateNow.sensitive = false;
+        let process;
+        try {
+            process = Gio.Subprocess.new(['pkexec', UPDATE_SCRIPT], Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE);
+        } catch {
+            updateNow.label = 'Update now';
+            updateNow.sensitive = true;
+            return;
+        }
+        process.wait_async(null, (_process, result) => {
+            let ok = false;
+            try { process.wait_finish(result); ok = process.get_successful(); } catch { /* not run */ }
+            updateNow.label = 'Update now';
+            updateNow.sensitive = true;
+            // What was installed is read from the files (versionIn), so a refusal or a failure just shows the same row again.
+            if (!ok)
+                status.subtitle = 'It was not updated (cancelled, not allowed, or the repository could not be reached)';
+            else
+                sync();
+        });
+    });
+    const all = [how, copy, download, logOutButton, checkNow, updateNow];
     for (const suffix of all)
         status.add_suffix(suffix);
-    const check = switchRow(settings, 'check-updates', 'Check for new versions', 'Asks GitHub once a day; nothing else is sent');
+    const check = switchRow(settings, 'check-updates', 'Check for new versions', 'Asks GitHub every six hours; nothing else is sent');
 
     const file = Gio.File.new_for_path(GLib.build_filenamev([GLib.get_user_data_dir(), 'island', 'updates.json']));
     const show = (iconName, css, title, subtitle, buttons = []) => {
@@ -1868,15 +1915,17 @@ function updateRows(settings, window, version, dir) {
             show('software-update-available-symbolic', ['dim-label'], 'Not checking for new versions',
                 'Turn it on below to hear when one is out');
         } else if (newer) {
-            show('software-update-available-symbolic', ['accent'], `Island ${checked.latest} is out`, rpm
-                ? 'Update the package (copy the command), or download it, then log out and back in'
-                : 'Download its package and open it to install, then log out and back in',
-            rpm ? [how, copy, download] : [how, download]);
+            const canUpdate = rpm && repoAdded() && GLib.file_test(UPDATE_SCRIPT, GLib.FileTest.EXISTS);
+            show('software-update-available-symbolic', ['accent'], `Island ${checked.latest} is out`, canUpdate
+                ? 'Update now, then log out and back in'
+                : rpm ? 'Add the package repository and update (copy the command), or download it, then log out and back in'
+                    : 'Download its package and open it to install, then log out and back in',
+            canUpdate ? [updateNow, how, download] : rpm ? [how, copy, download] : [how, download]);
         } else if (checked?.at_ms && checked.latest) {
             // Only once GitHub answered: a look that failed stamps the time too, with no version.
-            show('object-select-symbolic', ['success'], 'You’re up to date', `Checked ${checkedWhen(checked.at_ms)}`);
+            show('object-select-symbolic', ['success'], 'You’re up to date', `Checked ${checkedWhen(checked.at_ms)}`, [checkNow]);
         } else {
-            show('software-update-available-symbolic', ['dim-label'], 'Not checked yet', 'Island asks GitHub once a day');
+            show('software-update-available-symbolic', ['dim-label'], 'Not checked yet', 'Island asks GitHub every six hours', [checkNow]);
         }
     };
     // island-daemon writes updates.json after each look (switched on, or once a day): the row follows while open.

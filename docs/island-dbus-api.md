@@ -381,11 +381,12 @@ without starting island-daemon, prints nothing and always exits 0.
 
 ## org.niro.island.Updates1
 
-Whether a newer Island is out: GitHub's latest release, looked up at most once a day while enabled.
+Whether a newer Island is out: GitHub's latest release, looked up every six hours while enabled, and on `Check()`.
 
 | Member | Signature | |
 |---|---|---|
 | `SetEnabled(b enabled)` | | Look, or not (Settings → New versions); off until set. |
+| `Check()` | | Look now (Settings → About, "Check now"), whenever the last look was. |
 | `Latest` | `s` | The latest release's version (`0.8.0`) when it is newer than this island-daemon; empty otherwise. |
 
 ## org.niro.island.System1

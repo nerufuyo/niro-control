@@ -35,6 +35,15 @@ test('the polkit action names the switch helper and asks an administrator', () =
     assert.doesNotMatch(policy, /<allow_[a-z_]+>yes<\/allow_[a-z_]+>/);
 });
 
+test('"Update now" runs the same one-package script, through its own polkit action', () => {
+    const policy = read('data/auto-update/org.niro.control.auto-update.policy');
+    assert.match(policy, /<action id="org\.niro\.control\.update-now">/);
+    assert.match(policy, /exec\.path">\/usr\/libexec\/niro-control\/auto-update</);
+    const prefs = read('shell/island/prefs.ts');
+    assert.match(prefs, /'pkexec', UPDATE_SCRIPT/);
+    assert.match(prefs, /UPDATE_SCRIPT = '\/usr\/libexec\/niro-control\/auto-update'/);
+});
+
 test('the rpm carries all of it, and Settings uses the helper through pkexec', () => {
     const spec = read('packaging/rpm/niro-control.spec');
     for (const path of ['niro-control-update.service', 'niro-control-update.timer', '%{_prefix}/libexec/niro-control', 'org.niro.control.auto-update.policy'])

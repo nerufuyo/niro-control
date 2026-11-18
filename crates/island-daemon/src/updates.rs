@@ -5,6 +5,7 @@
 //! (Settings), so the island can say an update is out. Nothing is sent but the request itself.
 
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use log::warn;
@@ -34,6 +35,8 @@ pub struct UpdatesService {
     enabled: bool,
     latest: String,
     wake: Arc<Notify>,
+    /// Set by `Check`: look now, whenever the last look was.
+    force: Arc<AtomicBool>,
 }
 
 impl UpdatesService {
@@ -44,6 +47,7 @@ impl UpdatesService {
             enabled: false,
             latest: String::new(),
             wake: wake.clone(),
+            force: Arc::new(AtomicBool::new(false)),
         };
         (service, wake)
     }
@@ -52,6 +56,12 @@ impl UpdatesService {
 #[interface(name = "org.niro.island.Updates1")]
 impl UpdatesService {
     /// Whether to look (Settings); off until the extension says so.
+    /// Looks now (the About page's "Check now"), though the last look was not long ago. Does nothing while the switch is off.
+    fn check(&self) {
+        self.force.store(true, Ordering::SeqCst);
+        self.wake.notify_one();
+    }
+
     fn set_enabled(&mut self, enabled: bool) -> fdo::Result<()> {
         self.enabled = enabled;
         self.wake.notify_one();
@@ -76,7 +86,8 @@ pub async fn run(iface: InterfaceRef<UpdatesService>, wake: Arc<Notify>) {
             wake.notified().await;
             continue;
         }
-        if now_ms() - checked.at_ms >= EVERY_MS {
+        let forced = iface.get().await.force.swap(false, Ordering::SeqCst);
+        if forced || now_ms() - checked.at_ms >= EVERY_MS {
             let looked = tokio::task::spawn_blocking(latest_release)
                 .await
                 .ok()
@@ -102,7 +113,8 @@ pub async fn run(iface: InterfaceRef<UpdatesService>, wake: Arc<Notify>) {
         .await;
         // Until the next look is due, or Settings change.
         while !wait_until(Some(checked.at_ms + EVERY_MS), &wake).await {
-            if !iface.get().await.enabled {
+            let service = iface.get().await;
+            if !service.enabled || service.force.load(Ordering::SeqCst) {
                 break;
             }
         }
