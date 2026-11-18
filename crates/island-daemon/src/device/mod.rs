@@ -9,8 +9,10 @@
 // The messages and the SRP client wait for the socket that will use them.
 #![allow(dead_code, unused_imports)]
 
+mod adpcm;
 mod avahi;
 mod enroll;
+mod feed;
 mod link;
 mod pair;
 mod paired;
@@ -18,7 +20,11 @@ mod proto;
 mod server;
 mod service;
 mod srp;
+mod tts;
+mod voice;
 
+pub use self::voice::set_assistant;
+pub use self::feed::{from_agent, from_system, push, run as feed};
 pub use self::pair::{Pairing, Refused};
 pub use self::paired::{Paired, PairedDevices};
 pub use self::proto::{FromDevice, ToDevice};

@@ -42,12 +42,23 @@ pub enum Face {
     Love,
 }
 
+fn pcm() -> String {
+    "pcm".into()
+}
+
 /// Sent by the device.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "t")]
 pub enum FromDevice {
     #[serde(rename = "listen.start")]
-    ListenStart { lang: String, rate: u32 },
+    ListenStart {
+        #[serde(default)]
+        lang: String,
+        /// `pcm` (16-bit little-endian samples, the first version) is the only one the daemon takes.
+        #[serde(default = "pcm")]
+        codec: String,
+        rate: u32,
+    },
     #[serde(rename = "listen.stop")]
     ListenStop,
     #[serde(rename = "button")]
@@ -98,6 +109,12 @@ pub enum ToDevice {
     },
     #[serde(rename = "pong")]
     Pong,
+    /// One frame of speech for the speaker (16 kHz ADPCM): sent as an audio frame, never as JSON.
+    #[serde(skip)]
+    Audio(Vec<u8>),
+    /// The speech is over.
+    #[serde(rename = "audio.end")]
+    AudioEnd,
     #[serde(rename = "bye")]
     Bye { reason: String },
 }

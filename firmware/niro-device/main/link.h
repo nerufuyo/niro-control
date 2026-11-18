@@ -28,5 +28,7 @@ int link_clear_recv(int fd, char *buf, size_t cap, int timeout_ms);
 int link_open(link_t *link, int fd, const uint8_t device_key[32], const char *device_id);
 /** A JSON control message. */
 int link_send(link_t *link, const char *json);
-/** The next sealed frame: 1 for a message (text in `buf`, `*len` long), 0 for a timeout, -1 for the end. */
+/** The next sealed frame: 1 for a message (text in `buf`, `*len` long), 2 for a frame of audio (the bytes in `buf`), 0 for a timeout, -1 for the end. */
 int link_recv(link_t *link, char *buf, size_t cap, size_t *len, int timeout_ms);
+/** A frame of audio: 16-bit little-endian PCM at 16 kHz (the daemon's `voice.rs`), at most LINK_PAYLOAD_MAX bytes. */
+int link_send_audio(link_t *link, const uint8_t *pcm, size_t len);
