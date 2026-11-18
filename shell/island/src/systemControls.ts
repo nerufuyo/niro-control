@@ -246,15 +246,18 @@ export class Battery extends Signals.EventEmitter {
 }
 
 /** Wi-Fi: the radio and the networks in range, and joining one (through nmcli: no network library to carry, the same service as
- * GNOME's). `connecting` names the network being joined; `error` is {ssid, message, wrongPassword} for the last that failed. */
+ * GNOME's). Its methods are `join` and `leave`, never `connect` and `disconnect`: those are the EventEmitter's, for the signals, and the page
+ * calls them with a signal's name and id (naming a method after them once joined a network called "changed" and left Wi-Fi when the page ended).
+ * `connecting` names the network being joined; `error` is {ssid, message, wrongPassword} for the last that failed. */
 export class WifiNetworks extends Signals.EventEmitter {
     constructor() {
         super();
         this.available = false;
         this.enabled = false;
         this.networks = [];
-        /** Names NetworkManager has a saved connection for: joined with no password asked. */
-        this.known = new Set();
+        /** The saved connections: network name -> the name of its saved connection (not always the same: another tool may have named it
+         * "Home 1"), joined with no password asked. */
+        this.known = new Map();
         this.connecting = '';
         this.error = null;
         this._device = '';
@@ -303,11 +306,19 @@ export class WifiNetworks extends Signals.EventEmitter {
         if (this.enabled && rescan)
             await this._exec(['nmcli', 'device', 'wifi', 'rescan']);
         const list = this.enabled ? await this._run(['nmcli', '-t', '-f', 'IN-USE,SSID,SIGNAL,SECURITY', 'device', 'wifi', 'list']) : '';
-        const saved = await this._run(['nmcli', '-t', '-f', 'NAME,TYPE', 'connection', 'show']);
+        const saved = await this._run(['nmcli', '-t', '-f', 'NAME,UUID,TYPE', 'connection', 'show']);
+        // A saved connection is the network it names inside (its SSID), not the name it was given.
+        const profiles = (saved ?? '').split('\n').map(line => line.split(/(?<!\\):/).map(field => field.replace(/\\:/g, ':')))
+            .filter(([, , type]) => type === '802-11-wireless');
+        const known = new Map();
+        await Promise.all(profiles.map(async ([name, uuid]) => {
+            const ssid = (await this._run(['nmcli', '-g', '802-11-wireless.ssid', 'connection', 'show', 'uuid', uuid]))?.trim() || name;
+            if (!known.has(ssid))
+                known.set(ssid, name);
+        }));
         if (this._destroyed || turn !== this._turn)
             return;
-        this.known = new Set((saved ?? '').split('\n').map(line => line.split(/(?<!\\):/)).filter(([, type]) => type === '802-11-wireless')
-            .map(([name]) => name.replace(/\\:/g, ':')));
+        this.known = known;
         this.networks = parseWifiList(list);
         this.emit('changed');
     }
@@ -320,37 +331,58 @@ export class WifiNetworks extends Signals.EventEmitter {
 
     /** Joins `network`. A saved one or an open one goes at once; a new secured one needs `password`, and with none given this
      * answers 'needs-password' so the page can ask. Resolves 'connected', 'failed' (see `error`), 'needs-password' or 'busy'. */
-    async connect(network, password = null) {
+    async join(network, password = null) {
         if (this.connecting)
             return 'busy';
-        const saved = this.known.has(network.ssid);
-        if (network.secure && !saved && password === null)
+        const profile = this.known.get(network.ssid);
+        if (network.secure && !profile && password === null)
             return 'needs-password';
         this.connecting = network.ssid;
         this.error = null;
         this.emit('changed');
-        let argv;
-        if (saved)
-            argv = ['nmcli', '--wait', '25', 'connection', 'up', 'id', network.ssid];
-        else if (!network.secure)
-            argv = ['nmcli', '--wait', '25', 'device', 'wifi', 'connect', network.ssid];
-        else
-            argv = ['nmcli', '--wait', '25', 'device', 'wifi', 'connect', network.ssid, 'password', password];
-        const result = await this._exec(argv);
+        let result;
+        if (profile) {
+            // A password given for a saved network replaces the saved one, and is kept for the whole computer (not in one login's keyring),
+            // so the network joins by itself at boot and after a drop.
+            if (password !== null)
+                await this._exec(['nmcli', 'connection', 'modify', 'id', profile, 'wifi-sec.psk', password, 'wifi-sec.psk-flags', '0']);
+            result = await this._exec(['nmcli', '--wait', '25', 'connection', 'up', 'id', profile]);
+        } else {
+            const join = () => this._exec(['nmcli', '--wait', '25', 'device', 'wifi', 'connect', network.ssid, ...(network.secure ? ['password', password] : [])]);
+            result = await join();
+            // The adapter's list was out of date: look afresh, once, and try again.
+            if (!result.ok && /no network with ssid/i.test(result.err)) {
+                await this._exec(['nmcli', 'device', 'wifi', 'rescan']);
+                result = await join();
+            }
+        }
         this.connecting = '';
         if (!result.ok) {
-            this.error = {ssid: network.ssid, ...wifiFailure(result.err)};
+            const why = wifiFailure(result.err);
+            if (profile && password === null && why.wrongPassword) {
+                // The saved connection has no password this session can use (kept by another login's keyring, or changed since): ask for it.
+                if (!this._destroyed)
+                    await this.refresh();
+                return 'needs-password';
+            }
+            this.error = {ssid: network.ssid, ...why};
             // A connection this try made and that never worked would only be tried again, with the same password.
-            if (!saved)
+            if (!profile)
                 await this._exec(['nmcli', 'connection', 'delete', 'id', network.ssid]);
         }
         if (!this._destroyed)
             await this.refresh();
+        if (result.ok) {
+            // Joined by hand once: it is joined by itself from now on.
+            const kept = this.known.get(network.ssid);
+            if (kept)
+                await this._exec(['nmcli', 'connection', 'modify', 'id', kept, 'connection.autoconnect', 'yes']);
+        }
         return result.ok ? 'connected' : 'failed';
     }
 
     /** Leaves the network joined now (it stays saved, and is not joined again by itself until asked). */
-    async disconnect() {
+    async leave() {
         if (this._device)
             await this._exec(['nmcli', 'device', 'disconnect', this._device]);
         if (!this._destroyed)
