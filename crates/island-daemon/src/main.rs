@@ -178,6 +178,7 @@ async fn run() -> anyhow::Result<()> {
     server.at(OBJECT_PATH, RemindersService::load()).await?;
     server.at(OBJECT_PATH, SystemService::default()).await?;
     server.at(OBJECT_PATH, AppUsageService::load()).await?;
+    device::set_assistant(assistant.sender());
     server.at(OBJECT_PATH, assistant).await?;
     server.at(OBJECT_PATH, usage).await?;
     server.at(OBJECT_PATH, updates).await?;
@@ -219,6 +220,7 @@ async fn run() -> anyhow::Result<()> {
     });
     tokio::spawn(todo::run(todo));
     tokio::spawn(device::run(devices.clone()));
+    tokio::spawn(device::feed(devices.clone()));
     tokio::spawn(device::listen(devices));
     tokio::spawn(app_usage::run(app_usage));
     tokio::spawn(assistant::run(assistant, own_data, assistant_commands));

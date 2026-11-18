@@ -85,6 +85,10 @@ const INTERFACES = {
             <method name="Answer"><arg name="allow" type="b" direction="in"/></method>
             <method name="Rename"><arg name="device_id" type="s" direction="in"/><arg name="name" type="s" direction="in"/></method>
             <method name="Forget"><arg name="device_id" type="s" direction="in"/></method>
+            <method name="SetConfig"><arg name="device_id" type="s" direction="in"/><arg name="volume" type="u" direction="in"/><arg name="brightness" type="u" direction="in"/><arg name="language" type="s" direction="in"/></method>
+            <signal name="Button"><arg name="device_id" type="s"/><arg name="id" type="u"/><arg name="action" type="s"/></signal>
+            <method name="SetQuiet"><arg name="quiet" type="b" direction="in"/></method>
+            <method name="SetKind"><arg name="device_id" type="s" direction="in"/><arg name="kind" type="s" direction="in"/><arg name="on" type="b" direction="in"/></method>
             <method name="Face"><arg name="name" type="s" direction="in"/><arg type="u" direction="out"/></method>
             <method name="Notify"><arg name="kind" type="s" direction="in"/><arg name="title" type="s" direction="in"/><arg name="body" type="s" direction="in"/><arg name="urgent" type="b" direction="in"/><arg type="u" direction="out"/></method>
             <property name="Devices" type="s" access="read"/>
@@ -335,6 +339,9 @@ export class Daemon extends Signals.EventEmitter {
         switch (signal) {
         case 'PhaseFinished':
             this.emit('pomodoro-finished', ...args);
+            break;
+        case 'Button':
+            this.emit('device-button', ...args);
             break;
         case 'Level':
             this.emit('voice-level', args[0]);

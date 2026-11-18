@@ -38,3 +38,19 @@ export function codeKept({code, seenOpen, open, now, until}) {
         return {code, seenOpen: true};
     return seenOpen ? {code: null, seenOpen: false} : {code, seenOpen: false};
 }
+
+/** What a button on a Niro Device does when nothing is on its screen (UP is for talking and never comes): BOOT plays or pauses the
+ * music, DOWN goes to the next song; held, BOOT starts or pauses the focus timer and DOWN goes back a song.
+ * Returns `{service, method}` for island-daemon, or null for a press that means nothing. */
+export function buttonCommand(id, action, pomodoroRunning) {
+    if (action === 'press')
+        return id === 1 ? {service: 'media', method: 'PlayPause'} : id === 2 ? {service: 'media', method: 'Next'} : null;
+    if (action === 'long')
+        return id === 1 ? {service: 'pomodoro', method: pomodoroRunning ? 'Pause' : 'Start'} : id === 2 ? {service: 'media', method: 'Previous'} : null;
+    return null;
+}
+
+/** A volume or brightness a step up or down, kept in range: volume 0 to 100, brightness 5 to 100. */
+export function stepped(value, direction, {min = 0, max = 100, step = 10} = {}) {
+    return Math.min(max, Math.max(min, Math.round(value / step) * step + direction * step));
+}

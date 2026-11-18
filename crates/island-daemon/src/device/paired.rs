@@ -18,6 +18,26 @@ pub struct Paired {
     /// 32 random bytes in hex, made for this device at pairing.
     pub key: String,
     pub paired_at_ms: i64,
+    /// The kinds of notification (`agent`, `reminder`, `meeting`, `battery`, `system`) the user turned off for this device;
+    /// empty, as in a file from before this, is all on.
+    #[serde(default)]
+    pub muted: Vec<String>,
+    /// What the user set in the panel, sent to the device whenever it connects.
+    #[serde(default = "default_volume")]
+    pub volume: u8,
+    #[serde(default = "default_brightness")]
+    pub brightness: u8,
+    /// The language it listens and speaks (codes like `id,en`; empty: this computer's).
+    #[serde(default)]
+    pub language: String,
+}
+
+fn default_volume() -> u8 {
+    70
+}
+
+fn default_brightness() -> u8 {
+    100
 }
 
 /// The list kept on disk.
@@ -62,6 +82,10 @@ impl PairedDevices {
             name: name.to_owned(),
             key: key.clone(),
             paired_at_ms: now_ms,
+            muted: Vec::new(),
+            volume: default_volume(),
+            brightness: default_brightness(),
+            language: String::new(),
         });
         key
     }
@@ -92,6 +116,35 @@ impl PairedDevices {
         self.key_matches(device_id, &hex(key))
     }
 
+    /// Whether this device is to be shown notifications of `kind` (a device not paired is not).
+    pub fn wants(&self, device_id: &str, kind: &str) -> bool {
+        self.find(device_id)
+            .is_some_and(|device| !device.muted.iter().any(|muted| muted == kind))
+    }
+
+    /// Turns notifications of `kind` on or off for a device; true when it was paired.
+    pub fn set_kind(&mut self, device_id: &str, kind: &str, on: bool) -> bool {
+        let Some(device) = self.devices.iter_mut().find(|device| device.device_id == device_id) else {
+            return false;
+        };
+        device.muted.retain(|muted| muted != kind);
+        if !on {
+            device.muted.push(kind.to_owned());
+        }
+        true
+    }
+
+    /// Sets what the user chose for a device; true when it was paired.
+    pub fn set_config(&mut self, device_id: &str, volume: u8, brightness: u8, language: &str) -> bool {
+        let Some(device) = self.devices.iter_mut().find(|device| device.device_id == device_id) else {
+            return false;
+        };
+        device.volume = volume;
+        device.brightness = brightness;
+        device.language = language.to_owned();
+        true
+    }
+
     /// Renames a device; true when it was paired.
     pub fn rename(&mut self, device_id: &str, name: &str) -> bool {
         match self
@@ -113,6 +166,39 @@ mod tests {
     use super::*;
 
     const MAC: &str = "10:b4:1d:e9:9d:34";
+
+    #[test]
+    fn a_kind_can_be_turned_off_for_one_device_and_back_on() {
+        let mut devices = PairedDevices::default();
+        devices.add(MAC, "Desk", 1);
+        assert!(devices.wants(MAC, "agent"));
+        assert!(devices.set_kind(MAC, "agent", false));
+        assert!(!devices.wants(MAC, "agent") && devices.wants(MAC, "battery"));
+        assert!(devices.set_kind(MAC, "agent", false));
+        assert_eq!(devices.find(MAC).unwrap().muted, ["agent"]);
+        assert!(devices.set_kind(MAC, "agent", true));
+        assert!(devices.wants(MAC, "agent"));
+        assert!(!devices.set_kind("00:00:00:00:00:00", "agent", false));
+        assert!(!devices.wants("00:00:00:00:00:00", "agent"));
+    }
+
+    #[test]
+    fn the_settings_start_sensible_and_old_lists_get_them() {
+        let old = r#"{"devices":[{"device_id":"a","name":"n","key":"k","paired_at_ms":1}],"daemon_id":""}"#;
+        let mut devices: PairedDevices = serde_json::from_str(old).unwrap();
+        let device = devices.find("a").unwrap();
+        assert_eq!((device.volume, device.brightness, device.language.as_str()), (70, 100, ""));
+        assert!(devices.set_config("a", 30, 50, "id"));
+        assert_eq!(devices.find("a").unwrap().volume, 30);
+        assert!(!devices.set_config("b", 1, 1, ""));
+    }
+
+    #[test]
+    fn a_list_from_before_the_setting_has_everything_on() {
+        let old = r#"{"devices":[{"device_id":"a","name":"n","key":"k","paired_at_ms":1}],"daemon_id":""}"#;
+        let devices: PairedDevices = serde_json::from_str(old).unwrap();
+        assert!(devices.wants("a", "meeting"));
+    }
 
     #[test]
     fn pairing_gives_a_64_digit_hex_key() {

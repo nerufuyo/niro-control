@@ -2,7 +2,7 @@
 # Niro's Shell extensions against a real GNOME Shell (headless, Wayland, its own D-Bus session): they load without errors,
 # the action registry answers over D-Bus, the assistant's gateway (island-daemon --niro-action) obeys the same rules, and the
 # palette finds what it should. Needs the installed package (the extensions are read from /usr/share) and a built daemon.
-# It reads the real dconf but changes nothing: the only action run is a clipboard copy, and a restart is declined.
+# It reads the real dconf (headless.sh only; mascot.sh uses its own) but changes nothing: the only action run is a clipboard copy, and a restart is declined.
 set -u
 cd "$(dirname "$0")/../.."
 DAEMON="${DAEMON:-$PWD/target/release/island-daemon}"

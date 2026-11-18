@@ -163,6 +163,9 @@ struct State {
     draft: String,
     /// The command it asked to run, as its card shows it (see tasks.rs), or null.
     card: Value,
+    /// The request is a Niro Device's, not the island's: the island still runs its actions and has no card to show. Stays
+    /// until the island's own next request.
+    device: bool,
     /// Counts replies, so each one's actions run once.
     turn: u64,
     /// Counts the batches of actions run mid-way, so each runs once and its results find their way back.
@@ -322,6 +325,9 @@ pub enum Command {
     Warm(Box<Context>),
     Listen(Box<Context>),
     Ask(String, Box<Context>),
+    /// A Niro Device asked this (already turned into text, there is no island to listen): the answer's words go to the sender,
+    /// whatever came of it. The island's own context is kept as it was.
+    FromDevice(String, mpsc::UnboundedSender<String>),
     Stop,
     End,
     /// What the actions handed out as `step` did, as JSON `[{type, ok, detail}]`.
@@ -356,6 +362,11 @@ impl AssistantService {
             commands,
         };
         (service, receiver)
+    }
+
+    /// A line into the loop, for what is not the island (a Niro Device).
+    pub fn sender(&self) -> mpsc::UnboundedSender<Command> {
+        self.commands.clone()
     }
 
     /// Passes a command on; fails only once the loop is gone.
@@ -1194,6 +1205,7 @@ pub async fn run(iface: InterfaceRef<AssistantService>, data: Sources, mut comma
                 None
             }
             Command::Listen(context) => {
+                publish(&iface, |state| state.device = false).await;
                 keep = Keep::parse(&context.keep_chat);
                 if talk.end_if_over(&mut session, keep) {
                     show_history(&iface, &talk.chat).await;
@@ -1215,6 +1227,7 @@ pub async fn run(iface: InterfaceRef<AssistantService>, data: Sources, mut comma
                 interrupted
             }
             Command::Ask(text, context) => {
+                publish(&iface, |state| state.device = false).await;
                 keep = Keep::parse(&context.keep_chat);
                 if talk.end_if_over(&mut session, keep) {
                     show_history(&iface, &talk.chat).await;
@@ -1233,6 +1246,31 @@ pub async fn run(iface: InterfaceRef<AssistantService>, data: Sources, mut comma
                 )
                 .await;
                 // A command it ran and stopped following (Cancel, or out of time) is followed on.
+                look_after_tasks(&iface, &mut following).await;
+                interrupted
+            }
+            Command::FromDevice(text, reply) => {
+                publish(&iface, |state| state.device = true).await;
+                let began = chat::now_ms();
+                session.resume(today());
+                let interrupted = turn(
+                    &iface,
+                    &data,
+                    &mut session,
+                    &mut talk,
+                    Some(text),
+                    &mut commands,
+                    &mut later,
+                )
+                .await;
+                let said = talk
+                    .chat
+                    .items
+                    .iter()
+                    .rev()
+                    .find(|item| item.role == chat::Role::Assistant && item.at >= began)
+                    .map_or_else(|| DEVICE_NO_ANSWER.to_owned(), |item| item.text.clone());
+                let _ = reply.send(said);
                 look_after_tasks(&iface, &mut following).await;
                 interrupted
             }
@@ -1913,9 +1951,27 @@ fn hold(command: Command, later: &mut VecDeque<Command>) {
         Command::NewChat | Command::UndoNewChat | Command::ClearChat | Command::Settled(..) => {
             later.push_back(command);
         }
+        // A device cannot be told to wait: it is told now.
+        Command::FromDevice(_, reply) => {
+            let _ = reply.send(DEVICE_BUSY.to_owned());
+        }
         _ => {}
     }
 }
+
+/// The words in `audio` (16 kHz mono) for a Niro Device, which has no island to listen: the language is the device's
+/// (empty: any). Whisper runs for this one request and goes.
+pub async fn transcribe(audio: &[i16], language: &str) -> anyhow::Result<String> {
+    if !whisper::installed() {
+        anyhow::bail!("speech recognition is not set up");
+    }
+    let mut whisper = Whisper::start("small", language)?;
+    whisper.transcribe(audio).await
+}
+
+/// What a Niro Device is told when the request could not be answered, or came while another was.
+const DEVICE_NO_ANSWER: &str = "I could not answer that. Check the AI in Settings.";
+const DEVICE_BUSY: &str = "I am still answering the last one. Ask again in a moment.";
 
 const NOT_SET_UP: (&str, &str) = (
     "Voice isn’t set up",

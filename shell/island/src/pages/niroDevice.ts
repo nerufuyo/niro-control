@@ -13,7 +13,7 @@ import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import {VERTICAL, px} from '../compat.js';
-import {CODE_KEEP_MS, codeKept, deviceStatus, formatCode, formatLeft} from '../niroDeviceRules.js';
+import {CODE_KEEP_MS, codeKept, deviceStatus, formatCode, formatLeft, stepped} from '../niroDeviceRules.js';
 import {GREETING_MS, baseMood, greetingFor, summarize} from '../niroMascotRules.js';
 import {SlimeView} from '../slimeView.js';
 import {iconButton, label, pillButton} from '../widgets.js';
@@ -21,6 +21,8 @@ import {Page} from './page.js';
 
 /** Niro's size beside the list, in CSS pixels. */
 const SLIME_SIZE = 108;
+/** What a device can be told of: the daemon's kind and the word on its switch. */
+const NOTIFICATION_KINDS = [['agent', 'AI'], ['reminder', 'Reminders'], ['meeting', 'Meetings'], ['battery', 'Battery']];
 
 export const NiroDevicePage = GObject.registerClass(
 class NiroDevicePage extends Page {
@@ -202,6 +204,35 @@ class NiroDevicePage extends Page {
         return card;
     }
 
+    /** Its loudness and its screen's brightness, a step at a time. */
+    _settings(device) {
+        const line = new St.BoxLayout({style_class: 'island-nd-buttons', x_align: Clutter.ActorAlign.START});
+        const change = (volume, brightness) =>
+            this.daemon.call('niroDevices', 'SetConfig', device.device_id, volume, brightness, device.language ?? '');
+        const volume = device.volume ?? 70, brightness = device.brightness ?? 100;
+        line.add_child(pillButton('−', 'island-pill-small island-nd-kind', () => change(stepped(volume, -1), brightness)));
+        line.add_child(label(volume ? `Volume ${volume}` : 'Muted', 'island-nd-hint', {y_align: Clutter.ActorAlign.CENTER}));
+        line.add_child(pillButton('+', 'island-pill-small island-nd-kind', () => change(stepped(volume, 1), brightness)));
+        line.add_child(pillButton('−', 'island-pill-small island-nd-kind', () => change(volume, stepped(brightness, -1, {min: 10}))));
+        line.add_child(label(`Screen ${brightness}`, 'island-nd-hint', {y_align: Clutter.ActorAlign.CENTER}));
+        line.add_child(pillButton('+', 'island-pill-small island-nd-kind', () => change(volume, stepped(brightness, 1, {min: 10}))));
+        return line;
+    }
+
+    /** What it is told of, one switch each: lit is shown on the device, dim is not. */
+    _kinds(device) {
+        const line = new St.BoxLayout({style_class: 'island-nd-buttons', x_align: Clutter.ActorAlign.START});
+        const muted = device.muted ?? [];
+        for (const [kind, text] of NOTIFICATION_KINDS) {
+            const off = muted.includes(kind);
+            const chip = pillButton(text, `island-pill-small island-nd-kind${off ? ' island-nd-kind-off' : ''}`,
+                () => this.daemon.call('niroDevices', 'SetKind', device.device_id, kind, off));
+            chip.accessible_name = `${text} on ${device.name}: ${off ? 'off' : 'on'}`;
+            line.add_child(chip);
+        }
+        return line;
+    }
+
     /** A paired device: whether it is here, its battery, and a way to forget it. */
     _deviceRow(device) {
         const row = new St.BoxLayout({style_class: `island-nd-row${device.online ? ' online' : ''}`});
@@ -211,6 +242,8 @@ class NiroDevicePage extends Page {
         name.clutter_text.ellipsize = Pango.EllipsizeMode.END;
         words.add_child(name);
         words.add_child(label(deviceStatus(device), 'island-nd-hint'));
+        words.add_child(this._kinds(device));
+        words.add_child(this._settings(device));
         row.add_child(words);
         row.add_child(iconButton('island-close-symbolic', 'island-nd-forget',
             () => this.daemon.call('niroDevices', 'Forget', device.device_id),
