@@ -162,8 +162,9 @@ const FADE_IN = 320;
 const AUTO_HIDE_UP = 260;
 const AUTO_HIDE_DOWN = 300;
 const AUTO_HIDE_FADE_SHARE = 0.35;
-/** The incoming view waits for the shape to make room before appearing. */
-const FADE_IN_DELAY = 120;
+/** The incoming view waits for the shape to make room before appearing, but not so long that the shape is wide and empty:
+ * tests/shell/motion.sh keeps what the island holds above a quarter while it changes view. */
+const FADE_IN_DELAY = 90;
 /** How far (CSS px) the views slide as the shape grows or shrinks: they travel with it. Whole
  * pixels only, never a scale: a scaled picture or text is resampled every frame and seems to shiver. */
 const VIEW_SHIFT = 8;
@@ -742,7 +743,8 @@ export const Island = GObject.registerClass({
             previous.ease({
                 opacity: 0,
                 duration: FADE_OUT,
-                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                // Stays whole at first and goes at the end, so the next view comes in before this one is gone.
+                mode: Clutter.AnimationMode.EASE_IN_QUAD,
                 onStopped: finished => {
                     if (!finished)
                         return;

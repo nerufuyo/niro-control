@@ -51,6 +51,12 @@ The display:
 - **The amplifier and the microphone parts** are unknown (a MEMS microphone and an I2S amplifier would fit).
 - **GPIO 2** as the charge status is inferred from the log and the PCB, not read from the code.
 
+## Battery, charger and microphone in the firmware (guesses to check)
+
+- **Battery**: ADC1 channel 7 (GPIO 8), read through a divider whose ratio is not known; `CONFIG_NIRO_BATTERY_DIVIDER_X10` (20, a divider of 2) is a guess. The device logs "battery N mV": compare it with a meter on the battery and set the ratio. A reading outside 2.8 to 4.5 V is reported as 255 (unknown). The percentage is a lithium cell's usual curve.
+- **Charging**: GPIO 2, taken as active low (a TP4056's CHRG pulls low while charging): `CONFIG_NIRO_CHARGING_ACTIVE_LOW`. If the device says it is charging when it is not, turn it off.
+- **Microphone**: I2S 4 / 5 / 6 at 16 kHz, 32-bit slot, left channel, `>> CONFIG_NIRO_MIC_SHIFT` (14) to 16 bits; `CONFIG_NIRO_MIC_RIGHT` if nothing is heard. All of it compiled, none heard.
+
 ## Firmware
 
 The firmware for this board is in [`firmware/niro-device`](../firmware/niro-device/README.md). It has been built, and tested against the

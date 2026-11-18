@@ -61,3 +61,20 @@ test('a code past its time is dropped, open or not, and no code stays none', () 
     assert.deepEqual(codeKept({code: null, seenOpen: true, open: true, now: 1, until: 126000}), {code: null, seenOpen: false});
     assert.ok(CODE_KEEP_MS > 120000);
 });
+
+test('the buttons of a device play, skip and time', async () => {
+    const {buttonCommand, stepped} = await import('../../shell/island/build/src/niroDeviceRules.js');
+    assert.deepEqual(buttonCommand(1, 'press', false), {service: 'media', method: 'PlayPause'});
+    assert.deepEqual(buttonCommand(2, 'press', false), {service: 'media', method: 'Next'});
+    assert.deepEqual(buttonCommand(1, 'long', false), {service: 'pomodoro', method: 'Start'});
+    assert.deepEqual(buttonCommand(1, 'long', true), {service: 'pomodoro', method: 'Pause'});
+    assert.deepEqual(buttonCommand(2, 'long', false), {service: 'media', method: 'Previous'});
+    // UP is for talking, and a release or a stranger means nothing.
+    assert.equal(buttonCommand(0, 'press', false), null);
+    assert.equal(buttonCommand(1, 'release', false), null);
+    assert.equal(buttonCommand(9, 'long', false), null);
+    assert.equal(stepped(70, 1), 80);
+    assert.equal(stepped(100, 1), 100);
+    assert.equal(stepped(5, -1, {min: 5}), 5);
+    assert.equal(stepped(0, -1), 0);
+});

@@ -22,6 +22,7 @@ use super::enroll::{Offer, enroll};
 use super::link::{Error, Incoming, Link, Opening, accept_hello, open};
 use super::proto::{FromDevice, ToDevice};
 use super::service::{DeviceService, text};
+use super::voice::{self, Busy, Heard};
 
 /// How long a connection has to open and prove itself.
 const HANDSHAKE: Duration = Duration::from_secs(10);
@@ -241,7 +242,16 @@ async fn approve(iface: InterfaceRef<DeviceService>, offer: Offer) -> Option<[u8
 async fn session(iface: &InterfaceRef<DeviceService>, link: Link<TcpStream>) {
     let (device_id, mut reader, mut writer) = link.split();
     let (outbox, mut outgoing) = mpsc::unbounded_channel::<ToDevice>();
+    let reply_to = outbox.clone();
     let connection = iface.get_mut().await.connected(&device_id, outbox);
+    if let Some(config) = iface.get().await.config_for(&device_id) {
+        let _ = reply_to.send(config);
+    }
+    if iface.get().await.quiet() {
+        let _ = reply_to.send(ToDevice::Face { name: super::proto::Face::Sleepy });
+    }
+    let mut heard: Option<Heard> = None;
+    let busy = Busy::default();
     changed(iface).await;
     info!("{device_id} connected");
 
@@ -271,14 +281,36 @@ async fn session(iface: &InterfaceRef<DeviceService>, link: Link<TcpStream>) {
                         let service = iface.get().await;
                         let _ = service.devices_changed(iface.signal_emitter()).await;
                     }
-                    // Buttons, listening and audio are not used yet.
+                    Incoming::Control(FromDevice::ListenStart { lang, codec, rate }) => {
+                        let lang = if lang.is_empty() { iface.get().await.language_for(&device_id) } else { lang };
+                        heard = Heard::begin(&lang, &codec, rate);
+                    }
+                    Incoming::Audio(frame) => {
+                        if let Some(heard) = heard.as_mut() {
+                            heard.push(&frame);
+                        }
+                    }
+                    Incoming::Control(FromDevice::ListenStop) => {
+                        if let Some(heard) = heard.take() {
+                            voice::answer(heard, &busy, reply_to.clone(), voice::assistant());
+                        }
+                    }
+                    Incoming::Control(FromDevice::Button { id, action }) => {
+                        let action = serde_json::to_value(action).ok().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default();
+                        let _ = DeviceService::button(iface.signal_emitter(), &device_id, u32::from(id), &action).await;
+                    }
+                    // Acknowledgements are not used yet.
                     _ => {}
                 }
             }
             message = outgoing.recv() => {
                 let Some(message) = message else { break };
                 let last = matches!(message, ToDevice::Bye { .. });
-                if writer.send(&message).await.is_err() || last {
+                let sent = match &message {
+                    ToDevice::Audio(frame) => writer.send_audio(frame).await,
+                    other => writer.send(other).await,
+                };
+                if sent.is_err() || last {
                     break;
                 }
             }
@@ -385,9 +417,12 @@ mod tests {
             .await
             .unwrap();
         device.send(&FromDevice::Ping).await.unwrap();
+        // The settings the user chose come first, as it connects; then the answer to the ping.
+        assert_eq!(device.receive().await.unwrap(), ToDevice::Config { volume: 70, brightness: 100, language: String::new() });
         assert_eq!(device.receive().await.unwrap(), ToDevice::Pong);
         let listed = iface.get().await.devices_json();
         assert!(listed.contains("\"online\":true"), "{listed}");
+
         assert!(listed.contains("\"battery\":78"), "{listed}");
 
         // A notification from the daemon shows up on the device.
@@ -532,6 +567,7 @@ mod tests {
             tokio::time::timeout(Duration::from_secs(20), lines.next_line()).await.expect("a line in time").unwrap().unwrap_or_default()
         }
         assert_eq!(next_line(&mut lines).await, "CONNECTED");
+        assert_eq!(next_line(&mut lines).await, "MSG {\"t\":\"config\",\"volume\":70,\"brightness\":100,\"language\":\"\"}");
         assert_eq!(next_line(&mut lines).await, "MSG {\"t\":\"pong\"}");
         let listed = loop {
             let listed = iface.get().await.devices_json();
@@ -541,6 +577,27 @@ mod tests {
             sleep(Duration::from_millis(50)).await;
         };
         assert!(listed.contains("\"online\":true"), "{listed}");
+        // A tap on the talk button, in the firmware's own framing: heard as too short, and told so, with the slime curious.
+        let mut talker = Command::new(&sim)
+            .args(["hello", &host, &port, &key, "10:b4:1d:e9:9d:34"].map(String::from))
+            .env("NIRO_SIM_TALK", "1")
+            .stdout(Stdio::piped())
+            .kill_on_drop(true)
+            .spawn()
+            .expect("device_sim starts");
+        let mut talk_lines = BufReader::new(talker.stdout.take().unwrap()).lines();
+        assert_eq!(next_line(&mut talk_lines).await, "CONNECTED");
+        let mut heard = Vec::new();
+        for _ in 0..4 {
+            heard.push(next_line(&mut talk_lines).await);
+        }
+        assert!(heard.iter().any(|line| line.contains("\"t\":\"answer\"") && line.contains("did not catch")), "{heard:?}");
+        assert!(heard.iter().any(|line| line.contains("\"name\":\"curious\"")), "{heard:?}");
+        drop(talker);
+        // Its connection ends with it, before the notification below is counted.
+        while iface.get().await.open_connections() > 1 {
+            sleep(Duration::from_millis(50)).await;
+        }
         let sent = iface.get().await.broadcast(&ToDevice::Notify {
             id: 1,
             kind: super::super::proto::Kind::Agent,
@@ -552,6 +609,10 @@ mod tests {
         assert_eq!(sent, 1);
         let notification = next_line(&mut lines).await;
         assert!(notification.contains("\"title\":\"Claude Code\"") && notification.contains("\"urgent\":true"), "{notification}");
+        // Speech for the speaker: one frame of ADPCM, which the firmware's C decodes to its 320 samples.
+        let frame = super::super::adpcm::Encoder::default().frame(&[300; 320]);
+        assert_eq!(iface.get().await.broadcast(&ToDevice::Audio(frame)), 1);
+        assert_eq!(next_line(&mut lines).await, "AUDIO 320");
         // A face is shown by name.
         assert_eq!(iface.get().await.broadcast(&ToDevice::Face { name: super::super::proto::Face::Sleepy }), 1);
         assert_eq!(next_line(&mut lines).await, "MSG {\"t\":\"face\",\"name\":\"sleepy\"}");

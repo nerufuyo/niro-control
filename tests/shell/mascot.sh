@@ -3,6 +3,7 @@
 # right mood for each case, and that a calm one on screen stays cheap. Run through tests/shell/run-staged.sh (`run-staged.sh mascot`).
 # Needs a built daemon. With NIRO_SHOTS=<dir> it also saves a screenshot of each case.
 set -u
+export GSETTINGS_BACKEND=${GSETTINGS_BACKEND:-memory}   # never the real dconf: the settings the test needs it sets itself
 cd "$(dirname "$0")/../.."
 LOG=$(mktemp); trap 'rm -f "$LOG"' EXIT
 SHOTS="${NIRO_SHOTS:-}"

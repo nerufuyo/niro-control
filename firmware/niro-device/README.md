@@ -57,9 +57,16 @@ NIRO_DEVICE_SIM=/tmp/niro-host/device_sim \
     dbus-run-session -- cargo test -p island-daemon -- --ignored firmware_e2e      # the whole pairing and a connection
 ```
 
+## Using it
+
+Pair it (BOOT, then type the six digits). Then **hold the UP button** (the volume-up one, GPIO 10) and speak; let go to send. The
+slime listens, thinks, and the answer appears on the screen: DOWN turns the pages, BOOT closes it. The PC does the hearing (whisper, set up
+in the island's assistant) and the answering (the AI chosen in Settings): an unset-up assistant is said so on the screen. Notifications
+(an AI that needs you or is done, a reminder, a meeting, the PC's battery) come the same way, with the slime's mood to match.
+
 ## What is not proven
 
-- **Nothing here has run on the board.** The code compiles for the ESP32-S3 (about 930 KB of the 3 MB the app may use), and the parts that
+- **Nothing here has run on the board** (the battery reading, the charger pin, the microphone, the answer screen and the talk button included: see `docs/device-hardware.md` for what is a guess). The code compiles for the ESP32-S3 (about 930 KB of the 3 MB the app may use), and the parts that
   do not touch the hardware (`srp_device.c`, `link.c`, `pair.c`) run on the PC against the daemon. The display, the buttons, Wi-Fi, mDNS on the
   board's own stack and the console have only been compiled.
 - The display's pins MOSI 41, SCLK 42 and CS 21 come from reading the old firmware's code, not its log (DC 40 and RST 45 were confirmed by
