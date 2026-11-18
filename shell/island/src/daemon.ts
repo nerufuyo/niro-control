@@ -151,6 +151,7 @@ const INTERFACES = {
     updates: {
         xml: node('Updates1', `
             <method name="SetEnabled"><arg name="enabled" type="b" direction="in"/></method>
+            <method name="Check"/>
             <property name="Latest" type="s" access="read"/>`),
         properties: {Latest: 'updates'},
     },
