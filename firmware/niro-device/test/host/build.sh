@@ -23,7 +23,7 @@ gcc -O2 -Wall -o "$OUT/harness" "$HERE/harness.c" "$FW/srp_device.c" \
     -I"$HERE/stub" -I"$FW" -I"$PC/include/crypto/srp6a" -I"$PC/src/crypto/srp6a" -I"$MB/include" -I"$MB/tf-psa-crypto/include"
 # The firmware's own link and pair code, with cJSON from ESP-IDF, as a command line device for the daemon's tests.
 CJ="$IDF/components/json/cJSON"
-gcc -O2 -Wall -Wno-unused-function -o "$OUT/device_sim" "$HERE/device_sim.c" "$FW/link.c" "$FW/pair.c" "$FW/srp_device.c" "$CJ/cJSON.c" \
+gcc -O2 -Wall -Wno-unused-function -o "$OUT/device_sim" "$HERE/device_sim.c" "$FW/link.c" "$FW/adpcm.c" "$FW/pair.c" "$FW/srp_device.c" "$CJ/cJSON.c" \
     "$PC/src/crypto/srp6a/esp_srp.c" "$PC/src/crypto/srp6a/esp_srp_mpi.c" "$OUT"/obj/*.o -lm \
     -I"$HERE/stub" -I"$FW" -I"$CJ" -I"$PC/include/crypto/srp6a" -I"$PC/src/crypto/srp6a" -I"$MB/include" -I"$MB/tf-psa-crypto/include"
 echo "$OUT/harness"

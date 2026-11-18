@@ -7,3 +7,6 @@
 void ui_code_entry(const uint8_t digits[6], int cursor, const char *hint);
 /** A notification; `urgent` is drawn in red. */
 void ui_notification(const char *title, const char *body, bool urgent);
+
+/** The assistant's answer, `page` of it (0 first); returns how many pages it has. Pages turn with DOWN. */
+int ui_answer(const char *text, int page);

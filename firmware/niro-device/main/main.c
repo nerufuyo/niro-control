@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "board.h"
+#include "battery.h"
 #include "buttons.h"
 #include "cJSON.h"
 #include "console.h"
@@ -12,9 +13,13 @@
 #include "esp_mac.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
+#include "driver/gpio.h"
 #include "freertos/task.h"
 #include "gfx.h"
 #include "link.h"
+#include "adpcm.h"
+#include "mic.h"
+#include "spk.h"
 #include "lwip/sockets.h"
 #include "net.h"
 #include "pair.h"
@@ -111,12 +116,28 @@ static int face_in(const char *json) {
     return found;
 }
 
-/** Is it urgent? */
-static bool urgent_in(const char *json) {
+/** The volume and the screen's brightness the user set in the panel. */
+static void config_in(const char *json) {
     cJSON *msg = cJSON_Parse(json);
-    bool urgent = cJSON_IsTrue(cJSON_GetObjectItem(msg, "urgent"));
+    const cJSON *volume = msg ? cJSON_GetObjectItem(msg, "volume") : NULL;
+    const cJSON *brightness = msg ? cJSON_GetObjectItem(msg, "brightness") : NULL;
+    if (cJSON_IsNumber(volume)) spk_set_volume(volume->valueint);
+    if (cJSON_IsNumber(brightness)) gfx_backlight(brightness->valueint);
     cJSON_Delete(msg);
-    return urgent;
+}
+
+/** How the slime greets a notification: its mood and a few words, by what it is about and whether it is urgent. */
+static void greet(const char *json) {
+    cJSON *msg = cJSON_Parse(json);
+    const cJSON *kind = msg ? cJSON_GetObjectItem(msg, "kind") : NULL;
+    const char *k = cJSON_IsString(kind) ? kind->valuestring : "";
+    bool urgent = cJSON_IsTrue(msg ? cJSON_GetObjectItem(msg, "urgent") : NULL);
+    if (!strcmp(k, "agent")) mood(urgent ? FACE_ALERT : FACE_HAPPY, urgent ? "AI NEEDS YOU" : "AI IS DONE");
+    else if (!strcmp(k, "reminder")) mood(FACE_ALERT, "REMINDER");
+    else if (!strcmp(k, "meeting")) mood(FACE_ALERT, "MEETING SOON");
+    else if (!strcmp(k, "battery")) mood(urgent ? FACE_SAD : FACE_LOVE, urgent ? "PC BATTERY LOW" : "PC IS CHARGED");
+    else mood(urgent ? FACE_ALERT : FACE_HAPPY, urgent ? "ATTENTION!" : "NEW MESSAGE");
+    cJSON_Delete(msg);
 }
 
 static void show_notification(const char *json) {
@@ -132,14 +153,56 @@ static void show_notification(const char *json) {
     cJSON_Delete(msg);
 }
 
-/** What the daemon sent: 1 a notification, 2 goodbye, 3 a face, 0 anything else. */
+/** What the daemon sent: 1 a notification, 2 goodbye, 3 a face, 4 an answer, 5 the end of speech, 6 the settings, 0 anything else. */
 static int kind_of(const char *json) {
     cJSON *msg = cJSON_Parse(json);
     const cJSON *t = msg ? cJSON_GetObjectItem(msg, "t") : NULL;
     int kind = 0;
-    if (cJSON_IsString(t)) kind = !strcmp(t->valuestring, "notify") ? 1 : !strcmp(t->valuestring, "bye") ? 2 : !strcmp(t->valuestring, "face") ? 3 : 0;
+    if (cJSON_IsString(t)) kind = !strcmp(t->valuestring, "notify") ? 1 : !strcmp(t->valuestring, "bye") ? 2 : !strcmp(t->valuestring, "face") ? 3 : !strcmp(t->valuestring, "answer") ? 4 : !strcmp(t->valuestring, "audio.end") ? 5 : !strcmp(t->valuestring, "config") ? 6 : 0;
     cJSON_Delete(msg);
     return kind;
+}
+
+/** Holding UP asks a question: the microphone's audio goes to the daemon until the button is let go (or 15 seconds).
+ * 0 when it went well, -1 when the connection failed. */
+static int talk(link_t *link) {
+    if (mic_init() != 0 || mic_start() != 0) {
+        mood(FACE_SAD, "NO MICROPHONE");
+        sleep_ms(2000);
+        return 0;
+    }
+    mood(FACE_LISTENING, "LISTENING");
+    if (link_send(link, "{\"t\":\"listen.start\",\"lang\":\"\",\"codec\":\"adpcm\",\"rate\":16000}") != 0) {
+        mic_stop();
+        return -1;
+    }
+    int64_t began = now_ms();
+    int rc = 0;
+    int16_t pcm[320];  // 20 ms
+    uint8_t packed[3 + 160];
+    adpcm_t coder = {0, 0};
+    while (gpio_get_level(PIN_BTN_UP) == 0 && now_ms() - began < 15000) {
+        int n = mic_read(pcm, 320, 100);
+        if (n > 0 && link_send_audio(link, packed, adpcm_encode(&coder, pcm, (size_t)n, packed)) != 0) {
+            rc = -1;
+            break;
+        }
+    }
+    mic_stop();
+    if (rc == 0 && link_send(link, "{\"t\":\"listen.stop\"}") != 0) rc = -1;
+    mood(FACE_THINKING, "THINKING");
+    xQueueReset(buttons);
+    return rc;
+}
+
+/** The words of an `answer`, copied into `out`; false when it has none. */
+static bool answer_in(const char *json, char *out, size_t cap) {
+    cJSON *msg = cJSON_Parse(json);
+    const cJSON *text = msg ? cJSON_GetObjectItem(msg, "text") : NULL;
+    bool ok = cJSON_IsString(text) && text->valuestring[0];
+    if (ok) snprintf(out, cap, "%s", text->valuestring);
+    cJSON_Delete(msg);
+    return ok;
 }
 
 /** Connects to the paired daemon and serves the connection until it ends. */
@@ -175,7 +238,10 @@ static void serve(const uint8_t daemon_id[16], const uint8_t key[32]) {
     int64_t connected_at = now_ms();
 
     int64_t last_ping = 0, last_status = -30000, shown_until = 0;
-    bool notifying = false;
+    bool notifying = false, answering = false;
+    int64_t up_since = 0;
+    char answer[1100];
+    int page = 0, pages = 1;
     for (;;) {
         int64_t now = now_ms();
         if (connected_at && now - connected_at > 4000) {
@@ -188,27 +254,56 @@ static void serve(const uint8_t daemon_id[16], const uint8_t key[32]) {
         }
         if (now - last_status >= 30000) {
             char status[160];
-            // The battery is not read yet: 255 says so.
-            snprintf(status, sizeof status, "{\"t\":\"status\",\"battery\":255,\"charging\":false,\"temp_c\":0.0,\"rssi\":%d,\"fw\":\"%s\"}",
-                     net_rssi(), FIRMWARE);
+            // 255 says the battery could not be read.
+            snprintf(status, sizeof status, "{\"t\":\"status\",\"battery\":%u,\"charging\":%s,\"temp_c\":0.0,\"rssi\":%d,\"fw\":\"%s\"}",
+                     battery_percent(), battery_charging() ? "true" : "false", net_rssi(), FIRMWARE);
+            ESP_LOGI(TAG, "battery %d mV", battery_mv());
             if (link_send(&link, status) != 0) break;
             last_status = now;
+        }
+        // UP held for a moment is a question.
+        if (gpio_get_level(PIN_BTN_UP) == 0) {
+            if (!up_since) up_since = now;
+            else if (now - up_since >= 300) {
+                face_task_poke();
+                notifying = answering = false;
+                if (talk(&link) != 0) break;
+                up_since = 0;
+                last_ping = 0;
+                continue;
+            }
+        } else {
+            up_since = 0;
         }
         char text[LINK_PAYLOAD_MAX + 1];
         size_t len = 0;
         int got = link_recv(&link, text, sizeof text, &len, 200);
         if (got < 0) break;
-        if (got == 1 && len) {
+        if (got == 2) {
+            // A frame of speech: played as it comes, which also keeps the daemon from sending faster than it is heard.
+            static int16_t speech[480];
+            int n = adpcm_decode((const uint8_t *)text, len, speech, 480);
+            if (n > 0 && spk_init() == 0) spk_play(speech, (size_t)n);
+            face_task_poke();
+        } else if (got == 1 && len) {
             int kind = kind_of(text);
             if (kind == 2) break;
+            if (kind == 5) spk_stop();
+            if (kind == 6) config_in(text);
             face_task_poke();
             if (kind == 3 && !notifying) {
                 int m = face_in(text);
                 if (m >= 0) mood((face_mood_t)m, NULL);
             }
+            if (kind == 4 && answer_in(text, answer, sizeof answer)) {
+                page = 0;
+                pages = ui_answer(answer, page);
+                notifying = answering = true;
+                shown_until = now_ms() + 120000;
+            }
             if (kind == 1) {
                 // The slime reacts first, then the words.
-                mood(urgent_in(text) ? FACE_ALERT : FACE_HAPPY, urgent_in(text) ? "ATTENTION!" : "NEW MESSAGE");
+                greet(text);
                 sleep_ms(1400);
                 show_notification(text);
                 notifying = true;
@@ -216,13 +311,25 @@ static void serve(const uint8_t daemon_id[16], const uint8_t key[32]) {
             }
         }
         button_event_t event;
-        while (next_button(&event, 0))
-            if (notifying) {
-                notifying = false;
-                mood(FACE_IDLE, NULL);
+        while (next_button(&event, 0)) {
+            if (event.id == BTN_UP) continue;
+            if (!notifying) {
+                // Nothing on the screen to close: the button is the user's, for the computer to bind (music, a timer).
+                char press[80];
+                snprintf(press, sizeof press, "{\"t\":\"button\",\"id\":%d,\"action\":\"%s\"}", (int)event.id, event.kind == PRESS_LONG ? "long" : "press");
+                if (link_send(&link, press) != 0) break;
+                continue;
             }
+            if (answering && event.id == BTN_DOWN && event.kind == PRESS_SHORT && pages > 1) {
+                page = (page + 1) % pages;
+                ui_answer(answer, page);
+                continue;
+            }
+            notifying = answering = false;
+            mood(FACE_IDLE, NULL);
+        }
         if (notifying && now_ms() > shown_until) {
-            notifying = false;
+            notifying = answering = false;
             mood(FACE_IDLE, NULL);
         }
     }
@@ -234,6 +341,7 @@ static void serve(const uint8_t daemon_id[16], const uint8_t key[32]) {
 
 void app_main(void) {
     store_init();
+    battery_init();
     gfx_init();
     face_task_start();
     mood(FACE_WAKING, NULL);

@@ -15,6 +15,7 @@
 static const char *TAG = "link";
 #define TAG_LEN 16
 #define TYPE_CONTROL 0
+#define TYPE_AUDIO 1
 
 void niro_hex_encode(const uint8_t *bytes, size_t len, char *out) {
     static const char digits[] = "0123456789abcdef";
@@ -176,12 +177,11 @@ int link_open(link_t *link, int fd, const uint8_t device_key[32], const char *de
     return 0;
 }
 
-int link_send(link_t *link, const char *json) {
-    size_t len = strlen(json);
+static int send_typed(link_t *link, uint8_t type, const uint8_t *data, size_t len) {
     if (len > LINK_PAYLOAD_MAX) return -1;
     uint8_t plain[1 + LINK_PAYLOAD_MAX], frame[LINK_PAYLOAD_MAX + 1 + TAG_LEN], nonce[12];
-    plain[0] = TYPE_CONTROL;
-    memcpy(plain + 1, json, len);
+    plain[0] = type;
+    memcpy(plain + 1, data, len);
     nonce_for(link->send_counter++, nonce);
     mbedtls_chachapoly_context ctx;
     mbedtls_chachapoly_init(&ctx);
@@ -190,6 +190,10 @@ int link_send(link_t *link, const char *json) {
     mbedtls_chachapoly_free(&ctx);
     return rc ? -1 : write_frame(link->fd, frame, len + 1 + TAG_LEN);
 }
+
+int link_send(link_t *link, const char *json) { return send_typed(link, TYPE_CONTROL, (const uint8_t *)json, strlen(json)); }
+
+int link_send_audio(link_t *link, const uint8_t *pcm, size_t len) { return send_typed(link, TYPE_AUDIO, pcm, len); }
 
 int link_recv(link_t *link, char *buf, size_t cap, size_t *len, int timeout_ms) {
     uint8_t frame[LINK_PAYLOAD_MAX + 1 + TAG_LEN], plain[1 + LINK_PAYLOAD_MAX], nonce[12];
@@ -205,8 +209,14 @@ int link_recv(link_t *link, char *buf, size_t cap, size_t *len, int timeout_ms) 
     if (!rc) rc = mbedtls_chachapoly_auth_decrypt(&ctx, body, nonce, NULL, 0, frame + body, frame, plain);
     mbedtls_chachapoly_free(&ctx);
     if (rc) return -1;
+    if (plain[0] == TYPE_AUDIO) {
+        if (body - 1 > cap) return -1;
+        memcpy(buf, plain + 1, body - 1);
+        *len = body - 1;
+        return 2;
+    }
     if (plain[0] != TYPE_CONTROL) {
-        // Audio and the rest are not used yet: a frame that says nothing.
+        // Anything else is not used: a frame that says nothing.
         buf[0] = 0;
         *len = 0;
         return 1;

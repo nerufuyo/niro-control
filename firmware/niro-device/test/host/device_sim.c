@@ -9,6 +9,7 @@
 #include <sys/select.h>
 
 #include "esp_random.h"
+#include "adpcm.h"
 #include "link.h"
 #include "pair.h"
 
@@ -52,10 +53,20 @@ int main(int argc, char **argv) {
     printf("CONNECTED\n"); fflush(stdout);
     link_send(&link, "{\"t\":\"status\",\"battery\":255,\"charging\":false,\"temp_c\":0.0,\"rssi\":-55,\"fw\":\"sim\"}");
     link_send(&link, "{\"t\":\"ping\"}");
+    if (getenv("NIRO_SIM_TALK")) {
+        // A tap on the talk button: too short to be a question, through the firmware's own audio framing.
+        int16_t pcm[320] = {0};
+        link_send(&link, "{\"t\":\"listen.start\",\"lang\":\"\",\"codec\":\"adpcm\",\"rate\":16000}");
+        adpcm_t coder = {0, 0};
+        uint8_t packed[3 + 160];
+        for (int i = 0; i < 5; i++) link_send_audio(&link, packed, adpcm_encode(&coder, pcm, 320, packed));
+        link_send(&link, "{\"t\":\"listen.stop\"}");
+    }
     for (;;) {
         char text[LINK_PAYLOAD_MAX + 1]; size_t len = 0;
         int got = link_recv(&link, text, sizeof text, &len, 8000);
         if (got < 0) { printf("END\n"); return 0; }
+        if (got == 2) { int16_t pcm[480]; printf("AUDIO %d\n", adpcm_decode((const uint8_t *)text, len, pcm, 480)); fflush(stdout); }
         if (got == 1 && len) { printf("MSG %s\n", text); fflush(stdout); }
         if (got == 0) { printf("IDLE\n"); return 0; }
     }

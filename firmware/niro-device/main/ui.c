@@ -55,3 +55,43 @@ void ui_notification(const char *title, const char *body, bool urgent) {
     wrapped(100, 2, COL_GREY, body, 19, 5);
     gfx_flush();
 }
+
+#define ANSWER_WIDTH 19
+#define ANSWER_LINES 7
+
+int ui_answer(const char *text, int page) {
+    // Lines of at most ANSWER_WIDTH characters, broken at spaces.
+    const char *start[64];
+    int length[64], lines = 0;
+    while (*text && lines < 64) {
+        while (*text == ' ') text++;
+        int len = (int)strlen(text);
+        if (len > ANSWER_WIDTH) {
+            len = ANSWER_WIDTH;
+            while (len > 0 && text[len] != ' ') len--;
+            if (len == 0) len = ANSWER_WIDTH;
+        }
+        if (len == 0) break;
+        start[lines] = text;
+        length[lines++] = len;
+        text += len;
+    }
+    int pages = lines ? (lines + ANSWER_LINES - 1) / ANSWER_LINES : 1;
+    if (page >= pages || page < 0) page = 0;
+    face_hide();
+    gfx_clear(COL_BLACK);
+    gfx_rect(0, 0, LCD_W, 6, COL_GREEN);
+    gfx_text(8, 14, 2, COL_GREEN, COL_BLACK, "NIRO");
+    for (int i = 0; i < ANSWER_LINES && page * ANSWER_LINES + i < lines; i++) {
+        char line[ANSWER_WIDTH + 1];
+        int at = page * ANSWER_LINES + i;
+        memcpy(line, start[at], (size_t)length[at]);
+        line[length[at]] = 0;
+        gfx_text(8, 40 + i * 24, 2, COL_WHITE, COL_BLACK, line);
+    }
+    char hint[32];
+    snprintf(hint, sizeof hint, pages > 1 ? "DOWN: MORE %d/%d  BOOT: OK" : "BOOT: OK", page + 1, pages);
+    gfx_text(8, 224, 1, COL_GREY, COL_BLACK, hint);
+    gfx_flush();
+    return pages;
+}

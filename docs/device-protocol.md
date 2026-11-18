@@ -1,7 +1,7 @@
 # Niro Device protocol (draft)
 
 How a Niro Device (an ESP32-S3 assistant with a screen, a microphone, a speaker and buttons) pairs with one
-user's Niro and talks to it. **Draft: nothing here is built yet.** Open decisions are marked **[open]**.
+user's Niro and talks to it. **Built and tested against firmware code on a PC; not yet run on the board.** Open decisions are marked **[open]**.
 
 ## Goals
 
@@ -97,10 +97,10 @@ JSON text frames for control; binary frames for audio. `t` is the type.
 
 | `t` | Fields | Meaning |
 |---|---|---|
-| `listen.start` | `lang`, `codec: "opus"`, `rate: 16000` | The user asked (button or wake). Audio frames follow. |
-| `listen.stop` | | The user let go, or the device's own end-of-speech fired. |
-| *(binary)* | Opus frame, 20 ms | Audio, only between `listen.start` and `listen.stop`. |
-| `button` | `id`, `action: press\|long\|release` | A button the daemon may bind to something. |
+| `listen.start` | `lang`, `codec`, `rate: 16000` | The user asked (hold UP). Audio frames follow. `codec` is `adpcm` (what the firmware sends: IMA ADPCM, 4 bits a sample, 20 ms = 163 bytes a frame, 64 kbit/s; the frame is a 3-byte header, the predictor and the step index, then the samples; `device/adpcm.rs` and `firmware/niro-device/main/adpcm.c` are the same code and are tested against each other) or `pcm` (16-bit little-endian samples, 640 bytes a frame); `opus` may come later. |
+| `listen.stop` | | The user let go (or 15 s passed). The daemon turns the audio into words (whisper), asks the assistant and sends `face`, `stt` and `answer`. A tap under a third of a second is answered "I did not catch that". One question at a time per connection; the longest is 30 s. |
+| *(binary)* | PCM (or Opus) frame, 20 ms | Audio, only between `listen.start` and `listen.stop`. |
+| `button` | `id`, `action: press\|long` | BOOT (1) and DOWN (2) with nothing on the screen (UP, 0, is for talking). The daemon raises `Devices1.Button`; the island plays or skips the music, or starts the focus timer. |
 | `status` | `battery`, `charging`, `temp_c`, `rssi`, `fw` | Every 30 s and when something changes. `battery` is 0 to 100, or 255 when the device does not read it. |
 | `ack` | `id` | A notification was shown or dismissed. |
 | `ping` | | Keep-alive, every 15 s. |
@@ -110,11 +110,12 @@ JSON text frames for control; binary frames for audio. `t` is the type.
 | `t` | Fields | Meaning |
 |---|---|---|
 | `stt` | `text`, `final` | What was heard, as it is recognised. |
-| `answer` | `id`, `text`, `done` | The AI's reply in pieces; `done` ends it. |
-| *(binary)* | Opus frame | Spoken reply, after `answer` with `audio: true`. |
+| `answer` | `id`, `text`, `done`, `audio` | The AI's reply. Today one message with `done: true`, cut to 400 characters and 800 escaped bytes (the device's receive buffer is 1024 bytes: a larger frame ends the connection); a cut answer ends in an ellipsis. |
+| *(binary)* | ADPCM frame, 20 ms, 16 kHz | Spoken reply (espeak-ng on the PC, in the device's language), after an `answer` with `audio: true`; the device plays each frame as it arrives, which also paces the daemon. |
+| `audio.end` | | The speech is over. |
 | `notify` | `id`, `kind`, `title`, `body`, `urgency`, `expire_ms` | An alert. `kind`: `agent`, `reminder`, `meeting`, `battery`, `system`. |
 | `face` | `name` | The mood of the mascot, a slime (see `firmware/niro-device/MASCOT.md`): `idle`, `listening`, `thinking`, `speaking`, `happy`, `alert`, `sleepy`, `sad`, `curious`, `love`. The device also has moods of its own for what it is doing (waking, searching for Wi-Fi). |
-| `config` | `volume`, `brightness`, `language` | Set by the user in the panel, kept by the device. |
+| `config` | `volume`, `brightness`, `language` | Set by the user in the panel (`Devices1.SetConfig`), kept by the daemon and sent when the device connects and when they change. The device applies the volume (0 is mute) and the backlight. |
 | `pong` | | |
 | `bye` | `reason` | The daemon is closing (`forgotten`, `shutdown`). |
 
@@ -122,8 +123,7 @@ While pairing, before the connection is sealed, the daemon also sends `pair.a` a
 does not allow the device: a device that typed the wrong code is not told anything, the connection is simply closed, so the two can
 be told apart.
 
-Notifications come from what the daemon already has: `Alert` and the agent hooks (`Agents1`), reminders,
-meetings, battery. Which kinds reach the device is a per-device setting in the panel.
+Notifications come from what the daemon already has, sent to every connected device by `device/feed.rs`: an AI that needs the user or has finished (the agent hooks, `agent`), the PC's battery low or full (`battery`), and, from the island, reminders and meetings that fall due (`reminder`, `meeting`, through `Devices1.Notify`). Which kinds reach a device is its own setting (`Devices1.SetKind`, the chips under each device on the island's Niro Device page; all on until turned off).
 
 ## Failure behaviour
 

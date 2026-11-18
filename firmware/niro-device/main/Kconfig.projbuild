@@ -20,4 +20,29 @@ menu "Niro Device"
     config NIRO_LCD_GAP_Y
         int "Display row offset"
         default 0
+    config NIRO_BATTERY_DIVIDER_X10
+        int "Battery divider ratio, times ten (20 is a divider of 2)"
+        default 20
+        help
+            The battery is read through a resistor divider whose ratio is not known for this board. Measure the
+            battery with a meter, compare it with the voltage the device logs ("battery ... mV"), and set this to
+            (meter / logged) times ten times the value now.
+    config NIRO_CHARGING_ACTIVE_LOW
+        bool "The charger pulls its status pin low while charging"
+        default y
+        help
+            Most charger chips (a TP4056's CHRG) pull the pin low while charging. Not read from this board yet:
+            if the device says it charges when it does not, turn this off.
+    config NIRO_MIC_SHIFT
+        int "Microphone gain: right shift of the 32 bit sample (smaller is louder)"
+        default 14
+        range 8 20
+        help
+            The microphone is not known for this board; most I2S MEMS microphones fit a shift of 14 to 16. If speech is
+            too quiet to be understood, lower it; if it clips, raise it.
+    config NIRO_MIC_RIGHT
+        bool "The microphone answers on the right channel"
+        default n
+        help
+            Depends on how the microphone's L/R pin is tied. If nothing is heard at all, try this.
 endmenu

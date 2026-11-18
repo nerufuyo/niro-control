@@ -492,6 +492,9 @@ impl AgentsService {
             return Ok(());
         }
         let json = serde_json::to_string(&event).unwrap_or_default();
+        if let Some(message) = crate::device::from_agent(&event) {
+            crate::device::push(message);
+        }
         Ok(Self::event(&emitter, &json).await?)
     }
 

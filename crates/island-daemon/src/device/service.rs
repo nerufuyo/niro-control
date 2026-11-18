@@ -60,6 +60,8 @@ pub struct DeviceService {
     pub(super) wake: Arc<Notify>,
     /// Wakes the loop that listens for devices, when what it wants changes.
     pub(super) hub: Arc<Notify>,
+    /// Do Not Disturb is on: the slime sleeps, and only what is urgent is shown (see `set_quiet`).
+    quiet: bool,
 }
 
 impl DeviceService {
@@ -78,6 +80,7 @@ impl DeviceService {
             connections: Vec::new(),
             status: HashMap::new(),
             next_connection: 0,
+            quiet: false,
             port: None,
             wake: Arc::default(),
             hub: Arc::default(),
@@ -231,14 +234,57 @@ impl DeviceService {
         }
     }
 
+    /// What a device is to be told about its settings, as it connects and when they change.
+    pub(super) fn config_for(&self, device_id: &str) -> Option<ToDevice> {
+        let device = self.devices.find(device_id)?;
+        Some(ToDevice::Config {
+            volume: device.volume,
+            brightness: device.brightness,
+            language: device.language.clone(),
+        })
+    }
+
+    /// The language a device's questions are heard in when it names none.
+    pub(super) fn language_for(&self, device_id: &str) -> String {
+        self.devices.find(device_id).map(|device| device.language.clone()).unwrap_or_default()
+    }
+
+    /// Sends a message to the connections of one device.
+    fn send_to(&self, device_id: &str, message: &ToDevice) {
+        for connection in self.connections.iter().filter(|c| c.device_id == device_id) {
+            let _ = connection.outbox.send(message.clone());
+        }
+    }
+
+    /// Whether Do Not Disturb is on, for a device that connects while it is.
+    pub(super) fn quiet(&self) -> bool {
+        self.quiet
+    }
+
+    /// How many connections are open (for tests that wait for one to end).
+    #[cfg(test)]
+    pub(super) fn open_connections(&self) -> usize {
+        self.connections.len()
+    }
+
     fn online(&self, device_id: &str) -> bool {
         self.connections.iter().any(|c| c.device_id == device_id)
     }
 
     /// Sends a message to every device that is connected; returns how many it was queued for.
     pub(super) fn broadcast(&self, message: &ToDevice) -> usize {
+        let kind = match message {
+            ToDevice::Notify { kind, .. } => serde_json::to_value(kind).ok().and_then(|v| v.as_str().map(str::to_owned)),
+            _ => None,
+        };
+        // Quiet: what is not urgent waits for the user to be free (it is not kept).
+        if self.quiet && matches!(message, ToDevice::Notify { urgent: false, .. }) {
+            return 0;
+        }
         self.connections
             .iter()
+            // A notification of a kind the user turned off for this device is not sent to it.
+            .filter(|c| kind.as_deref().is_none_or(|kind| self.devices.wants(&c.device_id, kind)))
             .filter(|c| c.outbox.send(message.clone()).is_ok())
             .count()
     }
@@ -293,6 +339,10 @@ impl DeviceService {
                     "paired_at_ms": device.paired_at_ms,
                     "online": self.online(&device.device_id),
                     "status": self.status.get(&device.device_id),
+                    "muted": device.muted,
+                    "volume": device.volume,
+                    "brightness": device.brightness,
+                    "language": device.language,
                 })
             })
             .collect();
@@ -374,6 +424,79 @@ impl DeviceService {
         Ok(self.devices_changed(&emitter).await?)
     }
 
+    /// Turns the notifications of one kind (`agent`, `reminder`, `meeting`, `battery`, `system`) on or off for a device.
+    /// GNOME Shell only.
+    async fn set_kind(
+        &mut self,
+        device_id: &str,
+        kind: &str,
+        on: bool,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] connection: &Connection,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> fdo::Result<()> {
+        crate::caller::shell_only(connection, &header).await?;
+        serde_json::from_value::<Kind>(Value::String(kind.to_owned()))
+            .map_err(|_| fdo::Error::InvalidArgs(format!("unknown kind `{kind}`")))?;
+        if !self.devices.set_kind(device_id, kind, on) {
+            return Err(fdo::Error::InvalidArgs(format!("no device `{device_id}` is paired")));
+        }
+        self.store.save(&self.devices);
+        Ok(self.devices_changed(&emitter).await?)
+    }
+
+    /// Sets a device's loudness (0 to 100, 0 is mute), screen brightness (5 to 100) and language (codes like `id,en`, or
+    /// empty for this computer's); the device is told at once. GNOME Shell only.
+    async fn set_config(
+        &mut self,
+        device_id: &str,
+        volume: u32,
+        brightness: u32,
+        language: &str,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] connection: &Connection,
+        #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
+    ) -> fdo::Result<()> {
+        crate::caller::shell_only(connection, &header).await?;
+        if volume > 100 || !(5..=100).contains(&brightness) {
+            return Err(fdo::Error::InvalidArgs("volume is 0 to 100 and brightness 5 to 100".into()));
+        }
+        if language.len() > 24 || !language.chars().all(|c| c.is_ascii_alphabetic() || c == ',') {
+            return Err(fdo::Error::InvalidArgs("a language is codes like `id,en`".into()));
+        }
+        if !self.devices.set_config(device_id, volume as u8, brightness as u8, language) {
+            return Err(fdo::Error::InvalidArgs(format!("no device `{device_id}` is paired")));
+        }
+        self.store.save(&self.devices);
+        if let Some(config) = self.config_for(device_id) {
+            self.send_to(device_id, &config);
+        }
+        Ok(self.devices_changed(&emitter).await?)
+    }
+
+    /// Do Not Disturb, from the island: every device's slime goes to sleep (and wakes when it ends), and notifications that
+    /// are not urgent are not shown meanwhile. GNOME Shell only.
+    async fn set_quiet(
+        &mut self,
+        quiet: bool,
+        #[zbus(header)] header: Header<'_>,
+        #[zbus(connection)] connection: &Connection,
+    ) -> fdo::Result<()> {
+        crate::caller::shell_only(connection, &header).await?;
+        if self.quiet != quiet {
+            self.quiet = quiet;
+            self.broadcast(&ToDevice::Face {
+                name: if quiet { Face::Sleepy } else { Face::Idle },
+            });
+        }
+        Ok(())
+    }
+
+    /// A button on a device was pressed: its number (0 UP, 1 BOOT, 2 DOWN) and `press`, `long` or `release`.
+    /// UP is for talking and is not sent.
+    #[zbus(signal)]
+    pub(super) async fn button(emitter: &SignalEmitter<'_>, device_id: &str, id: u32, action: &str) -> zbus::Result<()>;
+
     /// Forgets a paired device: its key stops working. GNOME Shell only.
     async fn forget(
         &mut self,
@@ -453,7 +576,7 @@ impl DeviceService {
         self.request_json()
     }
 
-    /// JSON array of `{device_id, name, paired_at_ms, online, status}`; never a key.
+    /// JSON array of `{device_id, name, paired_at_ms, online, status, muted}` (`muted`: the notification kinds turned off); never a key.
     #[zbus(property)]
     fn devices(&self) -> String {
         self.devices_json()
@@ -510,6 +633,36 @@ mod tests {
         assert_eq!(service.complete_pairing(MAC, "Desk"), None);
         assert!(service.devices.devices.is_empty());
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn a_muted_kind_is_not_sent_to_that_device_only() {
+        let (mut service, _dir) = service("muted-kind");
+        service.devices.add(MAC, "Desk", 1);
+        let (outbox, mut received) = mpsc::unbounded_channel();
+        service.connected(MAC, outbox);
+        let notice = |kind| ToDevice::Notify { id: 1, kind, title: "t".into(), body: "b".into(), urgent: false, expire_ms: 1 };
+        assert_eq!(service.broadcast(&notice(Kind::Agent)), 1);
+        service.devices.set_kind(MAC, "agent", false);
+        assert_eq!(service.broadcast(&notice(Kind::Agent)), 0);
+        assert_eq!(service.broadcast(&notice(Kind::Battery)), 1);
+        // Faces and the rest are not notifications: they always go.
+        assert_eq!(service.broadcast(&ToDevice::Pong), 1);
+        assert!(received.try_recv().is_ok());
+    }
+
+    #[test]
+    fn while_quiet_only_what_is_urgent_is_shown() {
+        let (mut service, _dir) = service("quiet");
+        service.devices.add(MAC, "Desk", 1);
+        let (outbox, _received) = mpsc::unbounded_channel();
+        service.connected(MAC, outbox);
+        let notice = |urgent| ToDevice::Notify { id: 1, kind: Kind::Agent, title: "t".into(), body: "b".into(), urgent, expire_ms: 1 };
+        service.quiet = true;
+        assert_eq!(service.broadcast(&notice(false)), 0);
+        assert_eq!(service.broadcast(&notice(true)), 1);
+        service.quiet = false;
+        assert_eq!(service.broadcast(&notice(false)), 1);
     }
 
     #[test]

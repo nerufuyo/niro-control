@@ -53,6 +53,7 @@ import {SystemPage} from './pages/system.js';
 import {PowerPage} from './pages/power.js';
 import {ControlsPage} from './pages/controls.js';
 import {ReminderWatcher} from './reminders.js';
+import {buttonCommand} from './niroDeviceRules.js';
 import * as Theme from './theme.js';
 import {GREETING, InstalledApps, UNDO_MS, VoiceView, stopUnit, actionTypes, aiSettings, openSetUp, openSignIn, runActions, signInHint, stopPending, voiceContext} from './voice.js';
 import {autoHide, revealBand} from './visibilityRules.js';
@@ -422,6 +423,7 @@ export class Controller {
         this._watchIdle();
         this._installedApps = new InstalledApps();
         this._reminders = new ReminderWatcher(this._daemon, (reminder, done) => {
+            this._tellDevices('reminder', 'Reminder', reminder.text, true);
             this._post(Alerts.reminder(reminder, () => {
                 this._chime('complete');
                 done();
@@ -772,6 +774,12 @@ export class Controller {
             this._chime('complete');
             this._post(Alerts.pomodoroFinished(finished, next, daemon.state.pomodoro, daemon));
         });
+        // A button on a Niro Device: music and the focus timer, as niroDeviceRules says.
+        daemon.connect('device-button', (_daemon, _device, id, action) => {
+            const command = buttonCommand(id, action, Boolean(daemon.state.pomodoro?.running));
+            if (command)
+                daemon.attemptQuietly(command.service, command.method).catch(() => {});
+        });
         daemon.connect('system-event', (_daemon, event) =>
             this._postSystemAlert(Alerts.system(event), SYSTEM_ALERTS[event.kind] ?? 'power',
                 URGENT_SYSTEM_ALERTS.includes(event.kind)));
@@ -796,7 +804,11 @@ export class Controller {
                 onWithdrawn: key => !this._destroying && this._withdrawAlert(key),
             }, this._sharing));
         });
-        notifications.connect('dnd-changed', () => this._setCompact('doNotDisturb', notifications.dnd));
+        notifications.connect('dnd-changed', () => {
+            this._setCompact('doNotDisturb', notifications.dnd);
+            // The Niro Device sleeps with it.
+            this._daemon.attemptQuietly('niroDevices', 'SetQuiet', notifications.dnd).catch(() => {});
+        });
         notifications.connect('changed', () => this._syncUnseen());
         notifications.connect('seen-changed', () => this._syncUnseen());
         this._setCompact('doNotDisturb', notifications.dnd);
@@ -1385,6 +1397,12 @@ export class Controller {
             !this._settings.get_strv('hidden-pages').includes('music'));
     }
 
+    /** Shows a line on the Niro Devices that are connected; nobody to tell, or no daemon, is no matter. */
+    _tellDevices(kind, title, body, urgent) {
+        this._daemon.attemptQuietly('niroDevices', 'Notify', kind, String(title ?? ''), String(body ?? ''), urgent)
+            .catch(() => {});
+    }
+
     /** An event starts soon: an alert, with Join when the event has a meeting link. Not in Do Not Disturb. */
     async _onEventSoon(event) {
         if (this._notifications.dnd)
@@ -1397,6 +1415,8 @@ export class Controller {
         // Island turned off, or Do Not Disturb on, while the link was looked for.
         if (this._destroying || this._notifications.dnd)
             return;
+        const when = Alerts.meeting(event, link, () => {});
+        this._tellDevices('meeting', when.title, when.subtitle ?? '', false);
         this._post(Alerts.meeting(event, link, () => {
             try {
                 Gio.AppInfo.launch_default_for_uri(link, global.create_app_launch_context(0, -1));
@@ -2947,7 +2967,8 @@ export class Controller {
             this._closedListeningAt = 0;
             this._voiceInBackground = true;
         }
-        const ours = this._voiceOpen || this._voiceInBackground;
+        // A Niro Device's question: its actions run here as for the island closed, with no view to show them.
+        const ours = this._voiceOpen || this._voiceInBackground || Boolean(state.device);
         // Actions it takes mid-way, open or closed: each batch once, and what they did goes back.
         if (ours && state.phase === 'acting' && state.step !== this._voiceStep) {
             this._voiceStep = state.step;
@@ -3013,6 +3034,10 @@ export class Controller {
     // Answered with the island closed: its actions run, and the answer (or what went wrong) shows as an
     // alert, which opens it in full.
     _onAssistantInBackground(state) {
+        if (state.device && state.phase === 'reply' && state.turn !== this._deviceTurn) {
+            this._deviceTurn = state.turn;
+            runActions(state.actions, this._voiceActions());
+        }
         if (!this._voiceInBackground)
             return;
         if (state.phase === 'reply' && state.turn !== this._voiceTurn) {

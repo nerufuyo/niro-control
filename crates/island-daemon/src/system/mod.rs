@@ -217,6 +217,9 @@ async fn publish(
             service.state_changed(emitter).await?;
         }
         if let Some(event) = event {
+            if let Some(message) = crate::device::from_system(&event) {
+                crate::device::push(message);
+            }
             let json = serde_json::to_string(&event).unwrap_or_default();
             SystemService::event(emitter, &json).await?;
         }
