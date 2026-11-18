@@ -230,6 +230,12 @@ class NiroDevicePage extends Page {
             chip.accessible_name = `${text} on ${device.name}: ${off ? 'off' : 'on'}`;
             line.add_child(chip);
         }
+        // Waiting for "Momo Niro": lit, the device sends its microphone to this computer, which keeps nothing.
+        const awake = device.wake ?? true;
+        const wake = pillButton('Momo Niro', `island-pill-small island-nd-kind${awake ? '' : ' island-nd-kind-off'}`,
+            () => this.daemon.call('niroDevices', 'SetWake', device.device_id, !awake));
+        wake.accessible_name = `Listening for "Momo Niro" on ${device.name}: ${awake ? 'on' : 'off'}`;
+        line.add_child(wake);
         return line;
     }
 

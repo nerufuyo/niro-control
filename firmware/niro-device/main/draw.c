@@ -74,6 +74,27 @@ void draw_circle(uint16_t *px, float cx, float cy, float radius, rgb_t colour, f
         }
 }
 
+void draw_ring(uint16_t *px, float cx, float cy, float r, float thick, rgb_t colour, float alpha) {
+    if (alpha <= 0.f) return;
+    float outer = r + thick * .5f, inner = fmaxf(r - thick * .5f, 0.f);
+    for (int y = (int)(cy - outer - 1); y <= (int)(cy + outer + 1); y++) {
+        if (y < 0 || y >= CANVAS_H) continue;
+        float dy = y + .5f - cy, ox2 = (outer + 1.f) * (outer + 1.f) - dy * dy;
+        if (ox2 < 0) continue;
+        float ox = sqrtf(ox2), ix2 = (inner - 1.f) * (inner - 1.f) - dy * dy, ix = ix2 > 0 && inner > 1.f ? sqrtf(ix2) : 0.f;
+        // The two runs of this row that are off the hole.
+        for (int side = 0; side < 2; side++) {
+            int a = side ? (int)(cx + ix) : (int)(cx - ox) - 1, b = side ? (int)(cx + ox) + 1 : (int)(cx - ix);
+            if (ix <= 0.f && side) break;
+            if (ix <= 0.f) b = (int)(cx + ox) + 1;
+            for (int x = a; x <= b; x++) {
+                float dx = x + .5f - cx, d = fabsf(sqrtf(dx * dx + dy * dy) - r) - thick * .5f;
+                blend(px, x, y, colour, clampf(.5f - d, 0.f, 1.f) * alpha);
+            }
+        }
+    }
+}
+
 void draw_ellipse(uint16_t *px, float cx, float cy, float rx, float ry, rgb_t colour, float alpha) {
     if (rx < .5f || ry < .5f) return;
     float m = fminf(rx, ry), inv_rx = 1.f / rx, inv_ry = 1.f / ry;

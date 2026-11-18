@@ -88,6 +88,7 @@ const INTERFACES = {
             <method name="SetConfig"><arg name="device_id" type="s" direction="in"/><arg name="volume" type="u" direction="in"/><arg name="brightness" type="u" direction="in"/><arg name="language" type="s" direction="in"/></method>
             <signal name="Button"><arg name="device_id" type="s"/><arg name="id" type="u"/><arg name="action" type="s"/></signal>
             <method name="SetQuiet"><arg name="quiet" type="b" direction="in"/></method>
+            <method name="SetWake"><arg name="device_id" type="s" direction="in"/><arg name="on" type="b" direction="in"/></method>
             <method name="SetKind"><arg name="device_id" type="s" direction="in"/><arg name="kind" type="s" direction="in"/><arg name="on" type="b" direction="in"/></method>
             <method name="Face"><arg name="name" type="s" direction="in"/><arg type="u" direction="out"/></method>
             <method name="Notify"><arg name="kind" type="s" direction="in"/><arg name="title" type="s" direction="in"/><arg name="body" type="s" direction="in"/><arg name="urgent" type="b" direction="in"/><arg type="u" direction="out"/></method>
