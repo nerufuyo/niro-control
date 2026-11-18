@@ -63,7 +63,7 @@ static pose_t pose_for(face_mood_t m) {
         p.warm = 1.f; p.tip = 1.f;
         break;
     case FACE_WAKING:
-        p.sq = .3f; p.shut = 1; p.curve = .1f; p.tip = .2f; p.dim = .3f; p.mouth_hw = 6;
+        p.sq = .04f; p.shut = 1; p.curve = .1f; p.tip = .55f; p.dim = .12f; p.mouth_hw = 6;
         break;
     case FACE_SEARCHING:
         p.eye_ry = 12.5f; p.mouth_hw = 6; p.curve = -.15f; p.tip = .6f; p.mouth_dy = 25; p.dim = .1f;
@@ -72,10 +72,10 @@ static pose_t pose_for(face_mood_t m) {
         p.tip_dx = -10; p.brow_r = .9f; p.tilt = -.1f; p.mouth_hw = 7; p.curve = .5f; p.eye_ry = 14.5f; p.tip = 1.f;
         break;
     case FACE_SLEEPY:
-        p.sq = .27f; p.shut = 1; p.mouth_hw = 5; p.curve = 0; p.tip = .3f; p.dim = .35f; p.eye_dy = 2;
+        p.sq = .03f; p.shut = 1; p.mouth_hw = 5; p.curve = 0; p.tip = .5f; p.dim = .15f; p.eye_dy = 1;
         break;
     case FACE_SAD:
-        p.sq = .2f; p.eye_ry = 12; p.tilt = -.85f; p.mouth_hw = 9; p.curve = -.6f; p.mouth_dy = 27; p.tip = .35f; p.dim = .28f; p.eye_dy = 2;
+        p.sq = .04f; p.eye_ry = 12.5f; p.tilt = -.85f; p.mouth_hw = 9; p.curve = -.6f; p.mouth_dy = 26; p.tip = .5f; p.tip_dx = -3; p.dim = .12f; p.eye_dy = 1;
         break;
     case FACE_LOVE:
         p.sq = .03f; p.blush = 1; p.mouth_hw = 15; p.curve = 1.f; p.mouth_dy = 23; p.tip = 1.f;
