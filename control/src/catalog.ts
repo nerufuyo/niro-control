@@ -2446,6 +2446,34 @@ export const CATALOG: Item[] = [
   "count": 10
  },
  {
+  "id": "dock.stack-downloads",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Downloads stack",
+  "help": "A Downloads folder at the dock's end: a click lists its newest files",
+  "detail": "A Downloads folder at the dock's end: a click lists its newest files",
+  "source": "dock",
+  "key": "stack-downloads",
+  "type": "b",
+  "default": "true",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "dock.stack-documents",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Documents stack",
+  "help": "A Documents folder at the dock's end: a click lists its newest files",
+  "detail": "A Documents folder at the dock's end: a click lists its newest files",
+  "source": "dock",
+  "key": "stack-documents",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
   "id": "dock.show-applications-button",
   "menu": "Dock",
   "group": "Applications and Indicators",

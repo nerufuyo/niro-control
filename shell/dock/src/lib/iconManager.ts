@@ -45,6 +45,23 @@ interface MinItem {
 export type Rect = { x: number; y: number; width: number; height: number };
 
 type ContextMenu = InstanceType<typeof PopupMenu.PopupMenu>;
+
+/** A folder shown as a stack: an XDG folder by its name. */
+export type StackFolder = "downloads" | "documents";
+const STACKS: Record<StackFolder, { dir: GLib.UserDirectory; icon: string; name: string }> = {
+  downloads: {
+    dir: GLib.UserDirectory.DIRECTORY_DOWNLOAD,
+    icon: "folder-download",
+    name: "Downloads",
+  },
+  documents: {
+    dir: GLib.UserDirectory.DIRECTORY_DOCUMENTS,
+    icon: "folder-documents",
+    name: "Documents",
+  },
+};
+/** How many of a stack's newest files its menu lists. */
+const STACK_FILES = 12;
 type MenuManager = InstanceType<typeof PopupMenu.PopupMenuManager>;
 
 /** Delegate exposed on a dragged icon so the drop target knows the source. */
@@ -128,6 +145,11 @@ export class IconManager {
   private _badgeCounts: Map<string, number> = new Map();
   private _badgeSources: Map<object, number> = new Map();
   private _badgesEnabled: boolean = true;
+  /** Folder stacks at the dock's very end (after the minimized windows): which, and their actors. */
+  private _stackFolders: StackFolder[] = [];
+  private _stackActors: IconActor[] = [];
+  private _stackSeparator: InstanceType<typeof St.Widget> | null = null;
+  private _stackMenu: ContextMenu | null = null;
   private _windowPreviewsEnabled: boolean = false;
   private _previewPopup: WindowPreviewPopup | null = null;
   private _onDragStateChanged: DragStateChanged | null = null;
@@ -223,6 +245,12 @@ export class IconManager {
       this._appButtonIcon.set_icon_size(this._iconSize);
       const padded = this._iconSize + 12;
       this._appButton.set_size(padded, padded - 4);
+    }
+    for (const actor of this._stackActors) {
+      actor.set_size(this._iconSize + 12, this._iconSize + 12 - 4);
+      (actor.get_first_child() as InstanceType<typeof St.Icon> | null)?.set_icon_size(
+        this._iconSize,
+      );
     }
     this._syncOverviewIcons();
   }
@@ -482,6 +510,7 @@ export class IconManager {
     }
 
     this._closeContextMenu();
+    this._closeStackMenu();
     this._menuManager = null;
 
     this._teardownDraggables();
@@ -510,6 +539,8 @@ export class IconManager {
     this._appButton = null;
     this._appButtonIcon = null;
     this._minSeparator = null;
+    this._stackActors = [];
+    this._stackSeparator = null;
     this._minItems.clear();
   }
 
@@ -564,6 +595,8 @@ export class IconManager {
     this._removePendingReloadSource();
     this._teardownDraggables();
     this._removeDropIndicator();
+    // The stacks go first: the icons are placed before what is counted at the end.
+    this._clearStacks();
     this._container.remove_all_children();
     this._icons.clear();
     this._apps.clear();
@@ -601,6 +634,7 @@ export class IconManager {
     // Add applications button at the end
     this._updateAppButton();
     this._positionAppButton();
+    this._syncStacks();
     this.syncMinimized(false);
   }
 
@@ -839,7 +873,7 @@ export class IconManager {
     // Before the minimized windows, which stay at the end.
     this._container.insert_child_at_index(
       actor,
-      this._container.get_n_children() - this._minChildCount(),
+      this._container.get_n_children() - this._tailCount(),
     );
     this._icons.set(appId, actor);
     // GNOME takes every actor down as the shell shuts down, before this runs again: a destroyed icon is let go at once, so the timers
@@ -1684,7 +1718,7 @@ export class IconManager {
     if (!this._appButton) return;
 
     const childCount = this._container.get_n_children();
-    const targetIndex = this._appButtonPosition === 0 ? 0 : childCount - 1 - this._minChildCount();
+    const targetIndex = this._appButtonPosition === 0 ? 0 : childCount - 1 - this._tailCount();
     if (this._container.get_child_at_index(targetIndex) === this._appButton) return;
 
     this._container.set_child_at_index(this._appButton, targetIndex);
@@ -1820,6 +1854,171 @@ export class IconManager {
     }
   }
 
+  /** How many container children the stacks take at the very end (their separator and one each). */
+  private _stackChildCount(): number {
+    return (this._stackSeparator ? 1 : 0) + this._stackActors.length;
+  }
+
+  /** Everything after the apps: the minimized windows, then the stacks. */
+  private _tailCount(): number {
+    return this._minChildCount() + this._stackChildCount();
+  }
+
+  /** Which folders are stacks; the dock is rebuilt with them. */
+  setStackFolders(folders: StackFolder[]): void {
+    if (folders.join() === this._stackFolders.join()) return;
+    this._stackFolders = folders;
+    this._syncStacks();
+    if (this._onIconsChanged) this._onIconsChanged();
+  }
+
+  /** Total length of the stacks along the dock, separator included, for the dock's size. */
+  getStackExtent(): number {
+    if (this._stackActors.length === 0) return 0;
+    return 9 + this._spacing + this._stackActors.length * (this._iconSize + 12 + this._spacing);
+  }
+
+  /** The stacks, put at the very end (after the minimized windows). */
+  private _syncStacks(): void {
+    this._clearStacks();
+    const folders = this._stackFolders.filter((f) => GLib.get_user_special_dir(STACKS[f].dir));
+    if (folders.length === 0) return;
+    this._stackSeparator = new St.Widget({
+      style_class: "dock-separator",
+      width: 1,
+      height: 32,
+      x_align: Clutter.ActorAlign.CENTER,
+      y_align: Clutter.ActorAlign.CENTER,
+    });
+    this._container.add_child(this._stackSeparator);
+    for (const folder of folders) {
+      const { icon, name } = STACKS[folder];
+      const actor = new St.BoxLayout({
+        style_class: "dock-icon dock-stack",
+        reactive: true,
+        track_hover: true,
+        ...box(true),
+        x_align: Clutter.ActorAlign.CENTER,
+        y_align: Clutter.ActorAlign.FILL,
+      }) as IconActor;
+      actor.set_size(this._iconSize + 12, this._iconSize + 12 - 4);
+      const glyph = new St.Icon({
+        icon_name: icon,
+        icon_size: this._iconSize,
+        x_align: Clutter.ActorAlign.CENTER,
+        y_align: Clutter.ActorAlign.CENTER,
+        y_expand: true,
+      });
+      actor.add_child(glyph);
+      this._signals.connect(actor, "notify::hover", () => {
+        if (actor.hover) this._showTooltip(actor, name);
+        else this._hideTooltip();
+      });
+      this._signals.connect(actor, "button-release-event", (_a, event) => {
+        const button = (event as { get_button: () => number }).get_button();
+        if (button === 1 || button === 3) this._openStack(actor, folder);
+        return Clutter.EVENT_STOP;
+      });
+      this._container.add_child(actor);
+      this._stackActors.push(actor);
+    }
+  }
+
+  /** Takes the stacks away (a rebuild puts them back last). */
+  private _clearStacks(): void {
+    this._closeStackMenu();
+    for (const actor of this._stackActors) actor.destroy();
+    this._stackActors = [];
+    this._stackSeparator?.destroy();
+    this._stackSeparator = null;
+  }
+
+  /** The folder's newest files, newest first (hidden ones left out). */
+  private _stackFiles(dir: string): { file: Gio.File; name: string; icon: Gio.Icon | null }[] {
+    const out: { file: Gio.File; name: string; icon: Gio.Icon | null; at: number }[] = [];
+    try {
+      const folder = Gio.File.new_for_path(dir);
+      const it = folder.enumerate_children(
+        "standard::name,standard::display-name,standard::icon,standard::is-hidden,time::modified",
+        Gio.FileQueryInfoFlags.NONE,
+        null,
+      );
+      let seen = 0;
+      for (let info = it.next_file(null); info && seen < 5000; info = it.next_file(null), seen++) {
+        if (info.get_is_hidden()) continue;
+        out.push({
+          file: folder.get_child(info.get_name()),
+          name: info.get_display_name(),
+          icon: info.get_icon(),
+          at: info.get_attribute_uint64("time::modified"),
+        });
+      }
+      it.close(null);
+    } catch (_e) {
+      return [];
+    }
+    return out.sort((a, b) => b.at - a.at).slice(0, STACK_FILES);
+  }
+
+  private _openStack(actor: IconActor, folder: StackFolder): void {
+    this._closeContextMenu();
+    this._closeStackMenu();
+    this._hideTooltip();
+    if (!this._menuManager) return;
+    const { dir, name } = STACKS[folder];
+    const path = GLib.get_user_special_dir(dir);
+    if (!path) return;
+    const menu = new PopupMenu.PopupMenu(actor, 0.5, St.Side.TOP);
+    menu.box.add_style_class_name("dock-popup-menu");
+    Main.uiGroup.add_child(menu.actor);
+    this._stackMenu = menu;
+    const open = (file: Gio.File) => {
+      try {
+        Gio.AppInfo.launch_default_for_uri(file.get_uri(), global.create_app_launch_context(0, -1));
+      } catch (e) {
+        Main.notify(name, `Could not open ${file.get_basename()}: ${(e as Error).message}`);
+      }
+    };
+    const files = this._stackFiles(path);
+    if (files.length === 0) {
+      const empty = new PopupMenu.PopupMenuItem(`${name} is empty`, { reactive: false });
+      menu.addMenuItem(empty);
+    }
+    for (const f of files) {
+      const item = new PopupMenu.PopupImageMenuItem(f.name, f.icon ?? "text-x-generic-symbolic");
+      item.label.add_style_class_name("dock-stack-name");
+      item.label.clutter_text.set_ellipsize(3); // Pango.EllipsizeMode.END
+      item.connect("activate", () => open(f.file));
+      menu.addMenuItem(item);
+    }
+    menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
+    const folderItem = new PopupMenu.PopupImageMenuItem(`Open ${name}`, "folder-open-symbolic");
+    folderItem.connect("activate", () => open(Gio.File.new_for_path(path)));
+    menu.addMenuItem(folderItem);
+    menu.connect("open-state-changed", (_m: unknown, isOpen: boolean) => {
+      if (!isOpen && this._stackMenu === menu) {
+        this._onContextMenuActorChanged?.(null);
+        GLib.idle_add(GLib.PRIORITY_DEFAULT, () => {
+          if (this._stackMenu === menu) this._stackMenu = null;
+          menu.destroy();
+          return GLib.SOURCE_REMOVE;
+        });
+      }
+    });
+    this._menuManager.addMenu(menu);
+    this._onContextMenuActorChanged?.(menu.actor);
+    menu.open(BoxPointer.PopupAnimation.FULL);
+  }
+
+  private _closeStackMenu(): void {
+    const menu = this._stackMenu;
+    this._stackMenu = null;
+    if (menu) {
+      menu.close(BoxPointer.PopupAnimation.NONE);
+      menu.destroy();
+    }
+  }
+
   /** How many container children the minimized section has (its separator and one thumbnail each). */
   private _minChildCount(): number {
     return (this._minSeparator ? 1 : 0) + this._minItems.size;
@@ -1882,7 +2081,9 @@ export class IconManager {
     if (!this.isMinimizable(win)) return null;
     const existing = this._minItems.get(win.get_id());
     if (existing) return this._minRect(existing.actor);
-    const last = this._container.get_last_child();
+    // The last child before the stacks: the new thumbnail goes right after it.
+    const lastIndex = this._container.get_n_children() - 1 - this._stackChildCount();
+    const last = lastIndex >= 0 ? this._container.get_child_at_index(lastIndex) : null;
     const slot = this._thumbSize(win).width + 12;
     const spacing = this._spacing;
     const addsSeparator = this._minSeparator === null;
@@ -1963,7 +2164,7 @@ export class IconManager {
       const first = [...this._minItems.values()][0]?.actor;
       const index = first
         ? this._container.get_children().indexOf(first)
-        : this._container.get_n_children();
+        : this._container.get_n_children() - this._stackChildCount();
       this._container.insert_child_at_index(this._minSeparator, Math.max(0, index));
     } else if (!wanted && this._minSeparator) {
       this._minSeparator.destroy();
@@ -2029,7 +2230,10 @@ export class IconManager {
       else this._hideTooltip();
     });
 
-    this._container.add_child(actor);
+    this._container.insert_child_at_index(
+      actor,
+      this._container.get_n_children() - this._stackChildCount(),
+    );
     this._positionAppButton();
     this._minItems.set(win.get_id(), { win, actor, width: width + 12 });
 

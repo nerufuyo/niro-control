@@ -1,19 +1,19 @@
 # Niro Control
 
-<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control 1.5.2: one look for the whole GNOME desktop"></p>
+<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control 1.5.3: one look for the whole GNOME desktop"></p>
 
 **One look for the whole GNOME desktop.** A top-bar island, a macOS-style dock, an application search, window blur and
 rounded corners, a tiling layout manager, an emoji picker, and a control panel that sets them all from one place. One repository, one package.
 
 Runs on **Fedora 45 (GNOME Shell 51)** and **Ubuntu 24.04 (GNOME Shell 46)**, on Wayland. The extensions declare GNOME Shell 46 to 51.
-Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.5.2** ([releases](https://github.com/nerufuyo/niro-control/releases)).
+Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.5.3** ([releases](https://github.com/nerufuyo/niro-control/releases)).
 
 ## What you get
 
 | Part | What it does |
 |---|---|
 | **Island** | A notch on the top bar that opens into music with synced lyrics, calls, a focus timer and a stopwatch with laps, quick controls (thick volume and brightness sliders, Wi-Fi with its password asked on the spot, Bluetooth, Night Light…), reminders, a clipboard and file shelf, calendar, notifications, system stats, a battery card for laptops with the power mode and session controls, AI usage (Claude, ChatGPT Plus or Pro, Grok and an opencode Go plan through their sign-ins, and the balance of a DeepSeek API account with its key, every provider in its own column so all the numbers are in view at once), alerts when Claude Code, Codex or opencode needs you or is done, and a voice assistant. Alerts for volume, battery, Bluetooth, meetings and more. |
-| **Dock** | A dock with icon magnification, window previews, genie minimise (a pinned app's window becomes a thumbnail at the dock's end as on macOS, an unpinned app's icon becomes its overview), running indicators, unread-notification counts on app icons, auto-hide (also over full-screen apps, brought back by the screen edge) four positions, and its size and icons your own: icon size, spacing and padding, any installed icon theme, tiles (rounded, circle, glass), muted or grey icons. |
+| **Dock** | A dock with icon magnification, window previews, genie minimise (a pinned app's window becomes a thumbnail at the dock's end as on macOS, an unpinned app's icon becomes its overview), running indicators, unread-notification counts on app icons, Downloads and Documents stacks at its end (a click lists the newest files), auto-hide (also over full-screen apps, brought back by the screen edge) four positions, and its size and icons your own: icon size, spacing and padding, any installed icon theme, tiles (rounded, circle, glass), muted or grey icons. |
 | **Search** | `Super+Space`: a command palette for applications, a calculator, unit and currency conversion (`150 usd to idr`; only the two currency codes are sent, to [Frankfurter](https://frankfurter.dev)'s ECB rates, kept for six hours), open windows, every Niro setting, profiles, system actions (lock, Do Not Disturb, Wi-Fi, Bluetooth, mute, Night Light, screenshot, suspend, log out…) and the island's clipboard history. One typed action registry, also on D-Bus. |
 | **Niro Snip** | `Super+Shift+S`: a screenshot (the desktop's own area / window / screen picker) opened in an editor: pen, highlighter, arrow, rectangle, text, numbered steps, pixelate to hide what is private, and crop. Save writes over the screenshot and copies it; Save As keeps a copy; Copy & close (`Ctrl+Enter`). `niro-snip --delay 5` waits first, `niro-snip --full` takes the whole screen, `niro-snip FILE` edits any picture. |
 | **Window blur** | Frosted glass behind application windows, with one strength and opacity for everything. |
@@ -22,7 +22,7 @@ Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from t
 | **Emoji, Emulator** | An emoji picker on `Super+.` or `Super+;` with every emoji, 179 kaomoji and about 1,100 text symbols (arrows, maths, Greek, currency, box drawing, accents…), searched by name in English or Indonesian, with its settings in the panel's Search page; keeps the Android Emulator window on top. |
 | **Profiles** | Save the whole desktop as a profile and switch with one action: four built-ins (Everyday, Deep Work, Creative, Gaming), preview before applying, backups, rollback, import and export. |
 | **Niro Device** | An ESP32-S3 assistant with a small screen that belongs to one user's Niro: paired with a 6-digit code (it is never sent over the network), then connected over the same Wi-Fi with every frame sealed. It shows notifications and Niro's face. Firmware in [`firmware/niro-device`](firmware/niro-device/README.md), protocol in [`docs/device-protocol.md`](docs/device-protocol.md); the island has a page for it (off until you switch it on in Settings → Island). Ask it out loud: say "Momo Niro" and your question (the computer turns speech into words with Whisper, nothing is kept), or hold its button; it answers on screen and through its speaker. |
-| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 202 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
+| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 204 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
 
 Opacity, blur, blur strength, accent and tint are set once, in **Look**, and the island, dock, search and windows follow.
 Light and dark appearance both work, and the panel adapts to narrow windows.

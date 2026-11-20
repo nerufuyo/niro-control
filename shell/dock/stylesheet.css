@@ -159,6 +159,11 @@
   color: #8ec8ff;
 }
 
+/* A stack's menu: long file names end in an ellipsis */
+.dock-stack-name {
+  max-width: 340px;
+}
+
 /* Unread notifications on an icon */
 .dock-notification-badge {
   min-width: 14px;
