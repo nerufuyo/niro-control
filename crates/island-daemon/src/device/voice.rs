@@ -72,7 +72,7 @@ impl Heard {
                 self.samples.extend(samples.into_iter().take(room));
             }
         } else {
-            self.samples.extend(frame.chunks_exact(2).take(room).map(|pair| i16::from_le_bytes([pair[0], pair[1]])));
+            self.samples.extend(frame.as_chunks::<2>().0.iter().take(room).map(|pair| i16::from_le_bytes([pair[0], pair[1]])));
         }
     }
 
