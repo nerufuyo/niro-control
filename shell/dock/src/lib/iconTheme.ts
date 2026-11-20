@@ -29,7 +29,9 @@ export function iconRoots(): string[] {
 }
 
 function loadTheme(name: string): Theme | null {
-  const roots = iconRoots().filter((root) => GLib.file_test(`${root}/${name}/index.theme`, GLib.FileTest.EXISTS));
+  const roots = iconRoots().filter((root) =>
+    GLib.file_test(`${root}/${name}/index.theme`, GLib.FileTest.EXISTS),
+  );
   if (roots.length === 0) return null;
   const file = new GLib.KeyFile();
   // index.theme separates its lists with commas, not GLib's semicolons.
@@ -54,7 +56,10 @@ function loadTheme(name: string): Theme | null {
     }
   };
   const dirs: Dir[] = [];
-  for (const path of [...list("Icon Theme", "Directories"), ...list("Icon Theme", "ScaledDirectories")]) {
+  for (const path of [
+    ...list("Icon Theme", "Directories"),
+    ...list("Icon Theme", "ScaledDirectories"),
+  ]) {
     if (!file.has_group(path)) continue;
     const size = number(path, "Size", 0);
     let type = "Threshold";

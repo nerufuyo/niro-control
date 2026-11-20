@@ -6,6 +6,7 @@ import Mtk from "gi://Mtk";
 import Shell from "gi://Shell";
 import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import { box, inhibitScanout, isWayland, setVertical } from "./compat.js";
 import { DockVisibility } from "./dockVisibility.js";
 import { genie } from "./genie.js";
 import { IconManager, type MediaAction } from "./iconManager.js";
@@ -14,7 +15,6 @@ import { Magnification } from "./magnification.js";
 import { MediaManager } from "./mediaManager.js";
 import { SignalManager } from "./signalManager.js";
 import { WindowPreviewPopup } from "./windowPreview.js";
-import { box, inhibitScanout, isWayland, setVertical } from "./compat.js";
 
 /** The applications button's pictures (setting `app-button-icon`). */
 const APP_BUTTON_ICONS: Record<string, string> = {
@@ -116,7 +116,16 @@ export class DockManager {
     this._bg = new St.Widget({ style_class: "dock-bg", reactive: false });
     Main.layoutManager.addTopChrome(this._bg);
     this._container.get_parent()?.set_child_below_sibling(this._bg, this._container);
-    for (const prop of ["x", "y", "width", "height", "opacity", "visible", "translation-x", "translation-y"])
+    for (const prop of [
+      "x",
+      "y",
+      "width",
+      "height",
+      "opacity",
+      "visible",
+      "translation-x",
+      "translation-y",
+    ])
       this._signals.connect(this._container, `notify::${prop}`, () => this._syncBg());
 
     // Icon manager: populates the container with app buttons.
@@ -135,7 +144,9 @@ export class DockManager {
       this._syncAllIconGeometry();
     });
     // Windows minimize into (and restore from) their dock icon, and new ones fly out of it.
-    this._signals.connect(global.window_manager, "map", (_wm: unknown, actor: unknown) => this._flyOut(actor as Clutter.Actor));
+    this._signals.connect(global.window_manager, "map", (_wm: unknown, actor: unknown) =>
+      this._flyOut(actor as Clutter.Actor),
+    );
     // Genie: a funnel-shaped clone of the window flies into (or out of) its dock icon.
     this._signals.connect(global.window_manager, "minimize", (_wm: unknown, actor: unknown) =>
       this._genie(actor as Clutter.Actor, false),
@@ -144,11 +155,15 @@ export class DockManager {
       this._genie(actor as Clutter.Actor, true),
     );
     // Thumbnails follow the windows that are minimized: a closed one, or one restored some other way, goes.
-    this._signals.connect(global.window_manager, "destroy", () => GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
-      this._iconManager?.syncMinimized();
-      return GLib.SOURCE_REMOVE;
-    }));
-    this._signals.connect(global.window_manager, "switch-workspace", () => this._iconManager?.syncMinimized());
+    this._signals.connect(global.window_manager, "destroy", () =>
+      GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+        this._iconManager?.syncMinimized();
+        return GLib.SOURCE_REMOVE;
+      }),
+    );
+    this._signals.connect(global.window_manager, "switch-workspace", () =>
+      this._iconManager?.syncMinimized(),
+    );
     this._signals.connect(global.display, "window-created", () =>
       GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
         this._syncAllIconGeometry();
@@ -167,7 +182,9 @@ export class DockManager {
     iconManager.setAppButtonPosition(settings.get_int("show-applications-button-position"));
     iconManager.setWorkspaceMode(settings.get_int("dock-workspace-mode"));
     iconManager.setIconSpacing(this._iconSpacing());
-    iconManager.setAppButtonIcon(APP_BUTTON_ICONS[settings.get_string("app-button-icon")] ?? APP_BUTTON_ICONS.grid);
+    iconManager.setAppButtonIcon(
+      APP_BUTTON_ICONS[settings.get_string("app-button-icon")] ?? APP_BUTTON_ICONS.grid,
+    );
     iconManager.setIconStyle(settings.get_string("icon-style"));
     iconManager.setIconColor(settings.get_string("icon-color"));
     iconManager.setIconTheme(settings.get_string("icon-theme"));
@@ -254,9 +271,13 @@ export class DockManager {
       iconManager.setIconStyle(settings.get_string("icon-style"));
       this._updatePosition();
     });
-    this._signals.connect(settings, "changed::icon-color", () => iconManager.setIconColor(settings.get_string("icon-color")));
+    this._signals.connect(settings, "changed::icon-color", () =>
+      iconManager.setIconColor(settings.get_string("icon-color")),
+    );
     this._signals.connect(settings, "changed::app-button-icon", () =>
-      iconManager.setAppButtonIcon(APP_BUTTON_ICONS[settings.get_string("app-button-icon")] ?? APP_BUTTON_ICONS.grid),
+      iconManager.setAppButtonIcon(
+        APP_BUTTON_ICONS[settings.get_string("app-button-icon")] ?? APP_BUTTON_ICONS.grid,
+      ),
     );
     const syncHiding = () => {
       if (this._hidingWanted()) {
@@ -369,9 +390,14 @@ export class DockManager {
     // The docks of the system (Ubuntu's, Dash to Dock) would stand beside this one: they go while it is on.
     // Not from inside this call (nor the manager's): it rewrites the list of extensions, which must not happen while one is being turned on.
     this._signals.connect(settings, "changed::hide-system-dock", () => this._scheduleSystemDocks());
-    this._signals.connect(Main.extensionManager, "extension-state-changed", (_manager: unknown, extension: unknown) => {
-      if (SYSTEM_DOCKS.includes((extension as { uuid: string }).uuid)) this._scheduleSystemDocks();
-    });
+    this._signals.connect(
+      Main.extensionManager,
+      "extension-state-changed",
+      (_manager: unknown, extension: unknown) => {
+        if (SYSTEM_DOCKS.includes((extension as { uuid: string }).uuid))
+          this._scheduleSystemDocks();
+      },
+    );
     this._scheduleSystemDocks();
   }
 
@@ -428,7 +454,10 @@ export class DockManager {
     const settings = this._settings;
     if (!settings || !this._container) return;
     const monitor = Main.layoutManager.primaryMonitor;
-    const wanted = settings.get_boolean("fullscreen-reveal") && Boolean(monitor?.inFullscreen) && global.window_group.visible;
+    const wanted =
+      settings.get_boolean("fullscreen-reveal") &&
+      Boolean(monitor?.inFullscreen) &&
+      global.window_group.visible;
     if (wanted === this._fsForced) return;
     this._fsForced = wanted;
     this._syncScanout();
@@ -458,9 +487,11 @@ export class DockManager {
     if (!container) return;
     const duration = this._settings?.get_int("animation-duration") ?? 200;
     if (hidden) {
-      const vertical = this._dockPosition === POSITIONS.LEFT || this._dockPosition === POSITIONS.RIGHT;
+      const vertical =
+        this._dockPosition === POSITIONS.LEFT || this._dockPosition === POSITIONS.RIGHT;
       const away = Math.ceil((vertical ? container.width : container.height) * 1.2) + 24;
-      const sign = this._dockPosition === POSITIONS.TOP || this._dockPosition === POSITIONS.LEFT ? -1 : 1;
+      const sign =
+        this._dockPosition === POSITIONS.TOP || this._dockPosition === POSITIONS.LEFT ? -1 : 1;
       const params: Record<string, unknown> = {
         translation_x: vertical ? sign * away : 0,
         translation_y: vertical ? 0 : sign * away,
@@ -564,7 +595,10 @@ export class DockManager {
   /** The dock goes away at times: always (`auto-hide`) or under a maximized or full-screen window (`hide-when-maximized`). */
   private _hidingWanted(): boolean {
     const settings = this._settings;
-    return Boolean(settings && (settings.get_boolean("auto-hide") || settings.get_boolean("hide-when-maximized")));
+    return Boolean(
+      settings &&
+        (settings.get_boolean("auto-hide") || settings.get_boolean("hide-when-maximized")),
+    );
   }
 
   private _startAutoHide(): void {
@@ -620,12 +654,19 @@ export class DockManager {
   }
 
   // Where the app's icon sits on screen; GNOME animates minimize/restore to and from this rectangle.
-  private _iconRect(app: Shell.App): { x: number; y: number; width: number; height: number } | null {
+  private _iconRect(
+    app: Shell.App,
+  ): { x: number; y: number; width: number; height: number } | null {
     const actor = this._iconManager?.getIconActor(app);
     if (!actor) return null;
     const [x, y] = actor.get_transformed_position();
     const [w, h] = actor.get_transformed_size();
-    return { x: Math.round(x), y: Math.round(y), width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)) };
+    return {
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.max(1, Math.round(w)),
+      height: Math.max(1, Math.round(h)),
+    };
   }
 
   private _syncIconGeometry(app: Shell.App): void {
@@ -668,7 +709,13 @@ export class DockManager {
   private _flyOut(actor: Clutter.Actor): void {
     const win = (actor as unknown as { meta_window?: Meta.Window }).meta_window;
     const pending = this._launching;
-    if (!win || !pending || Date.now() - pending.time > 5000 || win.get_window_type() !== Meta.WindowType.NORMAL) return;
+    if (
+      !win ||
+      !pending ||
+      Date.now() - pending.time > 5000 ||
+      win.get_window_type() !== Meta.WindowType.NORMAL
+    )
+      return;
     if (Shell.WindowTracker.get_default().get_window_app(win) !== pending.app) return;
     const rect = this._iconRect(pending.app);
     if (!rect) return;
@@ -840,7 +887,10 @@ export class DockManager {
           ? iconPadded
           : 0;
     const minimizedExtent = iconManager.getMinimizedExtent();
-    const dockAxisSize = Math.max(contentSize + minimizedExtent + padding, DockManager.MIN_DOCK_WIDTH);
+    const dockAxisSize = Math.max(
+      contentSize + minimizedExtent + padding,
+      DockManager.MIN_DOCK_WIDTH,
+    );
 
     let x = 0;
     let y = 0;

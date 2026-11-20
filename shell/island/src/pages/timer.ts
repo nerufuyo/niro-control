@@ -11,7 +11,7 @@ import St from 'gi://St';
 import {timerColor} from '../compact.js';
 import {VERTICAL, onUiScale} from '../compat.js';
 import * as Format from '../format.js';
-import {typedMinutes} from '../timerRules.js';
+import {Stopwatch, stopwatchText, typedMinutes} from '../timerRules.js';
 import {Ring, icon, iconButton, label, setEnabled} from '../widgets.js';
 import {PAGE_HEIGHT} from '../expanded.js';
 import {Page} from './page.js';
@@ -70,15 +70,25 @@ class TimerPage extends Page {
             steppers.add_child(this._buildStepper(stepper));
         this.add_child(steppers);
         this._steppers = steppers;
+        // The stopwatch's laps take the steppers' place while it is the stopwatch (see `_setMode`).
+        this._watch = new Stopwatch();
+        this._mode = 'timer';
+        this._laps = label('', 'island-timer-phase', {y_align: Clutter.ActorAlign.CENTER, visible: false});
+        this._laps.clutter_text.line_alignment = 0;
+        this.insert_child_above(this._laps, steppers);
         this.add_child(new St.Widget({x_expand: true}));
 
         // Reset only once started; then Start, Pause or Resume.
         const controls = new St.BoxLayout({style_class: 'island-timer-controls', x_expand: true,
             x_align: Clutter.ActorAlign.END, y_align: Clutter.ActorAlign.CENTER});
         this._reset = iconButton('island-reset', 'island-button-round',
-            () => daemon.call('pomodoro', 'Stop'), {size: 14, accessibleName: 'Reset the timer'});
+            () => this._resetPressed(), {size: 14, accessibleName: 'Reset the timer'});
         this._reset.y_align = Clutter.ActorAlign.CENTER;
         controls.add_child(this._reset);
+        this._lap = new St.Button({style_class: 'island-button-flat', label: 'Lap', can_focus: true, visible: false, y_align: Clutter.ActorAlign.CENTER,
+            accessible_name: 'Keep a lap'});
+        this._lap.connect('clicked', () => { this._watch.lap(Format.nowMs()); this._update(); });
+        controls.add_child(this._lap);
         const pill = new St.BoxLayout({style_class: 'island-start-pill-box'});
         this._playIcon = new St.Icon({gicon: icon('island-play-symbolic'), icon_size: 13, y_align: Clutter.ActorAlign.CENTER});
         this._playLabel = label('Start', 'island-start-pill-label');
@@ -94,6 +104,11 @@ class TimerPage extends Page {
                 this._centreSteppers();
         });
         slot.add_child(controls);
+        // Timer or stopwatch: a small switch in the corner above Start.
+        this._modeButton = new St.Button({style_class: 'island-button-flat', label: 'Stopwatch', can_focus: true, x_align: Clutter.ActorAlign.END,
+            y_align: Clutter.ActorAlign.START, translation_y: -34, accessible_name: 'Switch between the timer and the stopwatch'});
+        this._modeButton.connect('clicked', () => this._setMode(this._mode === 'timer' ? 'watch' : 'timer'));
+        slot.add_child(this._modeButton);
         this.add_child(slot);
         this._slot = slot;
 
@@ -284,8 +299,53 @@ class TimerPage extends Page {
         return Boolean(state && state.phase !== 'idle');
     }
 
+    /** Timer or stopwatch: the other one's controls are put away, and nothing of the other keeps running on screen. */
+    _setMode(mode) {
+        if (mode === this._mode)
+            return;
+        this._cancelTyping();
+        this._mode = mode;
+        const watch = mode === 'watch';
+        this._modeButton.label = watch ? 'Timer' : 'Stopwatch';
+        this._steppers.visible = !watch;
+        this._laps.visible = watch;
+        this._update();
+    }
+
+    /** Reset: the daemon's session, or the stopwatch. */
+    _resetPressed() {
+        if (this._mode === 'watch') {
+            this._watch.reset();
+            this._update();
+        } else {
+            this.daemon.call('pomodoro', 'Stop');
+        }
+    }
+
+    /** The stopwatch on the ring: the minute fills it again and again. */
+    _updateWatch() {
+        const now = Format.nowMs(), elapsed = this._watch.elapsed(now);
+        this._ring.color = timerColor('focus');
+        this._ring.progress = (elapsed % 60000) / 60000;
+        this._time.text = stopwatchText(elapsed);
+        this._phase.text = 'Stopwatch';
+        this._playIcon.gicon = icon(this._watch.running ? 'island-pause-symbolic' : 'island-play-symbolic');
+        this._playLabel.text = this._watch.running ? 'Stop' : elapsed > 0 ? 'Resume' : 'Start';
+        // Running: Lap and Stop; stopped: Reset and Resume. The same room either way, so nothing is squeezed.
+        this._reset.visible = elapsed > 0 && !this._watch.running;
+        this._lap.visible = this._watch.running;
+        this._laps.text = this._watch.laps.slice(-3).reverse().map(l => `${l.n}   ${stopwatchText(l.split)}`).join('\n');
+        if (this._watch.running && this.active)
+            this.later('tick', 1000 - (elapsed % 1000) + 15, () => this._update());
+    }
+
     /** Start, Pause or Resume. */
     _toggle() {
+        if (this._mode === 'watch') {
+            this._watch.toggle(Format.nowMs());
+            this._update();
+            return;
+        }
         // A length half typed is dropped, not started with.
         this._cancelTyping();
         const state = this.daemon.state.pomodoro;
@@ -294,6 +354,10 @@ class TimerPage extends Page {
 
     /** Ring, time, phase and buttons from island-daemon's timer state. */
     _update() {
+        if (this._mode === 'watch') {
+            this._updateWatch();
+            return;
+        }
         const state = this.daemon.state.pomodoro ?? DEFAULT_STATE;
         const idle = state.phase === 'idle';
         const remaining = this._remaining(state);

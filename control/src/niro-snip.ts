@@ -18,13 +18,15 @@ const TOOLS = [
     ['arrow', 'go-next-symbolic', 'Arrow'],
     ['rect', 'view-fullscreen-symbolic', 'Rectangle'],
     ['text', 'insert-text-symbolic', 'Text'],
+    ['step', 'emblem-ok-symbolic', 'Numbered step'],
     ['pixelate', 'view-grid-symbolic', 'Hide (pixelate)'],
+    ['crop', 'edit-cut-symbolic', 'Crop'],
 ];
 const COLORS = ['#e8472b', '#f5c518', '#2ecc71', '#2d8cff', '#111111', '#ffffff'];
 const BLOCK = 14;
 
 /** The screenshot, taken through the desktop portal: the shell's own picker, nothing of ours on the screen. */
-function capture() {
+function capture(interactive = true) {
     return new Promise((resolve, reject) => {
         const bus = Gio.DBus.session;
         const token = `niro${GLib.get_monotonic_time()}`;
@@ -38,7 +40,7 @@ function capture() {
                 else reject(new Error(code === 1 ? 'cancelled' : 'the screenshot failed'));
             });
         bus.call('org.freedesktop.portal.Desktop', '/org/freedesktop/portal/desktop', 'org.freedesktop.portal.Screenshot', 'Screenshot',
-            new GLib.Variant('(sa{sv})', ['', {handle_token: GLib.Variant.new_string(token), interactive: GLib.Variant.new_boolean(true)}]),
+            new GLib.Variant('(sa{sv})', ['', {handle_token: GLib.Variant.new_string(token), interactive: GLib.Variant.new_boolean(interactive)}]),
             null, Gio.DBusCallFlags.NONE, -1, null, (conn, res) => {
                 try { conn.call_finish(res); } catch (e) { bus.signal_unsubscribe(sub); reject(e); }
             });
@@ -86,6 +88,20 @@ function paintMark(cr, m, pixbuf) {
         cr.setFontSize(m.size * 5 + 10);
         m.text.split('\n').forEach((line, i) => { cr.moveTo(m.points[0][0], m.points[0][1] + (i + 1) * (m.size * 5 + 14)); cr.showText(line); });
         break;
+    case 'step': {
+        const r = m.size * 2 + 12;
+        cr.setSourceRGBA(c.red, c.green, c.blue, 1);
+        cr.arc(m.points[0][0], m.points[0][1], r, 0, 2 * Math.PI); cr.fill();
+        // White on a dark or saturated colour, black on a light one, so the number always reads.
+        const light = 0.299 * c.red + 0.587 * c.green + 0.114 * c.blue > 0.6;
+        cr.setSourceRGB(light ? 0 : 1, light ? 0 : 1, light ? 0 : 1);
+        cr.selectFontFace('Sans', cairo.FontSlant.NORMAL, cairo.FontWeight.BOLD);
+        cr.setFontSize(r * 1.1);
+        const ext = cr.textExtents(String(m.n));
+        cr.moveTo(m.points[0][0] - ext.width / 2 - ext.xBearing, m.points[0][1] - ext.height / 2 - ext.yBearing);
+        cr.showText(String(m.n));
+        break;
+    }
     case 'pixelate': {
         // Each block takes the average colour of the picture under it: what was there cannot be read back.
         const [x1, y1, x2, y2] = m.box;
@@ -158,7 +174,10 @@ class Editor {
         asBtn.connect('clicked', () => this.saveAs());
         const undoBtn = new Gtk.Button({icon_name: 'edit-undo-symbolic', tooltip_text: 'Undo (Ctrl+Z)'});
         undoBtn.connect('clicked', () => this.undo());
-        header.pack_end(saveBtn); header.pack_end(asBtn); header.pack_end(copyBtn); header.pack_end(undoBtn);
+        const closeBtn = new Gtk.Button({icon_name: 'edit-copy-symbolic', label: 'Copy & close', tooltip_text: 'Copies the picture and closes (Ctrl+Enter)'});
+        closeBtn.connect('clicked', () => { this.copy(); GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => { this.win.close(); return GLib.SOURCE_REMOVE; }); });
+        header.pack_end(saveBtn);
+        header.pack_end(closeBtn); header.pack_end(asBtn); header.pack_end(copyBtn); header.pack_end(undoBtn);
 
         this.area = new Gtk.DrawingArea({hexpand: true, vexpand: true, content_width: 400, content_height: 300});
         this.area.set_draw_func((_a, cr, w, h) => this.draw(cr, w, h));
@@ -181,6 +200,7 @@ class Editor {
             if (key === Gdk.KEY_z) { shift ? this.redoLast() : this.undo(); return true; }
             if (key === Gdk.KEY_y) { this.redoLast(); return true; }
             if (key === Gdk.KEY_c) { this.copy(); return true; }
+            if (key === Gdk.KEY_Return) { this.copy(); GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => { this.win.close(); return GLib.SOURCE_REMOVE; }); return true; }
             if (key === Gdk.KEY_s) { shift ? this.saveAs() : this.save(); return true; }
             return false;
         });
@@ -192,7 +212,17 @@ class Editor {
     paintAll(cr) {
         Gdk.cairo_set_source_pixbuf(cr, this.pixbuf, 0, 0);
         cr.paint();
-        for (const m of [...this.marks, ...(this.drawing ? [this.drawing] : [])]) paintMark(cr, m, this.pixbuf);
+        for (const m of [...this.marks, ...(this.drawing ? [this.drawing] : [])]) if (m.tool !== 'crop') paintMark(cr, m, this.pixbuf);
+    }
+
+    /** The area kept: the last crop, as [x, y, width, height] in the picture's pixels, or the whole picture. */
+    cropBox() {
+        const iw = this.pixbuf.get_width(), ih = this.pixbuf.get_height();
+        const m = [...this.marks, ...(this.drawing ? [this.drawing] : [])].filter(k => k.tool === 'crop').pop();
+        if (!m) return [0, 0, iw, ih];
+        const x = Math.max(0, Math.min(m.box[0], m.box[2])), y = Math.max(0, Math.min(m.box[1], m.box[3]));
+        const r = Math.min(iw, Math.max(m.box[0], m.box[2])), b = Math.min(ih, Math.max(m.box[1], m.box[3]));
+        return r - x < 4 || b - y < 4 ? [0, 0, iw, ih] : [Math.floor(x), Math.floor(y), Math.ceil(r - x), Math.ceil(b - y)];
     }
 
     draw(cr, w, h) {
@@ -203,6 +233,14 @@ class Editor {
         cr.scale(this.scale, this.scale);
         cr.rectangle(0, 0, iw, ih); cr.clip();
         this.paintAll(cr);
+        const [x, y, cw, ch] = this.cropBox();
+        if (cw < iw || ch < ih) {
+            cr.setSourceRGBA(0, 0, 0, 0.55);
+            cr.rectangle(0, 0, iw, ih); cr.rectangle(x, y, cw, ch);
+            cr.setFillRule(cairo.FillRule.EVEN_ODD); cr.fill();
+            cr.setSourceRGBA(1, 1, 1, 0.9); cr.setLineWidth(1.5 / this.scale);
+            cr.rectangle(x, y, cw, ch); cr.stroke();
+        }
     }
 
     point(x, y) { return [(x - this.offX) / this.scale, (y - this.offY) / this.scale]; }
@@ -212,6 +250,12 @@ class Editor {
         const [px, py] = this.point(x, y);
         this.redo = [];
         if (this.tool === 'text') { this.askText(x, y, px, py); return; }
+        if (this.tool === 'step') {
+            const n = this.marks.filter(k => k.tool === 'step').length + 1;
+            this.marks.push({tool: 'step', color: this.color, size: this.size, points: [[px, py]], n});
+            this.area.queue_draw();
+            return;
+        }
         const m = {tool: this.tool, color: this.color, size: this.size, points: [[px, py]], box: [px, py, px, py]};
         this.drawing = m;
     }
@@ -260,7 +304,14 @@ class Editor {
         const cr = new cairo.Context(surface);
         this.paintAll(cr);
         cr.$dispose();
-        return surface;
+        const [x, y, w, h] = this.cropBox();
+        if (w === surface.getWidth() && h === surface.getHeight()) return surface;
+        const cropped = new cairo.ImageSurface(cairo.Format.ARGB32, w, h);
+        const cc = new cairo.Context(cropped);
+        cc.setSourceSurface(surface, -x, -y);
+        cc.paint();
+        cc.$dispose();
+        return cropped;
     }
 
     say(text) {
@@ -279,7 +330,7 @@ class Editor {
     }
 
     save() {
-        try { this.write(this.path); this.say('Saved over the original'); } catch (e) { this.say(`Could not save: ${e.message}`); }
+        try { this.write(this.path); this.copy(); this.say('Saved over the original, and copied'); } catch (e) { this.say(`Could not save: ${e.message}`); }
     }
 
     saveAs() {
@@ -311,8 +362,13 @@ app.connect('activate', () => {
         try { new Editor(app, path); } catch (e) { fail(`cannot open ${path}: ${e.message}`); }
         app.release();
     };
-    const arg = ARGV.find(a => !a.startsWith('-'));
+    const delayAt = ARGV.indexOf('--delay');
+    const delay = delayAt >= 0 ? Math.min(30, Math.max(0, parseInt(ARGV[delayAt + 1], 10) || 0)) : 0;
+    const arg = ARGV.find((a, i) => !a.startsWith('-') && !(delayAt >= 0 && i === delayAt + 1));
     if (arg) { open(arg); return; }
-    capture().then(open).catch(e => { app.release(); if (e.message !== 'cancelled') printerr(`niro-snip: ${e.message}`); });
+    const full = ARGV.includes('--full');
+    // With a delay the screen is taken after it, so a menu can be opened first; the picker comes after, as before.
+    const start = () => capture(!full);
+    (delay ? new Promise(resolve => GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, delay, () => { resolve(); return GLib.SOURCE_REMOVE; })).then(start) : start()).then(open).catch(e => { app.release(); if (e.message !== 'cancelled') printerr(`niro-snip: ${e.message}`); });
 });
 System.exit(app.run([]));

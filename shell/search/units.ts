@@ -49,3 +49,34 @@ export function convert(query: string): Conversion | null {
     const value = amount * from.unit.factor / to.unit.factor;
     return {value, from: from.unit.label, to: to.unit.label, text: `${formatNumber(value)} ${to.unit.label}`};
 }
+
+// ---- Money: "150 usd to idr", "20 euro in rupiah". The rates are fetched by the extension (only the two currency codes leave the
+// computer, never the text typed); this only reads the question and does the sum.
+const CURRENCIES = new Set(['AUD', 'BGN', 'BRL', 'CAD', 'CHF', 'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'HKD', 'HUF', 'IDR', 'ILS', 'INR', 'ISK', 'JPY', 'KRW', 'MXN', 'MYR',
+    'NOK', 'NZD', 'PHP', 'PLN', 'RON', 'SEK', 'SGD', 'THB', 'TRY', 'USD', 'ZAR']);
+const CURRENCY_NAMES: Record<string, string> = {rupiah: 'IDR', rp: 'IDR', dollar: 'USD', dollars: 'USD', dolar: 'USD', euro: 'EUR', euros: 'EUR', yen: 'JPY',
+    pound: 'GBP', pounds: 'GBP', sterling: 'GBP', yuan: 'CNY', won: 'KRW', ringgit: 'MYR', baht: 'THB', peso: 'PHP', rupee: 'INR', franc: 'CHF'};
+
+const asCurrency = (word: string): string | null => {
+    const w = word.trim().toLowerCase();
+    const code = CURRENCY_NAMES[w] ?? w.toUpperCase();
+    return CURRENCIES.has(code) ? code : null;
+};
+
+export interface MoneyQuery {amount: number; from: string; to: string}
+
+/** `null` unless both sides are currencies we know: "5 km to miles" stays a unit conversion. */
+export function moneyQuery(query: string): MoneyQuery | null {
+    const m = /^\s*(-?\d[\d,]*\.?\d*|-?\.\d+)\s*([a-z]+)\s+(?:to|in|into|as|->|=)\s+([a-z]+)\s*$/i.exec(query);
+    if (!m) return null;
+    const amount = parseFloat(m[1].replace(/,/g, ''));
+    const from = asCurrency(m[2]), to = asCurrency(m[3]);
+    if (!Number.isFinite(amount) || !from || !to || from === to) return null;
+    return {amount, from, to};
+}
+
+/** The answer for a rate (one `from` is `rate` of `to`). */
+export function moneyText(q: MoneyQuery, rate: number): string {
+    const value = q.amount * rate;
+    return `${formatNumber(Math.round(value * 100) / 100)} ${q.to}`;
+}

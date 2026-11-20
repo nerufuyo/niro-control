@@ -19,7 +19,8 @@ export function box(vertical: boolean): Record<string, unknown> {
 /** Turns an existing box vertical or horizontal. */
 export function setVertical(target: unknown, vertical: boolean): void {
   const layout = target as { orientation?: number; vertical?: boolean };
-  if (SHELL_MAJOR >= 48) layout.orientation = vertical ? Clutter.Orientation.VERTICAL : Clutter.Orientation.HORIZONTAL;
+  if (SHELL_MAJOR >= 48)
+    layout.orientation = vertical ? Clutter.Orientation.VERTICAL : Clutter.Orientation.HORIZONTAL;
   else layout.vertical = vertical;
 }
 
@@ -73,7 +74,9 @@ export function fragmentHook(): Hook {
 
 /** Whether the shell runs on Wayland (GNOME 50 dropped X11 and the check). */
 export function isWayland(): boolean {
-  return (Meta as unknown as { is_wayland_compositor?: () => boolean }).is_wayland_compositor?.() ?? true;
+  return (
+    (Meta as unknown as { is_wayland_compositor?: () => boolean }).is_wayland_compositor?.() ?? true
+  );
 }
 
 /**
@@ -82,7 +85,9 @@ export function isWayland(): boolean {
  */
 export function inhibitScanout(inhibit: boolean): void {
   if (SHELL_MAJOR >= 48) {
-    const compositor = (global as unknown as { compositor: { disable_unredirect(): void; enable_unredirect(): void } }).compositor;
+    const compositor = (
+      global as unknown as { compositor: { disable_unredirect(): void; enable_unredirect(): void } }
+    ).compositor;
     if (inhibit) compositor.disable_unredirect();
     else compositor.enable_unredirect();
     return;

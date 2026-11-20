@@ -387,7 +387,7 @@ pub(super) async fn open<S: AsyncRead + Unpin>(stream: &mut S) -> Result<Opening
 /// Hex of `min` to `max` bytes.
 pub(super) fn unhex_vec(text: &str, min: usize, max: usize) -> Option<Vec<u8>> {
     let len = text.len() / 2;
-    if text.len() % 2 != 0 || !(min..=max).contains(&len) {
+    if !text.len().is_multiple_of(2) || !(min..=max).contains(&len) {
         return None;
     }
     text.as_bytes()
