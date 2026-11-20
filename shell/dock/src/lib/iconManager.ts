@@ -28,6 +28,8 @@ interface AppData {
   indicatorBox: InstanceType<typeof St.BoxLayout>;
   dots: InstanceType<typeof St.Widget>[];
   mediaIndicator: InstanceType<typeof St.Widget> | null;
+  /** Unread notifications, a red count on the icon's corner. */
+  badge: InstanceType<typeof St.Label> | null;
   /** An unpinned app with only minimized windows shows one of them in its icon's place. */
   overview: { win: Meta.Window; widget: InstanceType<typeof St.Widget> } | null;
   draggable: Draggable | null;
@@ -123,6 +125,9 @@ export class IconManager {
   private _workspaceMode: number = 0; // 0=all, 1=current-only
   private _mediaIndicatorEnabled: boolean = true;
   private _playingAppId: string | null = null;
+  private _badgeCounts: Map<string, number> = new Map();
+  private _badgeSources: Map<object, number> = new Map();
+  private _badgesEnabled: boolean = true;
   private _windowPreviewsEnabled: boolean = false;
   private _previewPopup: WindowPreviewPopup | null = null;
   private _onDragStateChanged: DragStateChanged | null = null;
@@ -382,7 +387,75 @@ export class IconManager {
     };
     (this._container as unknown as Record<string, unknown>)._delegate = this._dropTarget;
 
+    this._watchNotifications();
     this._reload();
+  }
+
+  setBadgesEnabled(enabled: boolean): void {
+    this._badgesEnabled = enabled;
+    this._refreshAllBadges();
+  }
+
+  /** Follows the notification tray: a count per application, shown on its icon. */
+  private _watchNotifications(): void {
+    const tray = Main.messageTray;
+    if (!tray) return;
+    const watch = (source: object) => {
+      if (this._badgeSources.has(source)) return;
+      const id = this._signals.connect(source as InstanceType<typeof St.Widget>, "notify::count", () => this._recountBadges());
+      this._badgeSources.set(source, id);
+    };
+    for (const source of tray.getSources()) watch(source);
+    this._signals.connect(tray, "source-added", (_t, source) => {
+      watch(source as object);
+      this._recountBadges();
+    });
+    this._signals.connect(tray, "source-removed", (_t, source) => {
+      this._badgeSources.delete(source as object);
+      this._recountBadges();
+    });
+    this._recountBadges();
+  }
+
+  private _recountBadges(): void {
+    this._badgeCounts.clear();
+    for (const source of Main.messageTray.getSources()) {
+      const app = (source as { app?: Shell.App | null }).app;
+      const id = app?.get_id?.();
+      const count = (source as { count?: number }).count ?? 0;
+      if (id && count > 0) this._badgeCounts.set(id, (this._badgeCounts.get(id) ?? 0) + count);
+    }
+    this._refreshAllBadges();
+  }
+
+  private _refreshAllBadges(): void {
+    for (const actor of this._icons.values()) {
+      const data = this._getStored(actor);
+      if (data) this._refreshBadge(data);
+    }
+  }
+
+  private _refreshBadge(data: AppData): void {
+    const count = this._badgesEnabled ? (this._badgeCounts.get(data.appId) ?? 0) : 0;
+    if (count === 0) {
+      if (data.badge) {
+        data.iconWrapper.remove_child(data.badge);
+        data.badge.destroy();
+        data.badge = null;
+      }
+      return;
+    }
+    const text = count > 99 ? "99+" : String(count);
+    if (!data.badge) {
+      data.badge = new St.Label({
+        style_class: "dock-notification-badge",
+        y_align: Clutter.ActorAlign.CENTER,
+      });
+      data.iconWrapper.add_child(data.badge);
+    }
+    data.badge.text = text;
+    // The top-left corner: the media note takes the top-right, so both can show.
+    data.badge.set_position(-4, -4);
   }
 
   stop(): void {
@@ -392,6 +465,8 @@ export class IconManager {
     }
 
     this._signals.disconnectAll();
+    this._badgeSources.clear();
+    this._badgeCounts.clear();
 
     this._hideTooltip();
     if (this._tooltipText) {
@@ -689,12 +764,14 @@ export class IconManager {
       indicatorBox,
       dots: [],
       mediaIndicator: null,
+      badge: null,
       overview: null,
       draggable: null,
       dragSignalIds: [],
     };
     (actor as unknown as Record<string, unknown>)._appData = appData;
     this._decorateIcon(appData);
+    this._refreshBadge(appData);
 
     this._signals.connect(actor, "button-press-event", (_actor, event) => {
       const button = (event as { get_button: () => number }).get_button();

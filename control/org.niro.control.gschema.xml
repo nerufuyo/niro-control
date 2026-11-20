@@ -123,6 +123,11 @@
       <summary>Saved shell blur settings</summary>
       <description>Internal: the blur settings of the panel, Overview and popups before shell-surfaces was turned on.</description>
     </key>
+    <key name="snip-shortcut" type="as">
+      <default>['&lt;Super&gt;&lt;Shift&gt;s']</default>
+      <summary>Snip shortcut</summary>
+      <description>Takes a screenshot and opens it for marking up (Niro Snip).</description>
+    </key>
     <key name="search-shortcut" type="as">
       <default>['&lt;Super&gt;space']</default>
       <summary>Search shortcut</summary>

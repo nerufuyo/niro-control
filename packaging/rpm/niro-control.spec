@@ -62,6 +62,7 @@ fi
 %{_datadir}/gnome-shell/extensions/*@niro.local
 %{_datadir}/niro-control
 %{_datadir}/applications/org.niro.Control.desktop
+%{_datadir}/applications/org.niro.Snip.desktop
 %{_datadir}/icons/hicolor/scalable/apps/org.niro.Control.svg
 %{_datadir}/icons/hicolor/symbolic/apps/org.niro.Control-symbolic.svg
 %{_datadir}/glib-2.0/schemas/org.niro.control.gschema.xml

@@ -1,0 +1,318 @@
+// @ts-nocheck: gjs entry
+// SPDX-License-Identifier: GPL-3.0-or-later
+// niro-snip: a snipping tool with an editor. `niro-snip` takes a screenshot (the desktop's own area / window / screen picker)
+// and opens it for marking up; `niro-snip FILE` opens an image the same way. Save writes over the file, as asked for;
+// Save As makes a copy. Runs under `gjs -m`.
+import Gdk from 'gi://Gdk?version=4.0';
+import GdkPixbuf from 'gi://GdkPixbuf';
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+import Gtk from 'gi://Gtk?version=4.0';
+import cairo from 'cairo';
+import System from 'system';
+
+const APP_ID = 'org.niro.Snip';
+const TOOLS = [
+    ['pen', 'document-edit-symbolic', 'Pen'],
+    ['highlighter', 'format-text-bold-symbolic', 'Highlighter'],
+    ['arrow', 'go-next-symbolic', 'Arrow'],
+    ['rect', 'view-fullscreen-symbolic', 'Rectangle'],
+    ['text', 'insert-text-symbolic', 'Text'],
+    ['pixelate', 'view-grid-symbolic', 'Hide (pixelate)'],
+];
+const COLORS = ['#e8472b', '#f5c518', '#2ecc71', '#2d8cff', '#111111', '#ffffff'];
+const BLOCK = 14;
+
+/** The screenshot, taken through the desktop portal: the shell's own picker, nothing of ours on the screen. */
+function capture() {
+    return new Promise((resolve, reject) => {
+        const bus = Gio.DBus.session;
+        const token = `niro${GLib.get_monotonic_time()}`;
+        const sender = bus.get_unique_name().slice(1).replace(/\./g, '_');
+        const path = `/org/freedesktop/portal/desktop/request/${sender}/${token}`;
+        const sub = bus.signal_subscribe('org.freedesktop.portal.Desktop', 'org.freedesktop.portal.Request', 'Response', path, null,
+            Gio.DBusSignalFlags.NONE, (_c, _s, _p, _i, _n, params) => {
+                bus.signal_unsubscribe(sub);
+                const [code, results] = params.recursiveUnpack();
+                if (code === 0 && results.uri) resolve(Gio.File.new_for_uri(results.uri).get_path());
+                else reject(new Error(code === 1 ? 'cancelled' : 'the screenshot failed'));
+            });
+        bus.call('org.freedesktop.portal.Desktop', '/org/freedesktop/portal/desktop', 'org.freedesktop.portal.Screenshot', 'Screenshot',
+            new GLib.Variant('(sa{sv})', ['', {handle_token: GLib.Variant.new_string(token), interactive: GLib.Variant.new_boolean(true)}]),
+            null, Gio.DBusCallFlags.NONE, -1, null, (conn, res) => {
+                try { conn.call_finish(res); } catch (e) { bus.signal_unsubscribe(sub); reject(e); }
+            });
+    });
+}
+
+const rgba = hex => { const c = new Gdk.RGBA(); c.parse(hex); return c; };
+
+/** One mark on the picture, in the picture's own pixels. */
+function paintMark(cr, m, pixbuf) {
+    const c = rgba(m.color);
+    cr.setLineCap(cairo.LineCap.ROUND);
+    cr.setLineJoin(cairo.LineJoin.ROUND);
+    switch (m.tool) {
+    case 'pen':
+    case 'highlighter':
+        if (m.points.length < 2) return;
+        cr.setSourceRGBA(c.red, c.green, c.blue, m.tool === 'highlighter' ? 0.35 : 1);
+        cr.setLineWidth(m.tool === 'highlighter' ? m.size * 4 : m.size);
+        cr.moveTo(m.points[0][0], m.points[0][1]);
+        for (const [x, y] of m.points.slice(1)) cr.lineTo(x, y);
+        cr.stroke();
+        break;
+    case 'arrow': {
+        const [x1, y1, x2, y2] = m.box;
+        const angle = Math.atan2(y2 - y1, x2 - x1), head = Math.max(14, m.size * 4);
+        cr.setSourceRGBA(c.red, c.green, c.blue, 1);
+        cr.setLineWidth(m.size);
+        cr.moveTo(x1, y1); cr.lineTo(x2, y2); cr.stroke();
+        cr.moveTo(x2, y2); cr.lineTo(x2 - head * Math.cos(angle - 0.45), y2 - head * Math.sin(angle - 0.45));
+        cr.lineTo(x2 - head * Math.cos(angle + 0.45), y2 - head * Math.sin(angle + 0.45)); cr.closePath(); cr.fill();
+        break;
+    }
+    case 'rect': {
+        const [x1, y1, x2, y2] = m.box;
+        cr.setSourceRGBA(c.red, c.green, c.blue, 1);
+        cr.setLineWidth(m.size);
+        cr.rectangle(Math.min(x1, x2), Math.min(y1, y2), Math.abs(x2 - x1), Math.abs(y2 - y1));
+        cr.stroke();
+        break;
+    }
+    case 'text':
+        cr.setSourceRGBA(c.red, c.green, c.blue, 1);
+        cr.selectFontFace('Sans', cairo.FontSlant.NORMAL, cairo.FontWeight.BOLD);
+        cr.setFontSize(m.size * 5 + 10);
+        m.text.split('\n').forEach((line, i) => { cr.moveTo(m.points[0][0], m.points[0][1] + (i + 1) * (m.size * 5 + 14)); cr.showText(line); });
+        break;
+    case 'pixelate': {
+        // Each block takes the average colour of the picture under it: what was there cannot be read back.
+        const [x1, y1, x2, y2] = m.box;
+        const left = Math.max(0, Math.floor(Math.min(x1, x2))), top = Math.max(0, Math.floor(Math.min(y1, y2)));
+        const right = Math.min(pixbuf.get_width(), Math.ceil(Math.max(x1, x2))), bottom = Math.min(pixbuf.get_height(), Math.ceil(Math.max(y1, y2)));
+        const px = pixbuf.get_pixels(), stride = pixbuf.get_rowstride(), n = pixbuf.get_n_channels();
+        for (let by = top; by < bottom; by += BLOCK) for (let bx = left; bx < right; bx += BLOCK) {
+            let r = 0, g = 0, b = 0, count = 0;
+            for (let y = by; y < Math.min(by + BLOCK, bottom); y++) for (let x = bx; x < Math.min(bx + BLOCK, right); x++) {
+                const i = y * stride + x * n; r += px[i]; g += px[i + 1]; b += px[i + 2]; count++;
+            }
+            if (!count) continue;
+            cr.setSourceRGB(r / count / 255, g / count / 255, b / count / 255);
+            cr.rectangle(bx, by, Math.min(BLOCK, right - bx), Math.min(BLOCK, bottom - by));
+            cr.fill();
+        }
+        break;
+    }
+    }
+}
+
+class Editor {
+    constructor(app, path) {
+        this.path = path;
+        this.pixbuf = GdkPixbuf.Pixbuf.new_from_file(path);
+        this.marks = [];
+        this.redo = [];
+        this.tool = 'pen';
+        this.color = COLORS[0];
+        this.size = 4;
+        this.drawing = null;
+        this.scale = 1; this.offX = 0; this.offY = 0;
+
+        this.win = new Gtk.ApplicationWindow({application: app, title: 'Niro Snip', default_width: 980, default_height: 680});
+        const header = new Gtk.HeaderBar();
+        this.win.set_titlebar(header);
+
+        const toolBox = new Gtk.Box({css_classes: ['linked']});
+        let first = null;
+        for (const [id, icon, tip] of TOOLS) {
+            const b = new Gtk.ToggleButton({icon_name: icon, tooltip_text: tip, active: id === this.tool});
+            if (first) b.set_group(first); else first = b;
+            b.connect('toggled', () => { if (b.active) this.tool = id; });
+            toolBox.append(b);
+        }
+        header.pack_start(toolBox);
+
+        const colorBox = new Gtk.Box({spacing: 4, margin_start: 8});
+        let firstColor = null;
+        for (const hex of COLORS) {
+            const b = new Gtk.ToggleButton({tooltip_text: hex, active: hex === this.color, width_request: 26, height_request: 26});
+            const css = new Gtk.CssProvider();
+            css.load_from_string(`button { background: ${hex}; min-width: 18px; min-height: 18px; padding: 0; border-radius: 13px; }`);
+            b.get_style_context().add_provider(css, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION);
+            if (firstColor) b.set_group(firstColor); else firstColor = b;
+            b.connect('toggled', () => { if (b.active) this.color = hex; });
+            colorBox.append(b);
+        }
+        header.pack_start(colorBox);
+        const size = new Gtk.Scale({orientation: Gtk.Orientation.HORIZONTAL, width_request: 90, draw_value: false, tooltip_text: 'Thickness',
+            adjustment: new Gtk.Adjustment({lower: 2, upper: 16, step_increment: 1, value: this.size})});
+        size.connect('value-changed', () => { this.size = size.get_value(); });
+        header.pack_start(size);
+
+        const saveBtn = new Gtk.Button({label: 'Save', tooltip_text: 'Saves over the original picture (Ctrl+S)', css_classes: ['suggested-action']});
+        saveBtn.connect('clicked', () => this.save());
+        const copyBtn = new Gtk.Button({icon_name: 'edit-copy-symbolic', tooltip_text: 'Copy the picture (Ctrl+C)'});
+        copyBtn.connect('clicked', () => this.copy());
+        const asBtn = new Gtk.Button({icon_name: 'document-save-as-symbolic', tooltip_text: 'Save a copy (Ctrl+Shift+S)'});
+        asBtn.connect('clicked', () => this.saveAs());
+        const undoBtn = new Gtk.Button({icon_name: 'edit-undo-symbolic', tooltip_text: 'Undo (Ctrl+Z)'});
+        undoBtn.connect('clicked', () => this.undo());
+        header.pack_end(saveBtn); header.pack_end(asBtn); header.pack_end(copyBtn); header.pack_end(undoBtn);
+
+        this.area = new Gtk.DrawingArea({hexpand: true, vexpand: true, content_width: 400, content_height: 300});
+        this.area.set_draw_func((_a, cr, w, h) => this.draw(cr, w, h));
+        const drag = new Gtk.GestureDrag();
+        drag.connect('drag-begin', (_g, x, y) => this.begin(x, y));
+        drag.connect('drag-update', (_g, dx, dy) => this.update(dx, dy));
+        drag.connect('drag-end', (_g, dx, dy) => this.end(dx, dy));
+        this.area.add_controller(drag);
+
+        this.toast = new Gtk.Label({css_classes: ['osd'], halign: Gtk.Align.CENTER, valign: Gtk.Align.END, margin_bottom: 16, visible: false});
+        const overlay = new Gtk.Overlay({child: this.area});
+        overlay.add_overlay(this.toast);
+        this.win.set_child(overlay);
+
+        const keys = new Gtk.EventControllerKey();
+        keys.connect('key-pressed', (_c, key, _code, state) => {
+            const ctrl = (state & Gdk.ModifierType.CONTROL_MASK) !== 0, shift = (state & Gdk.ModifierType.SHIFT_MASK) !== 0;
+            if (key === Gdk.KEY_Escape) { this.win.close(); return true; }
+            if (!ctrl) return false;
+            if (key === Gdk.KEY_z) { shift ? this.redoLast() : this.undo(); return true; }
+            if (key === Gdk.KEY_y) { this.redoLast(); return true; }
+            if (key === Gdk.KEY_c) { this.copy(); return true; }
+            if (key === Gdk.KEY_s) { shift ? this.saveAs() : this.save(); return true; }
+            return false;
+        });
+        this.win.add_controller(keys);
+        this.win.present();
+    }
+
+    /** What is on the picture now, painted at the given scale. */
+    paintAll(cr) {
+        Gdk.cairo_set_source_pixbuf(cr, this.pixbuf, 0, 0);
+        cr.paint();
+        for (const m of [...this.marks, ...(this.drawing ? [this.drawing] : [])]) paintMark(cr, m, this.pixbuf);
+    }
+
+    draw(cr, w, h) {
+        const iw = this.pixbuf.get_width(), ih = this.pixbuf.get_height();
+        this.scale = Math.min(w / iw, h / ih, 1);
+        this.offX = (w - iw * this.scale) / 2; this.offY = (h - ih * this.scale) / 2;
+        cr.translate(this.offX, this.offY);
+        cr.scale(this.scale, this.scale);
+        cr.rectangle(0, 0, iw, ih); cr.clip();
+        this.paintAll(cr);
+    }
+
+    point(x, y) { return [(x - this.offX) / this.scale, (y - this.offY) / this.scale]; }
+
+    begin(x, y) {
+        this.startX = x; this.startY = y;
+        const [px, py] = this.point(x, y);
+        this.redo = [];
+        if (this.tool === 'text') { this.askText(x, y, px, py); return; }
+        const m = {tool: this.tool, color: this.color, size: this.size, points: [[px, py]], box: [px, py, px, py]};
+        this.drawing = m;
+    }
+
+    update(dx, dy) {
+        if (!this.drawing) return;
+        const [px, py] = this.point(this.startX + dx, this.startY + dy);
+        const m = this.drawing;
+        if (m.tool === 'pen' || m.tool === 'highlighter') m.points.push([px, py]);
+        else m.box = [m.box[0], m.box[1], px, py];
+        this.area.queue_draw();
+    }
+
+    end(dx, dy) {
+        if (!this.drawing) return;
+        this.update(dx, dy);
+        const m = this.drawing;
+        this.drawing = null;
+        const small = (m.tool === 'pen' || m.tool === 'highlighter') ? m.points.length < 2 : Math.hypot(m.box[2] - m.box[0], m.box[3] - m.box[1]) < 4;
+        if (!small) this.marks.push(m);
+        this.area.queue_draw();
+    }
+
+    askText(x, y, px, py) {
+        const pop = new Gtk.Popover({has_arrow: true, autohide: true});
+        pop.set_parent(this.area);
+        pop.set_pointing_to(new Gdk.Rectangle({x: Math.round(x), y: Math.round(y), width: 1, height: 1}));
+        const entry = new Gtk.Entry({placeholder_text: 'Type, then Enter', width_chars: 24});
+        entry.connect('activate', () => {
+            const text = entry.get_text().trim();
+            if (text) { this.marks.push({tool: 'text', color: this.color, size: this.size, points: [[px, py]], text}); this.area.queue_draw(); }
+            pop.popdown();
+        });
+        pop.connect('closed', () => GLib.idle_add(GLib.PRIORITY_DEFAULT, () => { pop.unparent(); return GLib.SOURCE_REMOVE; }));
+        pop.set_child(entry);
+        pop.popup();
+        entry.grab_focus();
+    }
+
+    undo() { const m = this.marks.pop(); if (m) { this.redo.push(m); this.area.queue_draw(); } }
+    redoLast() { const m = this.redo.pop(); if (m) { this.marks.push(m); this.area.queue_draw(); } }
+
+    /** The picture with its marks, at its own size. */
+    render() {
+        const surface = new cairo.ImageSurface(cairo.Format.ARGB32, this.pixbuf.get_width(), this.pixbuf.get_height());
+        const cr = new cairo.Context(surface);
+        this.paintAll(cr);
+        cr.$dispose();
+        return surface;
+    }
+
+    say(text) {
+        this.toast.label = text; this.toast.visible = true;
+        GLib.timeout_add(GLib.PRIORITY_DEFAULT, 2200, () => { this.toast.visible = false; return GLib.SOURCE_REMOVE; });
+    }
+
+    write(path) {
+        const surface = this.render();
+        const lower = path.toLowerCase();
+        if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
+            Gdk.pixbuf_get_from_surface(surface, 0, 0, surface.getWidth(), surface.getHeight()).savev(path, 'jpeg', ['quality'], ['95']);
+        } else {
+            surface.writeToPNG(path);
+        }
+    }
+
+    save() {
+        try { this.write(this.path); this.say('Saved over the original'); } catch (e) { this.say(`Could not save: ${e.message}`); }
+    }
+
+    saveAs() {
+        const dialog = new Gtk.FileDialog({title: 'Save a copy', initial_name: GLib.path_get_basename(this.path).replace(/(\.\w+)?$/, '-edited.png')});
+        dialog.save(this.win, null, (d, res) => {
+            try {
+                const file = d.save_finish(res);
+                this.write(file.get_path());
+                this.say(`Saved ${file.get_basename()}`);
+            } catch (e) { if (!e.matches?.(Gtk.DialogError, Gtk.DialogError.DISMISSED)) this.say(`Could not save: ${e.message}`); }
+        });
+    }
+
+    copy() {
+        try {
+            const surface = this.render();
+            const pixbuf = Gdk.pixbuf_get_from_surface(surface, 0, 0, surface.getWidth(), surface.getHeight());
+            this.win.get_clipboard().set_texture(Gdk.Texture.new_for_pixbuf(pixbuf));
+            this.say('Copied');
+        } catch (e) { this.say(`Could not copy: ${e.message}`); }
+    }
+}
+
+const app = new Gtk.Application({application_id: APP_ID, flags: Gio.ApplicationFlags.NON_UNIQUE});
+const fail = message => { printerr(`niro-snip: ${message}`); System.exit(1); };
+app.connect('activate', () => {
+    app.hold();
+    const open = path => {
+        try { new Editor(app, path); } catch (e) { fail(`cannot open ${path}: ${e.message}`); }
+        app.release();
+    };
+    const arg = ARGV.find(a => !a.startsWith('-'));
+    if (arg) { open(arg); return; }
+    capture().then(open).catch(e => { app.release(); if (e.message !== 'cancelled') printerr(`niro-snip: ${e.message}`); });
+});
+System.exit(app.run([]));
