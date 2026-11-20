@@ -218,6 +218,16 @@
       <summary>Focus app 10</summary>
       <description>Keyboard shortcut to focus the tenth app in the dock</description>
     </key>
+    <key name="stack-downloads" type="b">
+      <default>true</default>
+      <summary>Downloads stack</summary>
+      <description>A Downloads folder at the dock's end: a click lists its newest files</description>
+    </key>
+    <key name="stack-documents" type="b">
+      <default>false</default>
+      <summary>Documents stack</summary>
+      <description>A Documents folder at the dock's end: a click lists its newest files</description>
+    </key>
     <key name="show-applications-button" type="b">
       <default>true</default>
       <summary>Show applications button</summary>
