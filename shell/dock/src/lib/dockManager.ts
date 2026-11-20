@@ -9,7 +9,7 @@ import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { box, inhibitScanout, isWayland, setVertical } from "./compat.js";
 import { DockVisibility } from "./dockVisibility.js";
 import { genie } from "./genie.js";
-import { IconManager, type MediaAction } from "./iconManager.js";
+import { IconManager, type MediaAction, type StackFolder } from "./iconManager.js";
 import { Intellihide } from "./intellihide.js";
 import { Magnification } from "./magnification.js";
 import { MediaManager } from "./mediaManager.js";
@@ -178,6 +178,15 @@ export class DockManager {
     });
     // Read at start-up too: the setting was only applied when it changed, so the button came back on every login.
     iconManager.setShowAppButton(settings.get_boolean("show-applications-button"));
+    const stacks = () => {
+      const folders: StackFolder[] = [];
+      if (settings.get_boolean("stack-downloads")) folders.push("downloads");
+      if (settings.get_boolean("stack-documents")) folders.push("documents");
+      iconManager.setStackFolders(folders);
+    };
+    stacks();
+    this._signals.connect(settings, "changed::stack-downloads", stacks);
+    this._signals.connect(settings, "changed::stack-documents", stacks);
     iconManager.setShowRunningApps(settings.get_boolean("show-running-apps"));
     iconManager.setAppButtonPosition(settings.get_int("show-applications-button-position"));
     iconManager.setWorkspaceMode(settings.get_int("dock-workspace-mode"));
@@ -886,7 +895,7 @@ export class DockManager {
         : hasAppButton
           ? iconPadded
           : 0;
-    const minimizedExtent = iconManager.getMinimizedExtent();
+    const minimizedExtent = iconManager.getMinimizedExtent() + iconManager.getStackExtent();
     const dockAxisSize = Math.max(
       contentSize + minimizedExtent + padding,
       DockManager.MIN_DOCK_WIDTH,

@@ -36,5 +36,6 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 30 | Dock preview close | Hover an app with two windows, click × on one preview | That window closes; the preview updates; the other window keeps focus |
 | 31 | Stopwatch | Island → Timer → Stopwatch; Start, Lap twice, Stop, Reset | The time runs on the ring; laps list newest first; Reset clears it; Timer brings the Pomodoro back as it was |
 | 32 | Currency | Search: `150 usd to idr` | A Conversion row with the rate appears within a second or two; offline, "Could not get the exchange rate" |
+| 33 | Dock stacks | Click the Downloads folder at the dock's end; minimize a pinned app's window | The newest 12 files, newest first; one opens in its app; "Open Downloads" opens Files; the minimized thumbnail sits before the stacks, the app icons keep their order |
 
 Nothing in this list has been run by the author yet; the report says so.
