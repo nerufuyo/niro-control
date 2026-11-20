@@ -193,6 +193,16 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "niro.snip-shortcut",
+  "menu": "Search",
+  "group": "Screenshots",
+  "title": "Snip shortcut",
+  "help": "Takes a screenshot and opens it for marking up (Niro Snip).",
+  "key": "snip-shortcut",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
   "id": "niro.search-shortcut",
   "menu": "Search",
   "group": "Application Search",

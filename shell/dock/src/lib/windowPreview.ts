@@ -252,7 +252,6 @@ export class WindowPreviewPopup {
         return GLib.SOURCE_REMOVE;
       });
     });
-    this._signals.connect(closeBtn, "button-press-event", () => Clutter.EVENT_STOP);
     // Title and close button share one header row, so nothing falls outside the popup.
     const header = new St.BoxLayout({ ...box(false), x_expand: true });
     titleLabel.set_x_expand(true);

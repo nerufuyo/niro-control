@@ -1,12 +1,12 @@
 # Niro Control
 
-<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control 1.5.0: one look for the whole GNOME desktop"></p>
+<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control 1.5.1: one look for the whole GNOME desktop"></p>
 
 **One look for the whole GNOME desktop.** A top-bar island, a macOS-style dock, an application search, window blur and
 rounded corners, a tiling layout manager, an emoji picker, and a control panel that sets them all from one place. One repository, one package.
 
 Runs on **Fedora 45 (GNOME Shell 51)** and **Ubuntu 24.04 (GNOME Shell 46)**, on Wayland. The extensions declare GNOME Shell 46 to 51.
-Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.5.0** ([releases](https://github.com/nerufuyo/niro-control/releases)).
+Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.5.1** ([releases](https://github.com/nerufuyo/niro-control/releases)).
 
 ## What you get
 
@@ -21,7 +21,7 @@ Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from t
 | **Emoji, Emulator** | An emoji picker on `Super+.` or `Super+;` with every emoji, 179 kaomoji and about 1,100 text symbols (arrows, maths, Greek, currency, box drawing, accents…), searched by name in English or Indonesian, with its settings in the panel's Search page; keeps the Android Emulator window on top. |
 | **Profiles** | Save the whole desktop as a profile and switch with one action: four built-ins (Everyday, Deep Work, Creative, Gaming), preview before applying, backups, rollback, import and export. |
 | **Niro Device** | An ESP32-S3 assistant with a small screen that belongs to one user's Niro: paired with a 6-digit code (it is never sent over the network), then connected over the same Wi-Fi with every frame sealed. It shows notifications and Niro's face. Firmware in [`firmware/niro-device`](firmware/niro-device/README.md), protocol in [`docs/device-protocol.md`](docs/device-protocol.md); the island has a page for it (off until you switch it on in Settings → Island). Voice questions and answers are not built yet. |
-| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 201 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
+| **Niro Control** | The control panel: a Home dashboard, Simple and Advanced modes, a sidebar with search over all 202 settings, live previews of the look, dock and windows, a shortcut recorder that refuses clashes, and per-setting reset. |
 
 Opacity, blur, blur strength, accent and tint are set once, in **Look**, and the island, dock, search and windows follow.
 Light and dark appearance both work, and the panel adapts to narrow windows.
