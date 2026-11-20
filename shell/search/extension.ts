@@ -67,11 +67,14 @@ export default class NiroSearch extends Extension {
 
         Main.wm.addKeybinding('search-shortcut', this._look, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._toggle());
+        Main.wm.addKeybinding('snip-shortcut', this._look, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._snip());
         this._export();
     }
 
     disable() {
         Main.wm.removeKeybinding('search-shortcut');
+        Main.wm.removeKeybinding('snip-shortcut');
         this._unexport();
         this._close();
         this._box?.destroy();
@@ -206,6 +209,12 @@ export default class NiroSearch extends Extension {
             GLib.mkdir_with_parents(GLib.path_get_dirname(this._recentPath), 0o700);
             GLib.file_set_contents(this._recentPath, JSON.stringify(list));
         } catch (_e) { /* not kept */ }
+    }
+
+    /** Niro Snip: the desktop's own picker, then an editor for the shot. */
+    _snip() {
+        if (this._box.visible) this._close();
+        this._run('system.snip', {}, 'ui');
     }
 
     // ---- Showing

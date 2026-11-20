@@ -148,6 +148,39 @@ export function buildRegistry() {
             s.set_boolean('show-banners', !on);
             return on ? 'Do Not Disturb on' : 'Do Not Disturb off';
         }});
+    r.register({id: 'system.wifi.toggle', title: 'Toggle Wi-Fi', description: 'Turns the Wi-Fi radio off, or on again', category: 'System', keywords: ['wifi', 'wireless', 'network', 'internet'], permission: 'none',
+        available: () => GLib.find_program_in_path('nmcli') ? null : 'NetworkManager (nmcli) is not installed',
+        run: async () => {
+            const on = (await run(['nmcli', 'radio', 'wifi'])) === 'enabled';
+            await run(['nmcli', 'radio', 'wifi', on ? 'off' : 'on']);
+            return on ? 'Wi-Fi off' : 'Wi-Fi on';
+        }});
+    r.register({id: 'system.bluetooth.toggle', title: 'Toggle Bluetooth', description: 'Turns Bluetooth off, or on again', category: 'System', keywords: ['bluetooth', 'bt', 'pair'], permission: 'none',
+        available: () => GLib.find_program_in_path('bluetoothctl') ? null : 'Bluetooth tools are not installed',
+        run: async () => {
+            const on = /Powered:\s*yes/.test(await run(['bluetoothctl', 'show']));
+            await run(['bluetoothctl', 'power', on ? 'off' : 'on']);
+            return on ? 'Bluetooth off' : 'Bluetooth on';
+        }});
+    r.register({id: 'system.mute.toggle', title: 'Mute or unmute sound', description: 'Silences the speakers, or brings the sound back', category: 'System', keywords: ['mute', 'volume', 'audio', 'silence', 'unmute'], permission: 'none',
+        available: () => GLib.find_program_in_path('wpctl') ? null : 'PipeWire tools (wpctl) are not installed',
+        run: async () => {
+            await run(['wpctl', 'set-mute', '@DEFAULT_AUDIO_SINK@', 'toggle']);
+            return /MUTED/.test(await run(['wpctl', 'get-volume', '@DEFAULT_AUDIO_SINK@'])) ? 'Sound muted' : 'Sound on';
+        }});
+    r.register({id: 'system.nightlight.toggle', title: 'Toggle Night Light', description: 'Warms the screen colours, or turns it off', category: 'System', keywords: ['night light', 'warm', 'blue light', 'eyes'], permission: 'none',
+        run: async () => {
+            const s = new Gio.Settings({schema_id: 'org.gnome.settings-daemon.plugins.color'});
+            const on = !s.get_boolean('night-light-enabled');
+            s.set_boolean('night-light-enabled', on);
+            return on ? 'Night Light on' : 'Night Light off';
+        }});
+    r.register({id: 'system.snip', title: 'Snip and edit a screenshot', description: 'Takes a screenshot, then opens it to draw on, add text or hide parts', category: 'System', keywords: ['snipping', 'screenshot', 'capture', 'annotate', 'edit', 'markup'], permission: 'none',
+        available: () => GLib.find_program_in_path('niro-snip') ? null : 'Niro Snip is not installed',
+        run: async () => { run([GLib.find_program_in_path('niro-snip')]).catch(e => notify('Niro Snip', e.message)); return 'Snip'; }});
+    r.register({id: 'system.screenshot', title: 'Take a screenshot', description: 'Opens the screenshot tool', category: 'System', keywords: ['capture', 'screen', 'snip', 'record'], permission: 'none',
+        available: () => Main.screenshotUI ? null : 'The screenshot tool is not available',
+        run: async () => { Main.screenshotUI.open(); return 'Screenshot'; }});
     r.register({id: 'system.suspend', title: 'Suspend', description: 'Puts the computer to sleep', category: 'System', keywords: ['sleep'], permission: 'none',
         run: async () => { await run(['systemctl', 'suspend']); return 'Suspended'; }});
     r.register({id: 'system.logout', title: 'Log out', description: 'Ends this session and closes its applications', category: 'System', keywords: ['sign out', 'exit'], permission: 'confirm',
