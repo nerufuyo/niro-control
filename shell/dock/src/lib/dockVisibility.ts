@@ -604,7 +604,8 @@ export class DockVisibility {
 
   /** How far the dock goes to be fully off its edge: its own thickness and a little more. */
   private _overviewDistance(): number {
-    const along = this._edge === 1 || this._edge === 2 ? this._container.width : this._container.height;
+    const along =
+      this._edge === 1 || this._edge === 2 ? this._container.width : this._container.height;
     return Math.max(60, Math.ceil(along * this._magnificationScale) + 24);
   }
 

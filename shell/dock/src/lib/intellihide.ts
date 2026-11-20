@@ -21,7 +21,14 @@ export class Intellihide {
     this._signals.connect(global.display, "window-created", () => this._checkOverlap());
     // Maximizing, full screen, minimizing and the like change what covers the dock without restacking anything.
     const wm = global.window_manager;
-    for (const signal of ["size-changed", "minimize", "unminimize", "map", "destroy", "switch-workspace"])
+    for (const signal of [
+      "size-changed",
+      "minimize",
+      "unminimize",
+      "map",
+      "destroy",
+      "switch-workspace",
+    ])
       this._signals.connect(wm, signal, () => this._checkOverlap());
     this._signals.connect(global.display, "in-fullscreen-changed", () => this._checkOverlap());
 

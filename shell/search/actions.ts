@@ -178,6 +178,12 @@ export function buildRegistry() {
     r.register({id: 'system.snip', title: 'Snip and edit a screenshot', description: 'Takes a screenshot, then opens it to draw on, add text or hide parts', category: 'System', keywords: ['snipping', 'screenshot', 'capture', 'annotate', 'edit', 'markup'], permission: 'none',
         available: () => GLib.find_program_in_path('niro-snip') ? null : 'Niro Snip is not installed',
         run: async () => { run([GLib.find_program_in_path('niro-snip')]).catch(e => notify('Niro Snip', e.message)); return 'Snip'; }});
+    const snip = (args) => { const bin = GLib.find_program_in_path('niro-snip'); run([bin, ...args]).catch(e => notify('Niro Snip', e.message)); };
+    const haveSnip = () => GLib.find_program_in_path('niro-snip') ? null : 'Niro Snip is not installed';
+    r.register({id: 'system.snip.delay', title: 'Snip in 5 seconds', description: 'Waits five seconds, so a menu or tooltip can be opened first, then takes the shot and opens it to edit', category: 'System', keywords: ['snipping', 'screenshot', 'timer', 'delay', 'later'], permission: 'none',
+        available: haveSnip, run: async () => { snip(['--delay', '5']); return 'Snip in 5 seconds'; }});
+    r.register({id: 'system.snip.full', title: 'Snip the whole screen', description: 'Takes the whole screen at once, then opens it to edit', category: 'System', keywords: ['snipping', 'screenshot', 'full screen', 'desktop'], permission: 'none',
+        available: haveSnip, run: async () => { snip(['--full']); return 'Snip'; }});
     r.register({id: 'system.screenshot', title: 'Take a screenshot', description: 'Opens the screenshot tool', category: 'System', keywords: ['capture', 'screen', 'snip', 'record'], permission: 'none',
         available: () => Main.screenshotUI ? null : 'The screenshot tool is not available',
         run: async () => { Main.screenshotUI.open(); return 'Screenshot'; }});

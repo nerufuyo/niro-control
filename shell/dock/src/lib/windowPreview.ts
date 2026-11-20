@@ -4,8 +4,8 @@ import type Meta from "gi://Meta";
 import Shell from "gi://Shell";
 import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
-import { SignalManager } from "./signalManager.js";
 import { box } from "./compat.js";
+import { SignalManager } from "./signalManager.js";
 
 type IconActor = InstanceType<typeof St.BoxLayout>;
 
