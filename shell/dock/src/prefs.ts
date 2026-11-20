@@ -131,8 +131,7 @@ export default class DockPreferences extends ExtensionPreferences {
       margin_end: 12,
     });
     const customCssHelp = new Gtk.Label({
-      label:
-        "Use dock selectors such as .dock-container, .dock-icon, and .dock-app-button.",
+      label: "Use dock selectors such as .dock-container, .dock-icon, and .dock-app-button.",
       wrap: true,
       xalign: 0,
     });
@@ -196,7 +195,8 @@ export default class DockPreferences extends ExtensionPreferences {
 
     const coverHideRow = new Adw.SwitchRow({
       title: "Hide under maximized and full-screen windows",
-      subtitle: "Stays up on the desktop; slides away while a maximized or full-screen window covers it",
+      subtitle:
+        "Stays up on the desktop; slides away while a maximized or full-screen window covers it",
     });
     settings.bind("hide-when-maximized", coverHideRow, "active", BIND_FLAGS);
     behaviorGroup.add(coverHideRow);

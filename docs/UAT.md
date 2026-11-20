@@ -31,5 +31,10 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 25 | Universal Appearance on a real GTK app | Compatibility > GTK theme integration > Install… (read the file list; a backup is made), restart Files and Settings | Backgrounds follow the glass and stay readable; Restore original brings the old look back and your gtk.css files are byte-identical to before |
 | 26 | Per-application rules | Compatibility: exclude one app; turn on "Window-level effects", set Window fade for one app | After the new login: the excluded app has no blur; only the fade app is see-through (and its text too); everything else is unfaded |
 | 27 | Presets, safe mode | Look > Universal Appearance: pick each preset; turn Safe mode on and off | Values change with the preset; safe mode makes everything solid at once; high-contrast (Settings > Accessibility) makes the panel solid |
+| 28 | Niro Snip | Super+Shift+S, pick an area; draw a pen line, an arrow, a numbered step, pixelate some text, crop; Save | The picker is GNOME's own; the editor opens with the shot; Save writes over the file in Pictures/Screenshots and the picture is on the clipboard |
+| 29 | Dock badges | Get a notification from an app pinned to the dock (e.g. `notify-send` from a terminal counts for the terminal) | A red count on its icon's top-left corner; it goes when the notification is dismissed |
+| 30 | Dock preview close | Hover an app with two windows, click × on one preview | That window closes; the preview updates; the other window keeps focus |
+| 31 | Stopwatch | Island → Timer → Stopwatch; Start, Lap twice, Stop, Reset | The time runs on the ring; laps list newest first; Reset clears it; Timer brings the Pomodoro back as it was |
+| 32 | Currency | Search: `150 usd to idr` | A Conversion row with the rate appears within a second or two; offline, "Could not get the exchange rate" |
 
 Nothing in this list has been run by the author yet; the report says so.

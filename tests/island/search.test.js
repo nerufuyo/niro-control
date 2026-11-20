@@ -4,7 +4,7 @@ import {test} from 'node:test';
 
 import {calculate} from '../../shell/search/build/calc.js';
 import {Registry, validateArgs} from '../../shell/search/build/registry.js';
-import {convert} from '../../shell/search/build/units.js';
+import {convert, moneyQuery, moneyText} from '../../shell/search/build/units.js';
 
 const calc = q => calculate(q)?.text ?? null;
 
@@ -130,4 +130,15 @@ test('registry: the manifest an outside caller sees has no handlers', () => {
     assert.equal(withEnv.reason, 'Niro Control is not installed');
     assert.equal(r.manifest({profiles: true}).find(a => a.id === 'profile.apply').available, true);
     assert.equal(r.manifest({}).find(a => a.id === 'system.lock').available, true);
+});
+
+test('money: both sides must be currencies; units stay units', () => {
+    assert.deepEqual(moneyQuery('150 usd to idr'), {amount: 150, from: 'USD', to: 'IDR'});
+    assert.deepEqual(moneyQuery('20 euro in rupiah'), {amount: 20, from: 'EUR', to: 'IDR'});
+    assert.deepEqual(moneyQuery('1,000 JPY = usd'), {amount: 1000, from: 'JPY', to: 'USD'});
+    assert.equal(moneyQuery('5 km to miles'), null);
+    assert.equal(moneyQuery('20 gb to mb'), null);
+    assert.equal(moneyQuery('5 usd to usd'), null);
+    assert.equal(moneyQuery('usd to idr'), null);
+    assert.equal(moneyText({amount: 150, from: 'USD', to: 'IDR'}, 16200.5), '2,430,075 IDR');
 });

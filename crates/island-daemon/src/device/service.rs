@@ -631,11 +631,10 @@ pub async fn run(iface: InterfaceRef<DeviceService>) {
             continue;
         }
         let mut service = iface.get_mut().await;
-        if service.expire() {
-            if let Err(err) = service.pairing_changed(iface.signal_emitter()).await {
+        if service.expire()
+            && let Err(err) = service.pairing_changed(iface.signal_emitter()).await {
                 warn!("could not tell that the pairing code ended: {err}");
             }
-        }
     }
 }
 

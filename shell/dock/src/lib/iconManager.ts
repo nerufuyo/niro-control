@@ -8,10 +8,10 @@ import * as BoxPointer from "resource:///org/gnome/shell/ui/boxpointer.js";
 import * as DND from "resource:///org/gnome/shell/ui/dnd.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
-import { SignalManager } from "./signalManager.js";
-import type { WindowPreviewPopup } from "./windowPreview.js";
 import { box } from "./compat.js";
 import { ThemeResolver } from "./iconTheme.js";
+import { SignalManager } from "./signalManager.js";
+import type { WindowPreviewPopup } from "./windowPreview.js";
 
 export type DockIconClicked = (app: Shell.App) => void;
 export type IconsChanged = () => void;
@@ -264,9 +264,11 @@ export class IconManager {
   private _createIconTexture(app: Shell.App): InstanceType<typeof St.Icon> {
     const inner = this._innerSize();
     const themed = this._themedGicon(app);
-    const icon = (themed
-      ? new St.Icon({ gicon: themed, icon_size: Math.ceil(inner * this._getTextureMultiplier()) })
-      : app.create_icon_texture(this._getTextureSize())) as InstanceType<typeof St.Icon>;
+    const icon = (
+      themed
+        ? new St.Icon({ gicon: themed, icon_size: Math.ceil(inner * this._getTextureMultiplier()) })
+        : app.create_icon_texture(this._getTextureSize())
+    ) as InstanceType<typeof St.Icon>;
     icon.set_size(inner, inner);
     icon.add_style_class_name("dock-icon-gicon");
     icon.x_align = Clutter.ActorAlign.CENTER;
@@ -402,7 +404,11 @@ export class IconManager {
     if (!tray) return;
     const watch = (source: object) => {
       if (this._badgeSources.has(source)) return;
-      const id = this._signals.connect(source as InstanceType<typeof St.Widget>, "notify::count", () => this._recountBadges());
+      const id = this._signals.connect(
+        source as InstanceType<typeof St.Widget>,
+        "notify::count",
+        () => this._recountBadges(),
+      );
       this._badgeSources.set(source, id);
     };
     for (const source of tray.getSources()) watch(source);
@@ -831,7 +837,10 @@ export class IconManager {
     });
 
     // Before the minimized windows, which stay at the end.
-    this._container.insert_child_at_index(actor, this._container.get_n_children() - this._minChildCount());
+    this._container.insert_child_at_index(
+      actor,
+      this._container.get_n_children() - this._minChildCount(),
+    );
     this._icons.set(appId, actor);
     // GNOME takes every actor down as the shell shuts down, before this runs again: a destroyed icon is let go at once, so the timers
     // that walk the icons do not touch it.
@@ -1021,7 +1030,8 @@ export class IconManager {
     for (const wa of windows) {
       const metaWin = wa.get_meta_window();
       if (!metaWin) continue;
-      if (!metaWin.showing_on_its_workspace() && !(this._minimizedEnabled && metaWin.minimized)) continue;
+      if (!metaWin.showing_on_its_workspace() && !(this._minimizedEnabled && metaWin.minimized))
+        continue;
       if (this._workspaceMode === 1 && metaWin.get_workspace() !== activeWorkspace) continue;
       const app = tracker.get_window_app(metaWin);
       if (!app) continue;
@@ -1749,7 +1759,8 @@ export class IconManager {
     for (const widget of [data.icon]) {
       widget.remove_effect_by_name("dock-tone");
       const factor = this._iconColor === "monochrome" ? 1 : this._iconColor === "muted" ? 0.5 : 0;
-      if (factor > 0) widget.add_effect_with_name("dock-tone", new Clutter.DesaturateEffect({ factor }));
+      if (factor > 0)
+        widget.add_effect_with_name("dock-tone", new Clutter.DesaturateEffect({ factor }));
     }
   }
 
@@ -1768,7 +1779,8 @@ export class IconManager {
       const data = this._getStored(actor);
       const app = this._apps.get(id);
       if (!data || !app) continue;
-      const win = this._minimizedEnabled && !this._favorites.includes(id) ? this._overviewWindow(app) : null;
+      const win =
+        this._minimizedEnabled && !this._favorites.includes(id) ? this._overviewWindow(app) : null;
       if ((data.overview?.win ?? null) === win) continue;
       if (data.overview) {
         data.overview.widget.destroy();
@@ -1791,7 +1803,10 @@ export class IconManager {
         const clone = new Clutter.Clone({ source: windowActor, reactive: false });
         const scale = Math.min(size / aw, size / ah);
         clone.set_scale(scale, scale);
-        clone.set_position(Math.round((size - aw * scale) / 2), Math.round((size - ah * scale) / 2));
+        clone.set_position(
+          Math.round((size - aw * scale) / 2),
+          Math.round((size - ah * scale) / 2),
+        );
         widget.add_child(clone);
       }
       const badgeSize = Math.round(size * 0.4);
@@ -1813,7 +1828,12 @@ export class IconManager {
   /** Whether `win` is one the dock shows as a thumbnail when minimized (a normal window the shell would list). */
   isMinimizable(win: Meta.Window): boolean {
     if (!this._minimizedEnabled || !this._isPinnedWindow(win)) return false;
-    return !win.skip_taskbar && (win.window_type === 0 /* NORMAL */ || win.window_type === 3 /* DIALOG */ || win.window_type === 4 /* MODAL_DIALOG */);
+    return (
+      !win.skip_taskbar &&
+      (win.window_type === 0 /* NORMAL */ ||
+        win.window_type === 3 /* DIALOG */ ||
+        win.window_type === 4) /* MODAL_DIALOG */
+    );
   }
 
   /** Whether `win` belongs to an app pinned to the dock: only those get a thumbnail at the end. */
@@ -1872,7 +1892,8 @@ export class IconManager {
     if (last) {
       const [lx, ly] = last.get_transformed_position();
       const [lw, lh] = last.get_transformed_size();
-      const start = (vertical ? ly + lh : lx + lw) + (addsSeparator ? 9 + spacing : 0) + spacing - added / 2;
+      const start =
+        (vertical ? ly + lh : lx + lw) + (addsSeparator ? 9 + spacing : 0) + spacing - added / 2;
       rect = vertical
         ? { x: lx, y: Math.round(start), width: Math.round(lw), height: slot }
         : { x: Math.round(start), y: ly, width: slot, height: Math.round(lh) };
@@ -1909,7 +1930,12 @@ export class IconManager {
   private _minRect(actor: IconActor): Rect {
     const [x, y] = actor.get_transformed_position();
     const [w, h] = actor.get_transformed_size();
-    return { x: Math.round(x), y: Math.round(y), width: Math.max(1, Math.round(w)), height: Math.max(1, Math.round(h)) };
+    return {
+      x: Math.round(x),
+      y: Math.round(y),
+      width: Math.max(1, Math.round(w)),
+      height: Math.max(1, Math.round(h)),
+    };
   }
 
   /** The thumbnail's size: as tall as an icon, as wide as the window's shape asks within reason. */
@@ -1917,7 +1943,9 @@ export class IconManager {
     const frame = win.get_frame_rect();
     const aspect = frame.height > 0 ? frame.width / frame.height : 1;
     const height = this._iconSize;
-    const width = Math.round(Math.max(this._iconSize * 0.9, Math.min(this._iconSize * 1.8, this._iconSize * aspect)));
+    const width = Math.round(
+      Math.max(this._iconSize * 0.9, Math.min(this._iconSize * 1.8, this._iconSize * aspect)),
+    );
     return { width, height };
   }
 
@@ -1933,7 +1961,9 @@ export class IconManager {
       });
       // Right before the first thumbnail.
       const first = [...this._minItems.values()][0]?.actor;
-      const index = first ? this._container.get_children().indexOf(first) : this._container.get_n_children();
+      const index = first
+        ? this._container.get_children().indexOf(first)
+        : this._container.get_n_children();
       this._container.insert_child_at_index(this._minSeparator, Math.max(0, index));
     } else if (!wanted && this._minSeparator) {
       this._minSeparator.destroy();
@@ -1971,7 +2001,10 @@ export class IconManager {
       const clone = new Clutter.Clone({ source: windowActor, reactive: false });
       const scale = Math.min(width / aw, height / ah);
       clone.set_scale(scale, scale);
-      clone.set_position(Math.round((width - aw * scale) / 2), Math.round((height - ah * scale) / 2));
+      clone.set_position(
+        Math.round((width - aw * scale) / 2),
+        Math.round((height - ah * scale) / 2),
+      );
       thumb.add_child(clone);
     }
     // The app's icon in the corner, so a thumbnail says whose window it is.
@@ -1983,7 +2016,8 @@ export class IconManager {
     (actor as unknown as Record<string, unknown>)._minimizedWindow = win;
 
     this._signals.connect(actor, "button-release-event", (_a, event) => {
-      if ((event as { get_button: () => number }).get_button() !== 1) return Clutter.EVENT_PROPAGATE;
+      if ((event as { get_button: () => number }).get_button() !== 1)
+        return Clutter.EVENT_PROPAGATE;
       if (!this._isPointerOver(actor)) return Clutter.EVENT_PROPAGATE;
       this._hideTooltip();
       win.unminimize();
@@ -2030,5 +2064,4 @@ export class IconManager {
       onComplete: () => actor.destroy(),
     });
   }
-
 }

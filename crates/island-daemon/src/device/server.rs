@@ -61,16 +61,14 @@ pub async fn run(iface: InterfaceRef<DeviceService>) {
             }
             _ => {}
         }
-        if let Some(open_now) = listening.as_mut() {
-            if open_now.pair_flag != pairing {
+        if let Some(open_now) = listening.as_mut()
+            && open_now.pair_flag != pairing {
                 open_now.pair_flag = pairing;
-                if let Some(publication) = &open_now.publication {
-                    if let Err(err) = publication.set_pair(pairing).await {
+                if let Some(publication) = &open_now.publication
+                    && let Err(err) = publication.set_pair(pairing).await {
                         warn!("could not update the mDNS record: {err}");
                     }
-                }
             }
-        }
         tokio::select! {
             () = hub.notified() => {}
             () = sleep(RECHECK) => {}
@@ -302,7 +300,7 @@ async fn session(iface: &InterfaceRef<DeviceService>, link: Link<TcpStream>) {
                             let samples = if *adpcm {
                                 super::adpcm::decode(&frame).unwrap_or_default()
                             } else {
-                                frame.chunks_exact(2).map(|pair| i16::from_le_bytes([pair[0], pair[1]])).collect()
+                                frame.as_chunks::<2>().0.iter().map(|pair| i16::from_le_bytes([pair[0], pair[1]])).collect()
                             };
                             if let Some(utterance) = cutter.push(&samples) {
                                 let lang = iface.get().await.language_for(&device_id);

@@ -7,6 +7,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
 import Shell from 'gi://Shell';
+import Soup from 'gi://Soup?version=3.0';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -19,7 +20,7 @@ import {searchItems} from './logic.js';
 import {hint, keyIntent, move, Once} from './nav.js';
 import {arrange, bestScore} from './rank.js';
 import {INDEX} from './settings-index.js';
-import {convert} from './units.js';
+import {convert, moneyQuery, moneyText} from './units.js';
 
 const WIDTH = 680;
 /** JSON with the keys in order, so the same arguments written in another order are the same request. */
@@ -32,6 +33,7 @@ const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g
 const VERTICAL = parseInt(PACKAGE_VERSION, 10) >= 48 ? {orientation: Clutter.Orientation.VERTICAL} : {vertical: true};
 
 const PAGE_OF = {Look: 'look', Island: 'island', Dock: 'dock', Windows: 'windows', Search: 'search'};
+const RATE_TTL_MS = 6 * 3600 * 1000;
 const ICON = {Calculator: 'accessories-calculator-symbolic', Conversion: 'edit-find-replace-symbolic', Settings: 'preferences-system-symbolic',
     Profiles: 'user-bookmarks-symbolic', Actions: 'system-run-symbolic', Clipboard: 'edit-paste-symbolic', Windows: 'focus-windows-symbolic'};
 
@@ -50,6 +52,8 @@ export default class NiroSearch extends Extension {
         this._rows = [];
         this._selected = 0;
         this._once = new Once();
+        this._rates = new Map();
+        this._soup = new Soup.Session({timeout: 6});
 
         this._box = new St.BoxLayout({style_class: 'niro-search', ...VERTICAL, reactive: true, visible: false, width: WIDTH});
         this._entry = new St.Entry({style_class: 'niro-search-entry', hint_text: 'Search apps, settings, windows, or type a calculation…', can_focus: true, x_expand: true});
@@ -76,6 +80,8 @@ export default class NiroSearch extends Extension {
         Main.wm.removeKeybinding('search-shortcut');
         Main.wm.removeKeybinding('snip-shortcut');
         this._unexport();
+        this._soup?.abort();
+        this._soup = null;
         this._close();
         this._box?.destroy();
         this._box = this._entry = this._list = this._scroll = this._status = this._hint = null;
@@ -265,6 +271,13 @@ export default class NiroSearch extends Extension {
         const conv = convert(q);
         if (conv) add('Conversion', {title: conv.text, subtitle: `${q}  ·  Enter copies`, score: 100, action: 'clipboard.copy', args: {text: conv.text}, iconName: ICON.Conversion, toast: true});
 
+        const money = moneyQuery(q);
+        const rate = money && this._rates.get(money.from)?.rates?.[money.to];
+        if (money && rate) {
+            const text = moneyText(money, rate);
+            add('Conversion', {title: text, subtitle: `${q}  ·  1 ${money.from} = ${rate} ${money.to}  ·  Enter copies`, score: 100, action: 'clipboard.copy', args: {text}, iconName: ICON.Conversion, toast: true});
+        }
+
         const nq = norm(q);
         // applications
         let apps = 0;
@@ -318,6 +331,7 @@ export default class NiroSearch extends Extension {
         let results = [];
         let failure = null;
         try { results = this._collect(query); } catch (e) { failure = e.message; }
+        this._fetchRates(query);
         this._results = results;
         this._list.destroy_all_children();
         this._rows = [];
@@ -348,6 +362,28 @@ export default class NiroSearch extends Extension {
             this._rows.push(row);
         });
         this._select(0);
+    }
+
+    /** A currency question needs the day's rate: fetched once, kept for six hours, and the list is drawn again when it arrives. */
+    _fetchRates(query) {
+        const money = moneyQuery(query);
+        if (!money || !this._soup) return;
+        const have = this._rates.get(money.from);
+        if ((have && Date.now() - have.at < RATE_TTL_MS) || this._rateBusy === money.from) return;
+        this._rateBusy = money.from;
+        const msg = Soup.Message.new('GET', `https://api.frankfurter.dev/v1/latest?base=${money.from}`);
+        this._soup.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (session, res) => {
+            this._rateBusy = null;
+            try {
+                const bytes = session.send_and_read_finish(res);
+                if (msg.get_status() !== Soup.Status.OK) throw new Error(`rates: HTTP ${msg.get_status()}`);
+                const data = JSON.parse(new TextDecoder().decode(bytes.get_data()));
+                this._rates?.set(money.from, {at: Date.now(), rates: data.rates ?? {}});
+                if (this._box?.visible && this._entry.get_text() === query) this._refresh();
+            } catch (e) {
+                if (this._box?.visible && this._entry.get_text() === query) this._say(`Could not get the exchange rate: ${e.message}`);
+            }
+        });
     }
 
     _say(text) {

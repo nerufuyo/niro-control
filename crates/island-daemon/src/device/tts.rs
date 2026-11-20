@@ -66,7 +66,7 @@ fn wav_samples(wav: &[u8]) -> Option<(u32, Vec<i16>)> {
     }
     let at = wav.windows(4).position(|w| w == b"data")? + 8;
     let data = wav.get(at..)?;
-    Some((rate, data.chunks_exact(2).map(|p| i16::from_le_bytes([p[0], p[1]])).collect()))
+    Some((rate, data.as_chunks::<2>().0.iter().map(|p| i16::from_le_bytes([p[0], p[1]])).collect()))
 }
 
 /// The samples at 16 kHz, by straight lines between them (speech, not music), cut at the longest speech.
