@@ -327,6 +327,20 @@ export const CATALOG: Item[] = [
   "kind": "switch"
  },
  {
+  "id": "niro.snip-shortcut",
+  "menu": "Search",
+  "group": "Screenshots",
+  "title": "Snip shortcut",
+  "help": "Takes a screenshot and opens it for marking up (Niro Snip).",
+  "detail": "Takes a screenshot and opens it for marking up (Niro Snip).",
+  "source": "niro",
+  "key": "snip-shortcut",
+  "type": "as",
+  "default": "['<Super><Shift>s']",
+  "unit": "",
+  "kind": "shortcut"
+ },
+ {
   "id": "niro.search-shortcut",
   "menu": "Search",
   "group": "Application Search",

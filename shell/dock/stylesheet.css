@@ -159,6 +159,21 @@
   color: #8ec8ff;
 }
 
+/* Unread notifications on an icon */
+.dock-notification-badge {
+  min-width: 14px;
+  height: 14px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background-color: rgba(235, 64, 52, 0.95);
+  color: white;
+  font-size: 9px;
+  font-weight: bold;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
 /* Drag-reorder drop indicator */
 .dock-drop-indicator {
   border-radius: 2px;
