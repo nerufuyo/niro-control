@@ -12,7 +12,7 @@ members = [
 default-members = ["crates/island-core", "crates/island-daemon"]
 
 [workspace.package]
-version = "1.5.2"
+version = "1.5.3"
 edition = "2024"
 # island-core and island-daemon use let chains (1.88); island-shelf sets its own, for gtk-rs.
 rust-version = "1.88"

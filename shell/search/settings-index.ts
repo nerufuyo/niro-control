@@ -1393,6 +1393,26 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "dock.stack-downloads",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Downloads stack",
+  "help": "A Downloads folder at the dock's end: a click lists its newest files",
+  "key": "stack-downloads",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "dock.stack-documents",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Documents stack",
+  "help": "A Documents folder at the dock's end: a click lists its newest files",
+  "key": "stack-documents",
+  "kind": "switch",
+  "managed": false
+ },
+ {
   "id": "dock.show-applications-button",
   "menu": "Dock",
   "group": "Applications and Indicators",

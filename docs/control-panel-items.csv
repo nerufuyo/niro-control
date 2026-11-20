@@ -138,6 +138,8 @@ Dock,Appearance,Dock position,select,Bottom / Left / Right / Top,0,"Position of 
 Dock,Shortcuts,Enable keyboard navigation,switch,,false,Allow keyboard shortcuts to control the dock,enable-keyboard-nav,dock.enable-keyboard-nav
 Dock,Shortcuts,Toggle dock visibility,shortcut,,['<Super>d'],Keyboard shortcut to toggle dock visibility,toggle-dock,dock.toggle-dock
 Dock,Shortcuts,Focus app 1 to 10,shortcuts,,['<Super>1'],Focus the Nth app in the dock: Super+1 to Super+0 by default,focus-app,dock.focus-app
+Dock,Applications and Indicators,Downloads stack,switch,,true,A Downloads folder at the dock's end: a click lists its newest files,stack-downloads,dock.stack-downloads
+Dock,Applications and Indicators,Documents stack,switch,,false,A Documents folder at the dock's end: a click lists its newest files,stack-documents,dock.stack-documents
 Dock,Applications and Indicators,Show applications button,switch,,true,Show a button to access all installed applications,show-applications-button,dock.show-applications-button
 Dock,Applications and Indicators,Applications button position,select,Start / End,0,"Position of the applications button (0=start, 1=end)",show-applications-button-position,dock.show-applications-button-position
 Dock,Appearance,Custom dock CSS,textarea,,,Custom CSS stylesheet applied to the dock,custom-css,dock.custom-css
