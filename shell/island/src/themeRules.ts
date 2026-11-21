@@ -14,3 +14,8 @@ export function isDarkAt(minute: number, lightFrom: number, darkFrom: number): b
     return lightFrom < darkFrom ? minute >= darkFrom || minute < lightFrom : minute >= darkFrom && minute < lightFrom;
 }
 
+
+/** Whether `minute` is inside the quiet hours from `from` until `until` (over midnight if need be). */
+export function isInside(minute: number, from: number, until: number): boolean {
+    return isDarkAt(minute, until, from);
+}

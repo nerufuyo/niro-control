@@ -13,6 +13,12 @@ Look,Universal Appearance,Light or dark,select,System / Dark / Light,system,The 
 Look,Schedule,"Light by day, dark by night",switch,,false,Switches GNOME between its light and dark style at the two times below.,theme-schedule,niro.theme-schedule
 Look,Schedule,Light from,text,,07:00,"The time the light style starts, as HH:MM (24 hours).",theme-light-from,niro.theme-light-from
 Look,Schedule,Dark from,text,,18:00,"The time the dark style starts, as HH:MM (24 hours).",theme-dark-from,niro.theme-dark-from
+Look,Schedule,Do Not Disturb on a schedule,switch,,false,"Hides notification banners from the first time below until the second, every day, and shows them again after.",dnd-schedule,niro.dnd-schedule
+Look,Schedule,Do Not Disturb from,text,,22:00,"The time banners are hidden from, as HH:MM (24 hours).",dnd-from,niro.dnd-from
+Look,Schedule,Do Not Disturb until,text,,07:00,"The time banners come back, as HH:MM (24 hours).",dnd-until,niro.dnd-until
+Search,Home Assistant,Home Assistant address,text,,,The address of your Home Assistant (http://homeassistant.local:8123).,ha-url,niro.ha-url
+Search,Screenshots,Keep a history of snips,switch,,false,"Keeps the last 30 screenshots taken with Niro Snip in your data folder (niro-snip/history), so Search can open them again with ""snips"".",snip-history,niro.snip-history
+Search,Screenshots,Upload address,text,,,An address (https://…) that accepts a PNG sent as a POST; Niro Snip then offers an Upload button and copies the answer (usually a link).,snip-upload-url,niro.snip-upload-url
 Look,Universal Appearance,Performance mode,switch,,false,Fewer effects for battery and weaker hardware: the blur is left out and surfaces are more solid.,performance-mode,niro.performance-mode
 Look,Universal Appearance,Apply to GNOME Shell parts,switch,,true,"The island, the dock and the search panel follow the shared look.",affect-shell,niro.affect-shell
 Look,Universal Appearance,Apply to GTK applications,switch,,true,"Used by the GTK theme integration (installed from Compatibility, never without your consent) and by the control panel.",affect-gtk,niro.affect-gtk
@@ -142,6 +148,8 @@ Dock,Shortcuts,Enable keyboard navigation,switch,,false,Allow keyboard shortcuts
 Dock,Shortcuts,Toggle dock visibility,shortcut,,['<Super>d'],Keyboard shortcut to toggle dock visibility,toggle-dock,dock.toggle-dock
 Dock,Shortcuts,Focus app 1 to 10,shortcuts,,['<Super>1'],Focus the Nth app in the dock: Super+1 to Super+0 by default,focus-app,dock.focus-app
 Dock,Applications and Indicators,Downloads stack,switch,,true,A Downloads folder at the dock's end: a click lists its newest files,stack-downloads,dock.stack-downloads
+Dock,Applications and Indicators,Trash stack,switch,,false,"The Trash at the dock's end: a click lists what is in it, with a way to empty it",stack-trash,dock.stack-trash
+Dock,Applications and Indicators,Folder stack,text,,,"A folder of your choice (its full path, such as /home/you/Projects) as a stack at the dock's end.",stack-custom,dock.stack-custom
 Dock,Applications and Indicators,Documents stack,switch,,false,A Documents folder at the dock's end: a click lists its newest files,stack-documents,dock.stack-documents
 Dock,Applications and Indicators,Show applications button,switch,,true,Show a button to access all installed applications,show-applications-button,dock.show-applications-button
 Dock,Applications and Indicators,Applications button position,select,Start / End,0,"Position of the applications button (0=start, 1=end)",show-applications-button-position,dock.show-applications-button-position

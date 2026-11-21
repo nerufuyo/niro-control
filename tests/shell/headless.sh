@@ -25,6 +25,9 @@ echo "STATE $(for e in island dock search blur corners emoji emulator tile; do e
 echo "ACTIONS $(call ListActions | grep -o "\"id\":\"[a-z.-]*\"" | wc -l)"
 echo "NOHANDLER $(call ListActions | grep -c "\"run\":")"
 echo "AVAIL $(call Availability profile.apply | grep -o "available\":[a-z]*")"
+echo "NETSPEED $(call RunAction system.network.speed "{}" | grep -o "Download [^\\\"]*")"
+echo "BATTERY $(call RunAction system.battery.info "{}" | grep -o "\"ok\":[a-z]*")"
+echo "ZOOM $(call RunAction system.zoom.toggle "{}" | grep -o "Magnifier o[a-z]*")"
 echo "COPY $(call RunAction clipboard.copy "{\"text\":\"niro-headless\"}" | grep -o "\"ok\":[a-z]*")"
 echo "UNKNOWN $(call RunAction nope.x "{}" | grep -o "unknown")"
 echo "EXTRA $(call RunAction system.lock "{\"evil\":1}" | grep -o "invalid")"
@@ -55,14 +58,17 @@ eval_js "$O._open(); \"x\"" >/dev/null; sleep 1; eval_js "$O._close(); \"x\"" >/
 echo "FOCUS_AFTER $(eval_js "global.display.focus_window ? global.display.focus_window.title : \"none\"" | grep -o "focus-probe\|none")"
 kill $(cat /tmp/niro_probe.pid) 2>/dev/null
 echo "HISTORY $(call History 50 | grep -o "\"caller\":\"[a-z-]*\"" | sort -u | tr "\n" " ")"
-} 2>&1 | grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)"
+} 2>&1 | grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|NETSPEED|BATTERY|ZOOM|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)"
 kill $SP; wait $SP 2>/dev/null' > /tmp/niro_headless.out 2>&1
 
-OUT=$(grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)" /tmp/niro_headless.out)
+OUT=$(grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|NETSPEED|BATTERY|ZOOM|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)" /tmp/niro_headless.out)
 has "all eight extensions active" "$OUT" "island=State:ACTIVE dock=State:ACTIVE search=State:ACTIVE blur=State:ACTIVE corners=State:ACTIVE emoji=State:ACTIVE emulator=State:ACTIVE tile=State:ACTIVE"
-has "twenty-two actions listed" "$OUT" "ACTIONS 22"
+has "forty-three actions listed" "$OUT" "ACTIONS 43"
 has "no handlers exposed" "$OUT" "NOHANDLER 0"
 has "availability answers" "$OUT" 'available":true'
+has "network speed answers" "$OUT" "NETSPEED Download"
+has "magnifier toggles" "$OUT" "ZOOM Magnifier on"
+has "battery action answers, with or without a battery" "$OUT" 'BATTERY "ok"'
 has "harmless action runs" "$OUT" 'COPY "ok":true'
 has "unknown action refused" "$OUT" "UNKNOWN unknown"
 has "extra argument refused" "$OUT" "EXTRA invalid"

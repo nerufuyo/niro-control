@@ -143,6 +143,66 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "niro.dnd-schedule",
+  "menu": "Look",
+  "group": "Schedule",
+  "title": "Do Not Disturb on a schedule",
+  "help": "Hides notification banners from the first time below until the second, every day, and shows them again after.",
+  "key": "dnd-schedule",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.dnd-from",
+  "menu": "Look",
+  "group": "Schedule",
+  "title": "Do Not Disturb from",
+  "help": "The time banners are hidden from, as HH:MM (24 hours).",
+  "key": "dnd-from",
+  "kind": "text",
+  "managed": false
+ },
+ {
+  "id": "niro.dnd-until",
+  "menu": "Look",
+  "group": "Schedule",
+  "title": "Do Not Disturb until",
+  "help": "The time banners come back, as HH:MM (24 hours).",
+  "key": "dnd-until",
+  "kind": "text",
+  "managed": false
+ },
+ {
+  "id": "niro.ha-url",
+  "menu": "Search",
+  "group": "Home Assistant",
+  "title": "Home Assistant address",
+  "help": "The address of your Home Assistant (http://homeassistant.local:8123).",
+  "key": "ha-url",
+  "kind": "text",
+  "managed": false
+ },
+ {
+  "id": "niro.snip-history",
+  "menu": "Search",
+  "group": "Screenshots",
+  "title": "Keep a history of snips",
+  "help": "Keeps the last 30 screenshots taken with Niro Snip in your data folder (niro-snip/history), so Search can open them again with \"snips\".",
+  "key": "snip-history",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.snip-upload-url",
+  "menu": "Search",
+  "group": "Screenshots",
+  "title": "Upload address",
+  "help": "An address (https://…) that accepts a PNG sent as a POST; Niro Snip then offers an Upload button and copies the answer (usually a link).",
+  "key": "snip-upload-url",
+  "kind": "text",
+  "managed": false
+ },
+ {
   "id": "niro.performance-mode",
   "menu": "Look",
   "group": "Universal Appearance",
@@ -1430,6 +1490,26 @@ export const INDEX = [
   "help": "A Downloads folder at the dock's end: a click lists its newest files",
   "key": "stack-downloads",
   "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "dock.stack-trash",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Trash stack",
+  "help": "The Trash at the dock's end: a click lists what is in it, with a way to empty it",
+  "key": "stack-trash",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "dock.stack-custom",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Folder stack",
+  "help": "A folder of your choice (its full path, such as /home/you/Projects) as a stack at the dock's end.",
+  "key": "stack-custom",
+  "kind": "text",
   "managed": false
  },
  {
