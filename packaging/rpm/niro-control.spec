@@ -22,6 +22,8 @@ Requires:       vulkan-loader
 Requires:       glib2
 Requires:       gnome-shell-extension-appindicator
 Requires:       gnome-shell-extension-user-theme
+Recommends:     tesseract
+Recommends:     tesseract-langpack-ind
 Requires:       polkit
 BuildRequires:  systemd-rpm-macros
 

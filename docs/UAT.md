@@ -39,5 +39,7 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 33 | Dock stacks | Click the Downloads folder at the dock's end; minimize a pinned app's window | The newest 12 files, newest first; one opens in its app; "Open Downloads" opens Files; the minimized thumbnail sits before the stacks, the app icons keep their order |
 | 34 | Time zones | Search: `jam di tokyo`, then `10:00 jakarta to london` | A Conversion row with the time; Enter copies it |
 | 35 | Dock quicklist | Right-click Firefox (or any app whose launcher has actions) in the dock | Its own actions, such as "New Private Window", sit under "New Window" |
+| 36 | Text from a screenshot | Super+Shift+S, pick an area with text, press the text button (or `Ctrl+T`) | "Copied N words"; paste shows the text. Without `tesseract` it says how to install it |
+| 37 | File search | Search: `f invoice` (any part of a file name in your home folder) | The matches with their folders; Enter opens one in its app; nothing is listed for an ordinary search |
 
 Nothing in this list has been run by the author yet; the report says so.
