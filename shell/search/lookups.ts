@@ -72,14 +72,16 @@ export function killName(query: string): string | null {
 export interface Proc {pid: number; name: string}
 
 /** `ps -o pid=,comm=` lines for the person's own processes, filtered by name (never this shell or the session itself), most specific first. */
-export function matchProcesses(psOutput: string, needle: string, selfPid: number, limit = 6): Proc[] {
+export function matchProcesses(psOutput: string, needle: string, selfPid: number, limit = 6, extraProtected: string[] = []): Proc[] {
     const PROTECTED = new Set(['gnome-shell', 'gnome-session-b', 'systemd', 'dbus-broker', 'dbus-daemon', 'gdm', 'gdm-wayland-ses', 'pipewire', 'wireplumber', 'Xwayland', 'gjs', 'bash', 'sh']);
+    for (const extra of extraProtected) PROTECTED.add(extra.trim());
+    const lowerProtected = new Set([...PROTECTED].map(n => n.toLowerCase()));
     const procs: Proc[] = [];
     for (const line of psOutput.split('\n')) {
         const m = /^\s*(\d+)\s+(.+?)\s*$/.exec(line);
         if (!m) continue;
         const pid = +m[1], name = m[2];
-        if (pid === selfPid || pid <= 1 || PROTECTED.has(name) || !name.toLowerCase().includes(needle)) continue;
+        if (pid === selfPid || pid <= 1 || lowerProtected.has(name.toLowerCase()) || !name.toLowerCase().includes(needle)) continue;
         procs.push({pid, name});
     }
     return procs.sort((a, b) => Number(b.name.toLowerCase().startsWith(needle)) - Number(a.name.toLowerCase().startsWith(needle)) || a.pid - b.pid).slice(0, limit);

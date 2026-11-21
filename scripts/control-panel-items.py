@@ -146,6 +146,8 @@ for name, k in schema_keys('niro').items():
     if name.startswith('snip-'):
         items.append(build('niro', 'Search', name, 'Screenshots', k)); continue
     if name.startswith(('theme-', 'dnd-')): grp = 'Schedule'
+    if name in ('tools-above-apps', 'world-clock-cities', 'search-language', 'weather-days', 'kill-protected'):
+        items.append(build('niro', 'Search', name, 'Search Behaviour', k)); continue
     if name == 'switcher-shortcut':
         items.append(build('niro', 'Search', name, 'Window Switcher', k)); continue
     if name == 'ha-url':
@@ -265,7 +267,7 @@ items += [
 ids = [i['id'] for i in items]
 assert len(ids) == len(set(ids)), 'duplicate ids'
 from collections import Counter; print(dict(Counter(i['menu'] for i in items)), dict(Counter((i['menu'],i['group']) for i in items if i['menu']=='Dock')))
-assert len(items) == 216, f'expected 216 items, got {len(items)}'
+assert len(items) == 224, f'expected 224 items, got {len(items)}'
 for i in items:
     assert '&' not in re.sub(r'&\s', '', i['title'] + i['help']) or '&apos;' not in i['title'], i
 
