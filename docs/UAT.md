@@ -64,5 +64,10 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 58 | Recurring reminder | Add a reminder `stretch /daily` (a minute from now) | It shows as `stretch` and is back tomorrow |
 | 59 | Snip history and upload | Niro Control → Search → Screenshots: switch history on, take a snip; Search: `snips` | The kept snips; Enter opens one. With an upload address set, an Upload button copies the answer |
 | 60 | Window switcher | Niro Control → Search → Window Switcher: record a shortcut; open two windows; press it | Cards with a live picture of each window, the previous one selected; arrows or Tab move, Enter or a click brings it forward, Esc closes; Alt+Tab is unchanged |
+| 61 | Search behaviour | Niro Control → Search → Search Behaviour: turn off "Tools above applications"; type `pass` | The password row now comes after matching applications; on again, it leads |
+| 62 | World clock cities and language | Set the cities to `jakarta, paris`, language Indonesian; Search: `world`, `cuaca bandung`, `30 days from now` | Two clocks; weather and dates in Indonesian; "Enter menyalin" under the clocks |
+| 63 | Dock tuning | Niro Control → Dock: set "Files listed in a stack" to 5 and "Download still going after" to 300; open Downloads | Five files; the bar stays up for a partial file changed within five minutes |
+| 64 | Kill protection and snip history size | Add `firefox` to "Processes kill never offers"; Search: `kill firefox`. Set "Snips kept" to 5 with history on | No Firefox row; only the newest five snips stay |
+| 65 | More recurring reminders | Add `standup /weekdays` and `rent /monthly` | After a Friday's, the next one comes on Monday; the monthly one on the same day next month |
 
 Nothing in this list has been run by the author yet; the report says so.

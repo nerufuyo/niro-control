@@ -112,6 +112,42 @@
       <summary>Window switcher</summary>
       <description>A shortcut that opens a switcher with a live picture of every window, most recently used first. Empty means off: Alt+Tab is not changed. Arrows or Tab move, Enter or a click brings the window forward, Esc closes.</description>
     </key>
+    <key name="tools-above-apps" type="b">
+      <default>true</default>
+      <summary>Tools above applications</summary>
+      <description>Search shows what it works out itself (a password, a UUID, a hash, a date) above matching applications. Turn it off to list those after the applications.</description>
+    </key>
+    <key name="world-clock-cities" type="s">
+      <default>'jakarta, tokyo, london, new york, sydney'</default>
+      <summary>World clock cities</summary>
+      <description>The cities Search shows for "world", separated by commas (up to eight). A name it does not know is left out.</description>
+    </key>
+    <key name="search-language" type="s">
+      <choices>
+        <choice value="english"/>
+        <choice value="indonesian"/>
+      </choices>
+      <default>'english'</default>
+      <summary>Language of Search answers</summary>
+      <description>The language of dates, weather and times that Search works out. What you type can be in either.</description>
+    </key>
+    <key name="weather-days" type="i">
+      <range min="1" max="7"/>
+      <default>3</default>
+      <summary>Weather days</summary>
+      <description>How many days of forecast Search shows for a city (1 to 7).</description>
+    </key>
+    <key name="kill-protected" type="s">
+      <default>''</default>
+      <summary>Processes "kill" never offers</summary>
+      <description>Names of programs, separated by commas, that Search never offers to stop, besides the desktop itself and the system, which are always left out.</description>
+    </key>
+    <key name="snip-history-keep" type="i">
+      <range min="5" max="200"/>
+      <default>30</default>
+      <summary>Snips kept in the history</summary>
+      <description>How many screenshots the history keeps when it is on (5 to 200); the oldest go first.</description>
+    </key>
     <key name="snip-history" type="b">
       <default>false</default>
       <summary>Keep a history of snips</summary>

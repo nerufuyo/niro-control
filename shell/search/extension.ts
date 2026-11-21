@@ -25,7 +25,7 @@ import {zoneQuery} from './zones.js';
 import {fileNeedle, findArgs, rankFiles} from './files.js';
 import {toolQuery} from './tools.js';
 import {habitQuery, habitStats, noteText, openTodos, recentNotes, todoQuery} from './notes.js';
-import {describe as weatherLines, forecastUrl, geocodeUrl, parsePlace, weatherQuery, WORLD_CITIES, worldQuery} from './weather.js';
+import {describe as weatherLines, forecastUrl, geocodeUrl, parseCities, parsePlace, weatherQuery, worldQuery} from './weather.js';
 import {entities, haQuery, validBase} from './homeAssistant.js';
 import {layoutQuery} from './layouts.js';
 import {agendaQuery, parseEvents, upcoming} from './agenda.js';
@@ -301,11 +301,11 @@ export default class NiroSearch extends Extension {
         if (calc) add('Calculator', {title: calc.assign ? `${calc.assign} = ${calc.text}` : calc.text, subtitle: calc.assign ? `Remembered until you log out: use ${calc.assign} in later sums  ·  Enter keeps it and copies`
             : `${q} =  ·  Enter copies  ·  ans is this result`, score: 100, action: 'clipboard.copy', args: {text: calc.text.replace(/,/g, '')}, iconName: ICON.Calculator, toast: true, calc: {assign: calc.assign, value: calc.value}});
         const tool = toolQuery(q, this._toolEnv());
-        if (tool) add('Tools', {title: tool.title, subtitle: tool.subtitle, score: 100, action: 'clipboard.copy', args: {text: tool.copy}, iconName: ICON.Tools, toast: true});
+        if (tool) add('Tools', {title: tool.title, subtitle: tool.subtitle, score: this._pref('tools-above-apps', true) ? 100 : 30, action: 'clipboard.copy', args: {text: tool.copy}, iconName: ICON.Tools, toast: true});
         const conv = convert(q);
         if (conv) add('Conversion', {title: conv.text, subtitle: `${q}  ·  Enter copies`, score: 100, action: 'clipboard.copy', args: {text: conv.text}, iconName: ICON.Conversion, toast: true});
 
-        const zone = zoneQuery(q, Date.now());
+        const zone = zoneQuery(q, Date.now(), undefined, this._lang());
         if (zone) add('Conversion', {title: zone.title, subtitle: zone.subtitle, score: 100, action: 'clipboard.copy', args: {text: zone.copy}, iconName: ICON.Conversion, toast: true});
 
         const money = moneyQuery(q);
@@ -382,13 +382,14 @@ export default class NiroSearch extends Extension {
         if (habit && 'list' in habit) habitStats(this._niroFile('habits.tsv'), GLib.DateTime.new_now_local().format('%Y-%m-%d')).forEach(h =>
             add('Tools', {title: `${h.doneToday ? '●' : '○'} ${h.name}`, subtitle: `${h.streak} day streak  ·  ${h.total} days in all  ·  ${h.doneToday ? 'done today' : 'Enter logs today'}`, score: 90, action: 'habit.log', args: {name: h.name}, iconName: ICON.Tools, toast: true, recent: false}));
         // clocks and weather
-        if (worldQuery(q)) WORLD_CITIES.forEach(c => { const z = zoneQuery(`time in ${c}`, Date.now()); if (z) add('Tools', {title: z.title, subtitle: 'World clock  ·  Enter copies the time', score: 90, action: 'clipboard.copy', args: {text: z.copy}, iconName: ICON.Tools, toast: true, recent: false}); });
+        if (worldQuery(q)) parseCities(this._pref('world-clock-cities', '')).forEach(c => { const z = zoneQuery(`time in ${c}`, Date.now(), undefined, this._lang()); if (z) add('Tools', {title: z.title, subtitle: 'World clock  ·  Enter copies the time', score: 90, action: 'clipboard.copy', args: {text: z.copy}, iconName: ICON.Tools, toast: true, recent: false}); });
         const city = weatherQuery(q);
         if (city) {
             const place = this._remote(`geo:${city.toLowerCase()}`, geocodeUrl(city), j => { const p = parsePlace(j); return p ? JSON.stringify(p) : null; });
             if (place.value) {
                 const p = JSON.parse(place.value);
-                const fc = this._remote(`wx:${p.lat},${p.lon}`, forecastUrl(p), j => { const l = weatherLines(j, p); return l.length ? l.join('\n') : null; });
+                const days = this._pref('weather-days', 3), lang = this._lang();
+                const fc = this._remote(`wx:${p.lat},${p.lon}:${days}:${lang}`, forecastUrl(p, days), j => { const l = weatherLines(j, p, lang); return l.length ? l.join('\n') : null; });
                 if (fc.value) fc.value.split('\n').forEach((line, i) => add('Tools', {title: line, subtitle: i ? '' : 'Only the city name was sent, to Open-Meteo  ·  Enter copies', score: 100 - i, action: 'clipboard.copy', args: {text: line}, iconName: ICON.Tools, toast: true, recent: false}));
             }
         }
@@ -467,7 +468,7 @@ export default class NiroSearch extends Extension {
             proc.communicate_utf8_async(null, null, (p, res) => {
                 try {
                     const [, out] = p.communicate_utf8_finish(res);
-                    this._procs?.set(needle, matchProcesses(out ?? '', needle, Number(new TextDecoder().decode(GLib.file_get_contents('/proc/self/stat')[1]).split(' ')[0])));
+                    this._procs?.set(needle, matchProcesses(out ?? '', needle, Number(new TextDecoder().decode(GLib.file_get_contents('/proc/self/stat')[1]).split(' ')[0]), 6, String(this._pref('kill-protected', '')).split(',')));
                     if (this._box?.visible) this._refresh();
                 } catch (_e) { /* no list */ }
             });
@@ -488,6 +489,19 @@ export default class NiroSearch extends Extension {
         const root = config ? GLib.get_user_config_dir() : `${GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS) ?? GLib.get_home_dir()}/Niro`;
         try { return new TextDecoder().decode(GLib.file_get_contents(`${root}/${name}`)[1]); } catch (_e) { return ''; }
     }
+
+    /** One of Niro Control's settings, or `fallback` when the package's schema (or that key of it) is not there. */
+    _pref(key, fallback) {
+        try {
+            const schema = Gio.SettingsSchemaSource.get_default()?.lookup('org.niro.control', true);
+            if (!schema?.has_key(key)) return fallback;
+            const settings = new Gio.Settings({schema_id: 'org.niro.control'});
+            const type = schema.get_key(key).get_value_type().dup_string();
+            return type === 'b' ? settings.get_boolean(key) : type === 'i' ? settings.get_int(key) : settings.get_string(key);
+        } catch (_e) { return fallback; }
+    }
+
+    _lang() { return this._pref('search-language', 'english') === 'indonesian' ? 'id' : 'en'; }
 
     _niroSettings() {
         try {
@@ -553,6 +567,7 @@ export default class NiroSearch extends Extension {
         const sum = {md5: GLib.ChecksumType.MD5, sha1: GLib.ChecksumType.SHA1, sha256: GLib.ChecksumType.SHA256};
         return {
             now: Date.now(),
+            lang: this._lang(),
             uuid: () => GLib.uuid_string_random(),
             randomBytes: n => {
                 const stream = Gio.File.new_for_path('/dev/urandom').read(null);

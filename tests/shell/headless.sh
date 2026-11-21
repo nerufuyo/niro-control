@@ -55,14 +55,15 @@ eval_js "$O._once.end()" >/dev/null
 eval_js "global.get_window_actors().find(a=>a.meta_window.title==\"focus-probe\").meta_window.activate(global.get_current_time()); \"x\"" >/dev/null; sleep 2
 echo "FOCUS_BEFORE $(eval_js "global.display.focus_window ? global.display.focus_window.title : \"none\"" | grep -o "focus-probe\|none")"
 eval_js "$O._open(); \"x\"" >/dev/null; sleep 1; eval_js "$O._close(); \"x\"" >/dev/null; sleep 1
+echo "PREF $(eval_js "$O._pref(\"weather-days\", -1) + \"|\" + $O._pref(\"tools-above-apps\", \"missing\") + \"|\" + $O._lang()")"
 echo "SWITCHER $(eval_js "$O._switcher.open(); const n = $O._switcher._windows.length; const was = $O._switcher.isOpen; $O._switcher.close(); n + \":\" + was + \":\" + $O._switcher.isOpen")"
 echo "FOCUS_AFTER $(eval_js "global.display.focus_window ? global.display.focus_window.title : \"none\"" | grep -o "focus-probe\|none")"
 kill $(cat /tmp/niro_probe.pid) 2>/dev/null
 echo "HISTORY $(call History 50 | grep -o "\"caller\":\"[a-z-]*\"" | sort -u | tr "\n" " ")"
-} 2>&1 | grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|NETSPEED|BATTERY|ZOOM|SWITCHER|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)"
+} 2>&1 | grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|NETSPEED|BATTERY|ZOOM|PREF|SWITCHER|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)"
 kill $SP; wait $SP 2>/dev/null' > /tmp/niro_headless.out 2>&1
 
-OUT=$(grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|NETSPEED|BATTERY|ZOOM|SWITCHER|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)" /tmp/niro_headless.out)
+OUT=$(grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|NETSPEED|BATTERY|ZOOM|PREF|SWITCHER|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)" /tmp/niro_headless.out)
 has "all eight extensions active" "$OUT" "island=State:ACTIVE dock=State:ACTIVE search=State:ACTIVE blur=State:ACTIVE corners=State:ACTIVE emoji=State:ACTIVE emulator=State:ACTIVE tile=State:ACTIVE"
 has "forty-three actions listed" "$OUT" "ACTIONS 43"
 has "no handlers exposed" "$OUT" "NOHANDLER 0"
@@ -88,6 +89,7 @@ has "palette: profiles" "$OUT" "Profiles:Everyday"
 has "palette: nothing found is empty" "$OUT" 'QUERY[qqqzzzxx] (true, '"'"'"[]"'
 has "keyboard: first result selected, protected action says Enter asks to confirm" "$OUT" "SEL=0 HINT=Enter asks to confirm"
 has "a second activation is refused" "$OUT" "ONCE true,false"
+has "Search reads the new settings (days, tools first, language)" "$OUT" 'PREF (true, '"'"'"3|true|en"'"'"')'
 has "the switcher opens on the open windows and closes again" "$OUT" 'SWITCHER (true, '"'"'"1:true:false"'"'"')'
 has "focus returns to the window that had it" "$OUT" "FOCUS_AFTER focus-probe"
 has "audit names the caller" "$OUT" '"caller":"island-daemon"'
