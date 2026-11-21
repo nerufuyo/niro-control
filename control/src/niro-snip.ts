@@ -176,7 +176,10 @@ class Editor {
         undoBtn.connect('clicked', () => this.undo());
         const closeBtn = new Gtk.Button({icon_name: 'edit-copy-symbolic', label: 'Copy & close', tooltip_text: 'Copies the picture and closes (Ctrl+Enter)'});
         closeBtn.connect('clicked', () => { this.copy(); GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => { this.win.close(); return GLib.SOURCE_REMOVE; }); });
+        const textBtn = new Gtk.Button({icon_name: 'insert-text-symbolic', tooltip_text: 'Copy the text in the picture, or in the cropped area (Ctrl+T)'});
+        textBtn.connect('clicked', () => this.copyText());
         header.pack_end(saveBtn);
+        header.pack_end(textBtn);
         header.pack_end(closeBtn); header.pack_end(asBtn); header.pack_end(copyBtn); header.pack_end(undoBtn);
 
         this.area = new Gtk.DrawingArea({hexpand: true, vexpand: true, content_width: 400, content_height: 300});
@@ -200,6 +203,7 @@ class Editor {
             if (key === Gdk.KEY_z) { shift ? this.redoLast() : this.undo(); return true; }
             if (key === Gdk.KEY_y) { this.redoLast(); return true; }
             if (key === Gdk.KEY_c) { this.copy(); return true; }
+            if (key === Gdk.KEY_t) { this.copyText(); return true; }
             if (key === Gdk.KEY_Return) { this.copy(); GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => { this.win.close(); return GLib.SOURCE_REMOVE; }); return true; }
             if (key === Gdk.KEY_s) { shift ? this.saveAs() : this.save(); return true; }
             return false;
@@ -342,6 +346,37 @@ class Editor {
                 this.say(`Saved ${file.get_basename()}`);
             } catch (e) { if (!e.matches?.(Gtk.DialogError, Gtk.DialogError.DISMISSED)) this.say(`Could not save: ${e.message}`); }
         });
+    }
+
+    /** OCR: reads the picture (or the cropped area) with `tesseract` and puts the words on the clipboard. */
+    copyText() {
+        const tmp = GLib.build_filenamev([GLib.get_tmp_dir(), `niro-snip-ocr-${GLib.get_monotonic_time()}.png`]);
+        try { this.render().writeToPNG(tmp); } catch (e) { this.say(`Could not read the picture: ${e.message}`); return; }
+        this.say('Reading the text…');
+        const run = langs => {
+            let proc;
+            try {
+                proc = Gio.Subprocess.new(['tesseract', tmp, 'stdout', ...(langs ? ['-l', langs] : [])],
+                    Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+            } catch (e) {
+                GLib.unlink(tmp);
+                this.say('Reading text needs tesseract: sudo dnf install tesseract tesseract-langpack-ind');
+                return;
+            }
+            proc.communicate_utf8_async(null, null, (p, res) => {
+                try {
+                    const [, out, err] = p.communicate_utf8_finish(res);
+                    // a missing language pack: try again with what is installed
+                    if (!p.get_successful() && langs && /language|traineddata/i.test(err ?? '')) return run(null);
+                    GLib.unlink(tmp);
+                    const text = (out ?? '').replace(/\f/g, '').trim();
+                    if (!p.get_successful()) this.say(`Could not read the text: ${(err ?? '').split('\n')[0]}`);
+                    else if (!text) this.say('No text found');
+                    else { this.win.get_clipboard().set(text); this.say(`Copied ${text.split(/\s+/).length} words`); }
+                } catch (e) { GLib.unlink(tmp); this.say(`Could not read the text: ${e.message}`); }
+            });
+        };
+        run('ind+eng');
     }
 
     copy() {

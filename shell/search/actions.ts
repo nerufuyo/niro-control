@@ -108,6 +108,16 @@ export function buildRegistry() {
             app.activate();
             return `Opened ${app.get_name()}`;
         }});
+    r.register({id: 'file.open', title: 'Open file', description: 'Opens a file from the home folder in its application', category: 'Files', keywords: ['file', 'open'],
+        params: [{name: 'path', type: 'string', required: true, maxLength: 1000}], permission: 'none',
+        run: async ({path}) => {
+            const home = GLib.get_home_dir();
+            if (!path.startsWith(`${home}/`) || path.includes('/../')) throw new Error('only files in the home folder open from here');
+            const file = Gio.File.new_for_path(path);
+            if (!file.query_exists(null)) throw new Error('that file is gone');
+            Gio.AppInfo.launch_default_for_uri(file.get_uri(), null);
+            return `Opened ${file.get_basename()}`;
+        }});
     r.register({id: 'window.activate', title: 'Switch to window', description: 'Brings an open window to the front', category: 'Windows', keywords: ['focus', 'switch'],
         params: [{name: 'id', type: 'number', required: true, min: 0}], permission: 'none',
         run: async ({id}) => {
