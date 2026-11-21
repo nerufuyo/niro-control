@@ -7,6 +7,7 @@ import {Registry, validateArgs} from '../../shell/search/build/registry.js';
 import {convert, moneyQuery, moneyText} from '../../shell/search/build/units.js';
 import {zoneQuery} from '../../shell/search/build/zones.js';
 import {fileNeedle, findArgs, rankFiles} from '../../shell/search/build/files.js';
+import {toolQuery, parseDate, password} from '../../shell/search/build/tools.js';
 
 const calc = q => calculate(q)?.text ?? null;
 
@@ -168,4 +169,44 @@ test('files: only with the trigger; no shell, no globs from the person; nearer a
     const found = rankFiles(['/home/u/a/b/c/invoice.pdf', '/home/u/old-invoice.txt', '/home/u/Documents/invoice-2026.pdf', ''], 'invoice', '/home/u');
     assert.deepEqual(found.map(f => f.name), ['invoice-2026.pdf', 'invoice.pdf', 'old-invoice.txt']);
     assert.equal(found[0].folder, '~/Documents');
+});
+
+test('calculator: names and ans, and 8jt / 5rb / 2k', () => {
+    assert.equal(calculate('8jt * 12')?.value, 96000000);
+    assert.equal(calculate('5rb + 2k')?.value, 7000);
+    assert.equal(calculate('5 km to miles'), null);
+    const set = calculate('gaji = 8jt');
+    assert.deepEqual([set.assign, set.value], ['gaji', 8000000]);
+    assert.equal(calculate('gaji * 12', {gaji: 8000000})?.text, '96,000,000');
+    assert.equal(calculate('ans / 2', {ans: 10})?.value, 5);
+    assert.equal(calculate('gaji', {gaji: 5}), null);           // a lone name is not a sum
+    assert.equal(calculate('sqrt = 4'), null);                  // a function's name cannot be taken
+    assert.equal(calculate('foo * 12'), null);                  // an unknown name is not a sum
+});
+
+const env = {
+    now: Date.UTC(2026, 10, 21, 10), uuid: () => '00000000-0000-4000-8000-000000000000',
+    randomBytes: n => Uint8Array.from({length: n}, (_, i) => (i * 37 + 11) % 256),
+    hash: (k, t) => `${k}:${t}`,
+    base64: (t, d) => d ? Buffer.from(t, 'base64').toString() : Buffer.from(t).toString('base64'),
+};
+test('tools: dates', () => {
+    assert.equal(toolQuery('30 days from now', env).copy, 'Mon, 21 Dec 2026');
+    assert.equal(toolQuery('2 minggu lalu', env).copy, 'Sat, 7 Nov 2026');
+    assert.equal(toolQuery('1 bulan lagi', env).copy, 'Mon, 21 Dec 2026');
+    assert.equal(toolQuery('selisih 1 jan ke 17 agu', env).copy, '228');
+    assert.equal(toolQuery('days until 25 dec', env).copy, '34');
+    assert.equal(toolQuery('selisih 31 feb ke 1 mar', env), null);   // no such day
+    assert.equal(parseDate('2026-08-17', env.now), Date.UTC(2026, 7, 17));
+});
+test('tools: uuid, passwords, base64, hashes', () => {
+    assert.equal(toolQuery('uuid', env).copy, '00000000-0000-4000-8000-000000000000');
+    assert.equal(toolQuery('pass 20', env).copy.length, 20);
+    assert.equal(toolQuery('pass', env).copy.length, 16);
+    assert.equal(toolQuery('pass 2', env).copy.length, 8);          // never shorter than 8
+    assert.match(password(env, 30), /^[A-Za-z2-9!#$%&*+=?@^_-]{30}$/);
+    assert.equal(toolQuery('b64 halo', env).copy, 'aGFsbw==');
+    assert.equal(toolQuery('unb64 aGFsbw==', env).copy, 'halo');
+    assert.equal(toolQuery('sha256 abc', env).copy, 'sha256:abc');
+    assert.equal(toolQuery('firefox', env), null);
 });

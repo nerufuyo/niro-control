@@ -113,6 +113,36 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "niro.theme-schedule",
+  "menu": "Look",
+  "group": "Schedule",
+  "title": "Light by day, dark by night",
+  "help": "Switches GNOME between its light and dark style at the two times below.",
+  "key": "theme-schedule",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.theme-light-from",
+  "menu": "Look",
+  "group": "Schedule",
+  "title": "Light from",
+  "help": "The time the light style starts, as HH:MM (24 hours).",
+  "key": "theme-light-from",
+  "kind": "text",
+  "managed": false
+ },
+ {
+  "id": "niro.theme-dark-from",
+  "menu": "Look",
+  "group": "Schedule",
+  "title": "Dark from",
+  "help": "The time the dark style starts, as HH:MM (24 hours).",
+  "key": "theme-dark-from",
+  "kind": "text",
+  "managed": false
+ },
+ {
   "id": "niro.performance-mode",
   "menu": "Look",
   "group": "Universal Appearance",
