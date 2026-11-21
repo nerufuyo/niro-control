@@ -95,6 +95,17 @@ export function confirm(title: string, question: string, verb: string): Promise<
 }
 
 // ---- The registry
+/** Presentation mode keeps the screen awake and the banners away until it is turned off (or the shell stops: the inhibitor goes with its connection). */
+let presenting: {cookie: number; hadBanners: boolean} | null = null;
+export function endPresentation(): void {
+    if (!presenting) return;
+    const {cookie, hadBanners} = presenting;
+    presenting = null;
+    try { Gio.DBus.session.call_sync('org.gnome.SessionManager', '/org/gnome/SessionManager', 'org.gnome.SessionManager', 'Uninhibit',
+        new GLib.Variant('(u)', [cookie]), null, Gio.DBusCallFlags.NONE, 2000, null); } catch (_e) { /* the session is ending */ }
+    try { new Gio.Settings({schema_id: 'org.gnome.desktop.notifications'}).set_boolean('show-banners', hadBanners); } catch (_e) { /* nothing to put back */ }
+}
+
 export function buildRegistry() {
     const r = new Registry();
     const needNiro = () => NIRO() ? null : 'Niro Control is not installed';
@@ -157,6 +168,16 @@ export function buildRegistry() {
             const on = s.get_boolean('show-banners');          // banners shown now: turning DND on hides them
             s.set_boolean('show-banners', !on);
             return on ? 'Do Not Disturb on' : 'Do Not Disturb off';
+        }});
+    r.register({id: 'system.presentation.toggle', title: 'Presentation mode', description: 'Keeps the screen awake and hides notification banners, until you turn it off', category: 'System', keywords: ['presentation', 'present', 'demo', 'meeting', 'awake', 'caffeine'], permission: 'none',
+        run: async () => {
+            if (presenting) { endPresentation(); return 'Presentation mode off'; }
+            const reply = Gio.DBus.session.call_sync('org.gnome.SessionManager', '/org/gnome/SessionManager', 'org.gnome.SessionManager', 'Inhibit',
+                new GLib.Variant('(susu)', ['Niro Control', 0, 'Presentation mode', 8]), null, Gio.DBusCallFlags.NONE, 3000, null);   // 8: do not go idle
+            const settings = new Gio.Settings({schema_id: 'org.gnome.desktop.notifications'});
+            presenting = {cookie: reply.deepUnpack()[0], hadBanners: settings.get_boolean('show-banners')};
+            settings.set_boolean('show-banners', false);
+            return 'Presentation mode on: the screen stays awake and banners are hidden';
         }});
     r.register({id: 'system.wifi.toggle', title: 'Toggle Wi-Fi', description: 'Turns the Wi-Fi radio off, or on again', category: 'System', keywords: ['wifi', 'wireless', 'network', 'internet'], permission: 'none',
         available: () => GLib.find_program_in_path('nmcli') ? null : 'NetworkManager (nmcli) is not installed',

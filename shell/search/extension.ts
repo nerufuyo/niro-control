@@ -14,7 +14,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {PACKAGE_VERSION} from 'resource:///org/gnome/shell/misc/config.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import {buildRegistry, clipboardHistory, confirm, profiles, windows} from './actions.js';
+import {buildRegistry, clipboardHistory, confirm, endPresentation, profiles, windows} from './actions.js';
 import {calculate} from './calc.js';
 import {searchItems} from './logic.js';
 import {hint, keyIntent, move, Once} from './nav.js';
@@ -23,6 +23,7 @@ import {INDEX} from './settings-index.js';
 import {convert, moneyQuery, moneyText} from './units.js';
 import {zoneQuery} from './zones.js';
 import {fileNeedle, findArgs, rankFiles} from './files.js';
+import {toolQuery} from './tools.js';
 
 const WIDTH = 680;
 /** JSON with the keys in order, so the same arguments written in another order are the same request. */
@@ -37,7 +38,7 @@ const VERTICAL = parseInt(PACKAGE_VERSION, 10) >= 48 ? {orientation: Clutter.Ori
 const PAGE_OF = {Look: 'look', Island: 'island', Dock: 'dock', Windows: 'windows', Search: 'search'};
 const RATE_TTL_MS = 6 * 3600 * 1000;
 const ICON = {Calculator: 'accessories-calculator-symbolic', Conversion: 'edit-find-replace-symbolic', Settings: 'preferences-system-symbolic',
-    Profiles: 'user-bookmarks-symbolic', Actions: 'system-run-symbolic', Clipboard: 'edit-paste-symbolic', Files: 'folder-documents-symbolic', Windows: 'focus-windows-symbolic'};
+    Profiles: 'user-bookmarks-symbolic', Actions: 'system-run-symbolic', Clipboard: 'edit-paste-symbolic', Files: 'folder-documents-symbolic', Tools: 'applications-utilities-symbolic', Windows: 'focus-windows-symbolic'};
 
 const DBUS_XML = `<node><interface name="org.niro.Search">
   <method name="ListActions"><arg type="s" direction="out" name="json"/></method>
@@ -56,6 +57,7 @@ export default class NiroSearch extends Extension {
         this._once = new Once();
         this._rates = new Map();
         this._files = new Map();
+        this._vars = {};
         this._soup = new Soup.Session({timeout: 6});
 
         this._box = new St.BoxLayout({style_class: 'niro-search', ...VERTICAL, reactive: true, visible: false, width: WIDTH});
@@ -83,6 +85,7 @@ export default class NiroSearch extends Extension {
         Main.wm.removeKeybinding('search-shortcut');
         Main.wm.removeKeybinding('snip-shortcut');
         this._unexport();
+        endPresentation();
         this._soup?.abort();
         this._soup = null;
         this._close();
@@ -199,6 +202,10 @@ export default class NiroSearch extends Extension {
         let outcome;
         try { outcome = await this._run(result.action, result.args, 'ui'); } finally { this._once.end(); }
         if (outcome.ok) {
+            if (result.calc && this._vars) {                       // a sum was used: its result is `ans`, and a named one is kept for later sums
+                this._vars.ans = result.calc.value;
+                if (result.calc.assign) this._vars[result.calc.assign] = result.calc.value;
+            }
             if (result.recent !== false) this._remember(result);
             if (result.toast) Main.notify('Niro Search', outcome.message);
         }
@@ -212,7 +219,7 @@ export default class NiroSearch extends Extension {
     }
 
     _remember(result) {
-        if (['Calculator', 'Conversion', 'Clipboard', 'Windows'].includes(result.section)) return;       // not kept: they are about the moment
+        if (['Calculator', 'Conversion', 'Clipboard', 'Windows', 'Tools', 'Files'].includes(result.section)) return;       // not kept: they are about the moment
         const entry = {section: result.section, title: result.title, subtitle: result.subtitle, action: result.action, args: result.args, icon: result.iconName};
         const list = [entry, ...this._recent().filter(r => !(r.action === entry.action && JSON.stringify(r.args) === JSON.stringify(entry.args)))].slice(0, RECENT_MAX);
         try {
@@ -271,8 +278,11 @@ export default class NiroSearch extends Extension {
         // score: how well the title (or a keyword) matches, plus the kind's bonus (see rank.ts)
         const add = (section, r) => out.push({section, ...r, score: (r.score ?? bestScore(q, [r.title, ...(r.keywords ?? [])]))});
         if (!q) return this._suggestions();
-        const calc = calculate(q);
-        if (calc) add('Calculator', {title: calc.text, subtitle: `${q} =  ·  Enter copies`, score: 100, action: 'clipboard.copy', args: {text: calc.text.replace(/,/g, '')}, iconName: ICON.Calculator, toast: true});
+        const calc = calculate(q, this._vars);
+        if (calc) add('Calculator', {title: calc.assign ? `${calc.assign} = ${calc.text}` : calc.text, subtitle: calc.assign ? `Remembered until you log out: use ${calc.assign} in later sums  ·  Enter keeps it and copies`
+            : `${q} =  ·  Enter copies  ·  ans is this result`, score: 100, action: 'clipboard.copy', args: {text: calc.text.replace(/,/g, '')}, iconName: ICON.Calculator, toast: true, calc: {assign: calc.assign, value: calc.value}});
+        const tool = toolQuery(q, this._toolEnv());
+        if (tool) add('Tools', {title: tool.title, subtitle: tool.subtitle, score: 100, action: 'clipboard.copy', args: {text: tool.copy}, iconName: ICON.Tools, toast: true});
         const conv = convert(q);
         if (conv) add('Conversion', {title: conv.text, subtitle: `${q}  ·  Enter copies`, score: 100, action: 'clipboard.copy', args: {text: conv.text}, iconName: ICON.Conversion, toast: true});
 
@@ -325,6 +335,22 @@ export default class NiroSearch extends Extension {
         if (fn) for (const f of this._files.get(fn.toLowerCase()) ?? [])
             add('Files', {title: f.name, subtitle: `${f.folder}  ·  Enter opens it`, iconName: ICON.Files, action: 'file.open', args: {path: f.path}, toast: true, score: 85});
         return arrange(out);
+    }
+
+    /** What the tools need from the system: the clock, a UUID, random bytes from the kernel, hashes and base64. */
+    _toolEnv() {
+        const sum = {md5: GLib.ChecksumType.MD5, sha1: GLib.ChecksumType.SHA1, sha256: GLib.ChecksumType.SHA256};
+        return {
+            now: Date.now(),
+            uuid: () => GLib.uuid_string_random(),
+            randomBytes: n => {
+                const stream = Gio.File.new_for_path('/dev/urandom').read(null);
+                try { return stream.read_bytes(n, null).toArray(); } finally { stream.close(null); }
+            },
+            hash: (kind, text) => GLib.compute_checksum_for_string(sum[kind], text, -1),
+            base64: (text, decode) => decode ? new TextDecoder('utf-8', {fatal: true}).decode(GLib.base64_decode(text.trim()))
+                : GLib.base64_encode(new TextEncoder().encode(text)),
+        };
     }
 
     /** `find` in the home folder, at most four seconds, and the list is drawn again when it answers. */
