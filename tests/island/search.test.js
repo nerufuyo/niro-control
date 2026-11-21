@@ -5,6 +5,7 @@ import {test} from 'node:test';
 import {calculate} from '../../shell/search/build/calc.js';
 import {Registry, validateArgs} from '../../shell/search/build/registry.js';
 import {convert, moneyQuery, moneyText} from '../../shell/search/build/units.js';
+import {zoneQuery} from '../../shell/search/build/zones.js';
 
 const calc = q => calculate(q)?.text ?? null;
 
@@ -141,4 +142,16 @@ test('money: both sides must be currencies; units stay units', () => {
     assert.equal(moneyQuery('5 usd to usd'), null);
     assert.equal(moneyQuery('usd to idr'), null);
     assert.equal(moneyText({amount: 150, from: 'USD', to: 'IDR'}, 16200.5), '2,430,075 IDR');
+});
+
+test('time zones: the time somewhere, and a time converted between places', () => {
+    const now = Date.UTC(2026, 10, 21, 3, 0); // 03:00 UTC, Saturday
+    assert.equal(zoneQuery('time in tokyo', now, 'Asia/Jakarta').copy, '12:00');
+    assert.match(zoneQuery('jam di new york', now, 'Asia/Jakarta').title, /^New York: 22:00  ·  yesterday$/);
+    assert.equal(zoneQuery('10:00 jakarta to london', now, 'Asia/Jakarta').copy, '03:00');
+    assert.equal(zoneQuery('9pm wib to tokyo', now, 'UTC').copy, '23:00');
+    assert.match(zoneQuery('23:00 london to tokyo', now, 'UTC').title, /\(next day\)$/);
+    assert.equal(zoneQuery('14:30 to tokyo', now, 'Asia/Jakarta').copy, '16:30');
+    assert.equal(zoneQuery('time in atlantis', now), null);
+    assert.equal(zoneQuery('5 km to miles', now), null);
 });

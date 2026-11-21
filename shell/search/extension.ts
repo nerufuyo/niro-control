@@ -21,6 +21,7 @@ import {hint, keyIntent, move, Once} from './nav.js';
 import {arrange, bestScore} from './rank.js';
 import {INDEX} from './settings-index.js';
 import {convert, moneyQuery, moneyText} from './units.js';
+import {zoneQuery} from './zones.js';
 
 const WIDTH = 680;
 /** JSON with the keys in order, so the same arguments written in another order are the same request. */
@@ -270,6 +271,9 @@ export default class NiroSearch extends Extension {
         if (calc) add('Calculator', {title: calc.text, subtitle: `${q} =  ·  Enter copies`, score: 100, action: 'clipboard.copy', args: {text: calc.text.replace(/,/g, '')}, iconName: ICON.Calculator, toast: true});
         const conv = convert(q);
         if (conv) add('Conversion', {title: conv.text, subtitle: `${q}  ·  Enter copies`, score: 100, action: 'clipboard.copy', args: {text: conv.text}, iconName: ICON.Conversion, toast: true});
+
+        const zone = zoneQuery(q, Date.now());
+        if (zone) add('Conversion', {title: zone.title, subtitle: zone.subtitle, score: 100, action: 'clipboard.copy', args: {text: zone.copy}, iconName: ICON.Conversion, toast: true});
 
         const money = moneyQuery(q);
         const rate = money && this._rates.get(money.from)?.rates?.[money.to];

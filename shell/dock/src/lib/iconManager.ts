@@ -1541,6 +1541,20 @@ export class IconManager {
       { label: "New Window", action: () => app.open_new_window(-1) },
     ];
 
+    // The app's own quicklist: the actions its .desktop file declares ("New Private Window", "Compose"…).
+    const info = app.get_app_info() as unknown as {
+      list_actions?: () => string[];
+      get_action_name: (action: string) => string | null;
+      launch_action: (action: string, context: null) => void;
+    } | null;
+    if (info && typeof info.list_actions === "function") {
+      for (const name of info.list_actions()) {
+        const label = info.get_action_name(name);
+        if (!label || label === "New Window") continue;
+        menuItems.push({ label, action: () => info.launch_action(name, null) });
+      }
+    }
+
     if (this._mediaControlsEnabled && this._playingAppId === app.get_id()) {
       menuItems.push({
         label: "Play/Pause",
