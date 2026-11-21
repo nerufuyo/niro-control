@@ -18,6 +18,12 @@ Look,Schedule,Do Not Disturb from,text,,22:00,"The time banners are hidden from,
 Look,Schedule,Do Not Disturb until,text,,07:00,"The time banners come back, as HH:MM (24 hours).",dnd-until,niro.dnd-until
 Search,Home Assistant,Home Assistant address,text,,,The address of your Home Assistant (http://homeassistant.local:8123).,ha-url,niro.ha-url
 Search,Window Switcher,Window switcher,shortcut,,[],"A shortcut that opens a switcher with a live picture of every window, most recently used first.",switcher-shortcut,niro.switcher-shortcut
+Search,Search Behaviour,Tools above applications,switch,,true,"Search shows what it works out itself (a password, a UUID, a hash, a date) above matching applications.",tools-above-apps,niro.tools-above-apps
+Search,Search Behaviour,World clock cities,text,,"jakarta, tokyo, london, new york, sydney","The cities Search shows for ""world"", separated by commas (up to eight).",world-clock-cities,niro.world-clock-cities
+Search,Search Behaviour,Language of Search answers,select,English / Indonesian,english,"The language of dates, weather and times that Search works out.",search-language,niro.search-language
+Search,Search Behaviour,Weather days,stepper,1–7,3,How many days of forecast Search shows for a city (1 to 7).,weather-days,niro.weather-days
+Search,Search Behaviour,"Processes ""kill"" never offers",text,,,"Names of programs, separated by commas, that Search never offers to stop, besides the desktop itself and the system, which are always left out.",kill-protected,niro.kill-protected
+Search,Screenshots,Snips kept in the history,stepper,5–200,30,How many screenshots the history keeps when it is on (5 to 200); the oldest go first.,snip-history-keep,niro.snip-history-keep
 Search,Screenshots,Keep a history of snips,switch,,false,"Keeps the last 30 screenshots taken with Niro Snip in your data folder (niro-snip/history), so Search can open them again with ""snips"".",snip-history,niro.snip-history
 Search,Screenshots,Upload address,text,,,An address (https://…) that accepts a PNG sent as a POST; Niro Snip then offers an Upload button and copies the answer (usually a link).,snip-upload-url,niro.snip-upload-url
 Look,Universal Appearance,Performance mode,switch,,false,Fewer effects for battery and weaker hardware: the blur is left out and surfaces are more solid.,performance-mode,niro.performance-mode
@@ -149,6 +155,8 @@ Dock,Shortcuts,Enable keyboard navigation,switch,,false,Allow keyboard shortcuts
 Dock,Shortcuts,Toggle dock visibility,shortcut,,['<Super>d'],Keyboard shortcut to toggle dock visibility,toggle-dock,dock.toggle-dock
 Dock,Shortcuts,Focus app 1 to 10,shortcuts,,['<Super>1'],Focus the Nth app in the dock: Super+1 to Super+0 by default,focus-app,dock.focus-app
 Dock,Applications and Indicators,Downloads stack,switch,,true,A Downloads folder at the dock's end: a click lists its newest files,stack-downloads,dock.stack-downloads
+Dock,Applications and Indicators,Files listed in a stack,stepper,5–30,12,How many of the newest files a stack lists (5 to 30),stack-files,dock.stack-files
+Dock,Applications and Indicators,Download still going after (seconds),stepper,10–600,90,The bar under Downloads shows while a partly downloaded file changed this recently (10 to 600 seconds).,download-active-seconds,dock.download-active-seconds
 Dock,Applications and Indicators,Trash stack,switch,,false,"The Trash at the dock's end: a click lists what is in it, with a way to empty it",stack-trash,dock.stack-trash
 Dock,Applications and Indicators,Folder stack,text,,,"A folder of your choice (its full path, such as /home/you/Projects) as a stack at the dock's end.",stack-custom,dock.stack-custom
 Dock,Applications and Indicators,Documents stack,switch,,false,A Documents folder at the dock's end: a click lists its newest files,stack-documents,dock.stack-documents

@@ -223,6 +223,18 @@
       <summary>Downloads stack</summary>
       <description>A Downloads folder at the dock's end: a click lists its newest files</description>
     </key>
+    <key name="stack-files" type="i">
+      <range min="5" max="30"/>
+      <default>12</default>
+      <summary>Files listed in a stack</summary>
+      <description>How many of the newest files a stack lists (5 to 30)</description>
+    </key>
+    <key name="download-active-seconds" type="i">
+      <range min="10" max="600"/>
+      <default>90</default>
+      <summary>Download still going after (seconds)</summary>
+      <description>The bar under Downloads shows while a partly downloaded file changed this recently (10 to 600 seconds). A download left behind stops counting after it.</description>
+    </key>
     <key name="stack-trash" type="b">
       <default>false</default>
       <summary>Trash stack</summary>

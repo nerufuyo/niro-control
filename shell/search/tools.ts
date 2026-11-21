@@ -3,6 +3,8 @@
 
 export interface Env {
     now: number;
+    /** The language of what is worked out: dates and units ('en' when absent). */
+    lang?: 'en' | 'id';
     uuid(): string;
     /** n random bytes, from the system's source (never Math.random). */
     randomBytes(n: number): Uint8Array;
@@ -14,7 +16,8 @@ export interface ToolAnswer {title: string; subtitle: string; copy: string}
 const MONTHS = ['jan', 'feb', 'mar', 'apr', 'mei|may', 'jun', 'jul', 'agu|aug', 'sep', 'okt|oct', 'nov', 'des|dec'];
 const monthOf = (w: string): number => MONTHS.findIndex(m => new RegExp(`^(?:${m})`, 'i').test(w));
 const DAY_MS = 86400000;
-const dateText = (ms: number) => new Date(ms).toLocaleDateString('en-GB', {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'});
+const dateText = (ms: number, lang: 'en' | 'id' = 'en') => new Date(ms).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-GB', {weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC'});
+const DAYS = {en: {one: 'day', many: 'days', earlier: ' earlier', ago: ' ago', until: 'Until', enter: 'Enter copies'}, id: {one: 'hari', many: 'hari', earlier: ' sebelumnya', ago: ' lalu', until: 'Sampai', enter: 'Enter menyalin'}};
 const dayStart = (ms: number) => Math.floor(ms / DAY_MS) * DAY_MS;
 
 /** "17 agu", "17 aug 2027", "2026-08-17", "today", "hari ini", "besok": midnight UTC of that day, or null. */
@@ -44,29 +47,30 @@ function addMonths(ms: number, n: number): number {
     return Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), Math.min(d.getUTCDate(), last));
 }
 
-function dateTool(q: string, now: number): ToolAnswer | null {
+function dateTool(q: string, now: number, lang: 'en' | 'id' = 'en'): ToolAnswer | null {
+    const T = DAYS[lang];
     const rel = /^(\d{1,5})\s*(hari|days?|minggu|weeks?|bulan|months?|tahun|years?)\s+(dari sekarang|dari hari ini|lagi|from now|from today|lalu|yang lalu|ago)$/i.exec(q);
     if (rel) {
         const n = parseInt(rel[1], 10) * (/(lalu|ago)$/i.test(rel[3]) ? -1 : 1);
         const unit = rel[2].toLowerCase();
         const today = dayStart(now);
         const at = /^(bulan|month)/.test(unit) ? addMonths(today, n) : /^(tahun|year)/.test(unit) ? addMonths(today, n * 12) : today + n * UNIT_DAYS[unit] * DAY_MS;
-        return {title: dateText(at), subtitle: `${q}  ·  Enter copies`, copy: dateText(at)};
+        return {title: dateText(at, lang), subtitle: `${q}  ·  ${T.enter}`, copy: dateText(at, lang)};
     }
     const diff = /^(?:selisih|diff|between|days between|berapa hari)\s+(.+?)\s+(?:ke|to|dan|and|sampai|until)\s+(.+)$/i.exec(q);
     if (diff) {
         const a = parseDate(diff[1], now), b = parseDate(diff[2], now);
         if (a === null || b === null) return null;
         const days = Math.round((b - a) / DAY_MS);
-        const text = `${Math.abs(days).toLocaleString('en-US')} day${Math.abs(days) === 1 ? '' : 's'}${days < 0 ? ' earlier' : ''}`;
-        return {title: text, subtitle: `${dateText(a)} → ${dateText(b)}  ·  Enter copies`, copy: String(Math.abs(days))};
+        const text = `${Math.abs(days).toLocaleString('en-US')} ${Math.abs(days) === 1 ? T.one : T.many}${days < 0 ? T.earlier : ''}`;
+        return {title: text, subtitle: `${dateText(a, lang)} → ${dateText(b, lang)}  ·  ${T.enter}`, copy: String(Math.abs(days))};
     }
     const until = /^(?:hari sampai|days? (?:until|to|till)|berapa hari lagi ke)\s+(.+)$/i.exec(q);
     if (until) {
         const b = parseDate(until[1], now);
         if (b === null) return null;
         const days = Math.round((b - dayStart(now)) / DAY_MS);
-        return {title: `${days.toLocaleString('en-US')} day${Math.abs(days) === 1 ? '' : 's'}${days < 0 ? ' ago' : ''}`, subtitle: `Until ${dateText(b)}  ·  Enter copies`, copy: String(Math.abs(days))};
+        return {title: `${days.toLocaleString('en-US')} ${Math.abs(days) === 1 ? T.one : T.many}${days < 0 ? T.ago : ''}`, subtitle: `${T.until} ${dateText(b, lang)}  ·  ${T.enter}`, copy: String(Math.abs(days))};
     }
     return null;
 }
@@ -84,7 +88,7 @@ export function password(env: Env, length: number): string {
 export function toolQuery(query: string, env: Env): ToolAnswer | null {
     const q = query.trim();
     if (!q || q.length > 400) return null;
-    const date = dateTool(q, env.now);
+    const date = dateTool(q, env.now, env.lang ?? 'en');
     if (date) return date;
     if (/^uuid(?:\s*v?4)?$/i.test(q)) { const u = env.uuid(); return {title: u, subtitle: 'A random UUID  ·  Enter copies', copy: u}; }
     const pw = /^(?:pass(?:word)?|sandi|kata sandi)(?:\s+(\d{1,3}))?$/i.exec(q);

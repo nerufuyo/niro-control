@@ -178,6 +178,14 @@ export class DockManager {
     });
     // Read at start-up too: the setting was only applied when it changed, so the button came back on every login.
     iconManager.setShowAppButton(settings.get_boolean("show-applications-button"));
+    const limits = () =>
+      iconManager.setStackLimits(
+        settings.get_int("stack-files"),
+        settings.get_int("download-active-seconds"),
+      );
+    limits();
+    this._signals.connect(settings, "changed::stack-files", limits);
+    this._signals.connect(settings, "changed::download-active-seconds", limits);
     const stacks = () => {
       const folders: StackFolder[] = [];
       if (settings.get_boolean("stack-downloads")) folders.push("downloads");

@@ -43,7 +43,13 @@ const dayNumber = (zone: string, ms: number): number => {
 export interface ZoneAnswer {title: string; subtitle: string; copy: string}
 
 /** `null` unless the query names a place or zone we know. `local` is the computer's own zone (the one a bare time is read in). */
-export function zoneQuery(query: string, now: number, local = Intl.DateTimeFormat().resolvedOptions().timeZone): ZoneAnswer | null {
+const SAY = {
+    en: {tomorrow: 'tomorrow', yesterday: 'yesterday', next: '(next day)', previous: '(previous day)', now: 'Time there now  ·  Enter copies', copies: 'Enter copies', here: 'here'},
+    id: {tomorrow: 'besok', yesterday: 'kemarin', next: '(hari berikutnya)', previous: '(hari sebelumnya)', now: 'Jam di sana sekarang  ·  Enter menyalin', copies: 'Enter menyalin', here: 'di sini'},
+};
+
+export function zoneQuery(query: string, now: number, local = Intl.DateTimeFormat().resolvedOptions().timeZone, lang: 'en' | 'id' = 'en'): ZoneAnswer | null {
+    const say = SAY[lang];
     const q = query.trim();
     // "time in tokyo", "jam di tokyo", "waktu london"
     const t = /^(?:what(?:'s| is) the )?(?:time|jam|waktu)(?:\s+(?:in|di|at))?\s+([a-z ]+?)\s*\??$/i.exec(q);
@@ -51,8 +57,8 @@ export function zoneQuery(query: string, now: number, local = Intl.DateTimeForma
         const zone = zoneOf(t[1]);
         if (!zone) return null;
         const day = dayNumber(zone, now) - dayNumber(local, now);
-        const text = `${clock(zone, now)}${day ? (day > 0 ? '  ·  tomorrow' : '  ·  yesterday') : ''}`;
-        return {title: `${label(t[1])}: ${text}`, subtitle: 'Time there now  ·  Enter copies', copy: clock(zone, now)};
+        const text = `${clock(zone, now)}${day ? (day > 0 ? `  ·  ${say.tomorrow}` : `  ·  ${say.yesterday}`) : ''}`;
+        return {title: `${label(t[1])}: ${text}`, subtitle: say.now, copy: clock(zone, now)};
     }
     // "10:00 jakarta to london", "9am wib in jst", "14:30 to tokyo" (from this computer's zone)
     const c = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\s*([a-z ]*?)\s+(?:to|in|ke|->|=)\s+([a-z ]+?)\s*$/i.exec(q);
@@ -71,7 +77,7 @@ export function zoneQuery(query: string, now: number, local = Intl.DateTimeForma
     let instant = guess - offset(from, guess) * 60000;
     instant = guess - offset(from, instant) * 60000; // once more: the offset can differ across a clock change
     const day = dayNumber(to, instant) - dayNumber(from, instant);
-    const there = `${clock(to, instant)}${day ? (day > 0 ? ' (next day)' : ' (previous day)') : ''}`;
-    const here = `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')} ${c[4].trim() ? label(c[4]) : 'here'}`;
-    return {title: `${label(c[5])}: ${there}`, subtitle: `${here}  ·  Enter copies`, copy: clock(to, instant)};
+    const there = `${clock(to, instant)}${day ? (day > 0 ? ` ${say.next}` : ` ${say.previous}`) : ''}`;
+    const here = `${String(h).padStart(2, '0')}:${String(mi).padStart(2, '0')} ${c[4].trim() ? label(c[4]) : say.here}`;
+    return {title: `${label(c[5])}: ${there}`, subtitle: `${here}  ·  ${say.copies}`, copy: clock(to, instant)};
 }

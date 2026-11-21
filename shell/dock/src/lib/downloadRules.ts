@@ -13,10 +13,14 @@ export interface Entry {
 export const ACTIVE_SECONDS = 90;
 
 /** How many of these files are unfinished downloads that changed within the last ACTIVE_SECONDS. */
-export function partialDownloads(entries: readonly Entry[], nowSeconds: number): number {
+export function partialDownloads(
+  entries: readonly Entry[],
+  nowSeconds: number,
+  activeSeconds = ACTIVE_SECONDS,
+): number {
   return entries.filter(
     (e) =>
-      nowSeconds - e.modified <= ACTIVE_SECONDS &&
+      nowSeconds - e.modified <= activeSeconds &&
       ((PARTIAL.test(e.name) && !e.name.startsWith(".")) ||
         /^\.com\.google\.Chrome\./.test(e.name)),
   ).length;
