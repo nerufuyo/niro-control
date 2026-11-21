@@ -6,6 +6,7 @@ import {calculate} from '../../shell/search/build/calc.js';
 import {Registry, validateArgs} from '../../shell/search/build/registry.js';
 import {convert, moneyQuery, moneyText} from '../../shell/search/build/units.js';
 import {zoneQuery} from '../../shell/search/build/zones.js';
+import {fileNeedle, findArgs, rankFiles} from '../../shell/search/build/files.js';
 
 const calc = q => calculate(q)?.text ?? null;
 
@@ -154,4 +155,17 @@ test('time zones: the time somewhere, and a time converted between places', () =
     assert.equal(zoneQuery('14:30 to tokyo', now, 'Asia/Jakarta').copy, '16:30');
     assert.equal(zoneQuery('time in atlantis', now), null);
     assert.equal(zoneQuery('5 km to miles', now), null);
+});
+
+test('files: only with the trigger; no shell, no globs from the person; nearer and prefix matches first', () => {
+    assert.equal(fileNeedle('f invoice 2026'), 'invoice 2026');
+    assert.equal(fileNeedle('cari skripsi'), 'skripsi');
+    assert.equal(fileNeedle('firefox'), null);
+    assert.equal(fileNeedle('f'), null);
+    const args = findArgs('/home/u', 'a*b [x]');
+    assert.ok(args.includes('*a\\*b*') && args.includes('*\\[x\\]*'));
+    assert.equal(args[0], '/home/u');
+    const found = rankFiles(['/home/u/a/b/c/invoice.pdf', '/home/u/old-invoice.txt', '/home/u/Documents/invoice-2026.pdf', ''], 'invoice', '/home/u');
+    assert.deepEqual(found.map(f => f.name), ['invoice-2026.pdf', 'invoice.pdf', 'old-invoice.txt']);
+    assert.equal(found[0].folder, '~/Documents');
 });

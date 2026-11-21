@@ -22,11 +22,12 @@ import {arrange, bestScore} from './rank.js';
 import {INDEX} from './settings-index.js';
 import {convert, moneyQuery, moneyText} from './units.js';
 import {zoneQuery} from './zones.js';
+import {fileNeedle, findArgs, rankFiles} from './files.js';
 
 const WIDTH = 680;
 /** JSON with the keys in order, so the same arguments written in another order are the same request. */
 const canon = (v) => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x));
-const LIMITS = {Applications: 5, Windows: 4, Settings: 5, Profiles: 4, Actions: 4, Clipboard: 6};
+const LIMITS = {Applications: 5, Windows: 4, Settings: 5, Profiles: 4, Actions: 4, Clipboard: 6, Files: 8};
 const RECENT_MAX = 8;
 const rgb = (hex: string) => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
 const norm = (s: string) => s.toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '');
@@ -36,7 +37,7 @@ const VERTICAL = parseInt(PACKAGE_VERSION, 10) >= 48 ? {orientation: Clutter.Ori
 const PAGE_OF = {Look: 'look', Island: 'island', Dock: 'dock', Windows: 'windows', Search: 'search'};
 const RATE_TTL_MS = 6 * 3600 * 1000;
 const ICON = {Calculator: 'accessories-calculator-symbolic', Conversion: 'edit-find-replace-symbolic', Settings: 'preferences-system-symbolic',
-    Profiles: 'user-bookmarks-symbolic', Actions: 'system-run-symbolic', Clipboard: 'edit-paste-symbolic', Windows: 'focus-windows-symbolic'};
+    Profiles: 'user-bookmarks-symbolic', Actions: 'system-run-symbolic', Clipboard: 'edit-paste-symbolic', Files: 'folder-documents-symbolic', Windows: 'focus-windows-symbolic'};
 
 const DBUS_XML = `<node><interface name="org.niro.Search">
   <method name="ListActions"><arg type="s" direction="out" name="json"/></method>
@@ -54,6 +55,7 @@ export default class NiroSearch extends Extension {
         this._selected = 0;
         this._once = new Once();
         this._rates = new Map();
+        this._files = new Map();
         this._soup = new Soup.Session({timeout: 6});
 
         this._box = new St.BoxLayout({style_class: 'niro-search', ...VERTICAL, reactive: true, visible: false, width: WIDTH});
@@ -87,6 +89,7 @@ export default class NiroSearch extends Extension {
         this._box?.destroy();
         this._box = this._entry = this._list = this._scroll = this._status = this._hint = null;
         this._registry = this._look = null;
+        this._files = null;
     }
 
     // ---- D-Bus: the registry for shortcuts and the assistant. Anything that is not harmless is asked about on screen.
@@ -252,6 +255,7 @@ export default class NiroSearch extends Extension {
         if (this._outside) { global.stage.disconnect(this._outside); this._outside = 0; }
         if (this._grab) { Main.popModal(this._grab); this._grab = null; }
         this._box?.hide();
+        this._files?.clear();                                   // file names are not kept once the palette is closed
     }
 
     _applyLook() {
@@ -316,7 +320,33 @@ export default class NiroSearch extends Extension {
                 .forEach(c => add('Clipboard', {title: c.text.replace(/\s+/g, ' ').slice(0, 90), subtitle: `Copied ${GLib.DateTime.new_from_unix_local(Math.floor(c.at / 1000)).format('%d %b, %H:%M')}  ·  Enter copies it again`,
                     iconName: ICON.Clipboard, action: 'clipboard.copy', args: {text: c.text.slice(0, 10000)}, toast: true, score: 80}));
         }
+        // files: only when asked for ("f invoice"), names only, searched on this computer
+        const fn = fileNeedle(q);
+        if (fn) for (const f of this._files.get(fn.toLowerCase()) ?? [])
+            add('Files', {title: f.name, subtitle: `${f.folder}  ·  Enter opens it`, iconName: ICON.Files, action: 'file.open', args: {path: f.path}, toast: true, score: 85});
         return arrange(out);
+    }
+
+    /** `find` in the home folder, at most four seconds, and the list is drawn again when it answers. */
+    _findFiles(query) {
+        const needle = fileNeedle(query);
+        if (!needle || this._files.has(needle.toLowerCase()) || this._fileBusy === needle) return;
+        this._fileBusy = needle;
+        const home = GLib.get_home_dir();
+        let proc;
+        try {
+            proc = Gio.Subprocess.new(['find', ...findArgs(home, needle)], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
+        } catch (e) { this._fileBusy = null; this._say(`Could not search files: ${e.message}`); return; }
+        const stop = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 4, () => { proc.force_exit(); return GLib.SOURCE_REMOVE; });
+        proc.communicate_utf8_async(null, null, (p, res) => {
+            GLib.source_remove(stop);
+            this._fileBusy = null;
+            let out = '';
+            try { [, out] = p.communicate_utf8_finish(res); } catch (e) { out = ''; }
+            if (!this._files) return;
+            this._files.set(needle.toLowerCase(), rankFiles((out ?? '').split('\n'), needle, home));
+            if (this._box?.visible && fileNeedle(this._entry.get_text())?.toLowerCase() === needle.toLowerCase()) this._refresh();
+        });
     }
 
     _suggestions() {
@@ -336,6 +366,7 @@ export default class NiroSearch extends Extension {
         let failure = null;
         try { results = this._collect(query); } catch (e) { failure = e.message; }
         this._fetchRates(query);
+        this._findFiles(query);
         this._results = results;
         this._list.destroy_all_children();
         this._rows = [];
