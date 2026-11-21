@@ -29,6 +29,7 @@ import {describe as weatherLines, forecastUrl, geocodeUrl, parsePlace, weatherQu
 import {entities, haQuery, validBase} from './homeAssistant.js';
 import {layoutQuery} from './layouts.js';
 import {agendaQuery, parseEvents, upcoming} from './agenda.js';
+import {Switcher} from './switcher.js';
 import {savedLayouts} from './actions.js';
 import {contentNeedle, defineQuery, definitions, grepArgs, historyMatches, historyNeedle, killName, matchProcesses, qrText, translateQuery, translated} from './lookups.js';
 
@@ -86,6 +87,9 @@ export default class NiroSearch extends Extension {
 
         Main.wm.addKeybinding('search-shortcut', this._look, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._toggle());
+        this._switcher = new Switcher();
+        Main.wm.addKeybinding('switcher-shortcut', this._look, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
+            Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._switcher.isOpen ? this._switcher.close() : this._switcher.open());
         Main.wm.addKeybinding('snip-shortcut', this._look, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._snip());
         this._export();
@@ -94,6 +98,9 @@ export default class NiroSearch extends Extension {
     disable() {
         Main.wm.removeKeybinding('search-shortcut');
         Main.wm.removeKeybinding('snip-shortcut');
+        Main.wm.removeKeybinding('switcher-shortcut');
+        this._switcher?.destroy();
+        this._switcher = null;
         this._unexport();
         endPresentation();
         endSpotlight();
