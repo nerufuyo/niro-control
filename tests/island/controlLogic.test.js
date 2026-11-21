@@ -8,17 +8,17 @@ import {canonicalAccel, decodeEntities, dependencyBlocks, dependencyMet, findCon
 
 const csv = readFileSync(new URL('../../docs/control-panel-items.csv', import.meta.url), 'utf8').trim().split('\n').slice(1);
 
-test('the catalog has all 207 settings, once each, in step with the CSV', () => {
-    assert.equal(CATALOG.length, 207);
-    assert.equal(new Set(CATALOG.map(i => i.id)).size, 207);
-    assert.equal(csv.length, 207);
+test('the catalog has all 215 settings, once each, in step with the CSV', () => {
+    assert.equal(CATALOG.length, 215);
+    assert.equal(new Set(CATALOG.map(i => i.id)).size, 215);
+    assert.equal(csv.length, 215);
 });
 
 test('every menu and group the design names is there with the right number of items', () => {
     const count = (menu, group) => CATALOG.filter(i => i.menu === menu && (!group || i.group === group)).length;
-    assert.deepEqual(['Look', 'Island', 'Dock', 'Windows', 'Search'].map(m => count(m)), [22, 88, 42, 42, 13]);
+    assert.deepEqual(['Look', 'Island', 'Dock', 'Windows', 'Search'].map(m => count(m)), [25, 88, 44, 42, 16]);
     assert.equal(count('Dock', 'Appearance') + count('Dock', 'Motion') + count('Dock', 'Applications and Indicators')
-        + count('Dock', 'Windows and Media') + count('Dock', 'Shortcuts'), 42);
+        + count('Dock', 'Windows and Media') + count('Dock', 'Shortcuts'), 44);
     assert.equal(count('Windows', 'Window Blur') + count('Windows', 'Rounded Corners'), 19);
     const island = new Set(CATALOG.filter(i => i.menu === 'Island').map(i => i.group));
     assert.deepEqual([...island].sort(), ['AI Agents', 'AI Usage', 'Alerts', 'Appearance and Behavior', 'Clipboard', 'Focus', 'Music',

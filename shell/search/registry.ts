@@ -26,6 +26,7 @@ export interface Action<Env = unknown> {
     keywords: string[];
     params?: Param[];
     permission: Permission;
+    ask?: (args: Record<string, unknown>) => string;     // the question built from the arguments, instead of the fixed `confirm`
     confirm?: string;                                   // the question asked before running, when permission is not none
     available?: (env: Env) => string | null;            // why it can't run now, or null
     run: (args: Record<string, unknown>, env: Env) => Promise<string | void>;

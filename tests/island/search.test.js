@@ -8,6 +8,14 @@ import {convert, moneyQuery, moneyText} from '../../shell/search/build/units.js'
 import {zoneQuery} from '../../shell/search/build/zones.js';
 import {fileNeedle, findArgs, rankFiles} from '../../shell/search/build/files.js';
 import {toolQuery, parseDate, password} from '../../shell/search/build/tools.js';
+import {contentNeedle, defineQuery, definitions, grepArgs, historyMatches, historyNeedle, killName, matchProcesses, qrText, translateQuery, translated} from '../../shell/search/build/lookups.js';
+import {qrMatrix, qrPng} from '../../shell/search/build/qrmatrix.js';
+import {habitLog, habitQuery, habitStats, markDone, noteLine, noteText, openTodos, recentNotes, todoLine, todoQuery} from '../../shell/search/build/notes.js';
+import {describe as weatherLines, forecastUrl, geocodeUrl, parsePlace, weatherQuery, worldQuery} from '../../shell/search/build/weather.js';
+import {entities, haQuery, serviceFor, validBase, validEntity} from '../../shell/search/build/homeAssistant.js';
+import {agendaQuery, parseEvents, upcoming} from '../../shell/search/build/agenda.js';
+import {layoutQuery, planMoves} from '../../shell/search/build/layouts.js';
+import {autostartOverride, batteryReport, formatRate, netTotals, parseDesktop, parseNeighbours, parseVpns} from '../../shell/search/build/sysinfo.js';
 
 const calc = q => calculate(q)?.text ?? null;
 
@@ -209,4 +217,139 @@ test('tools: uuid, passwords, base64, hashes', () => {
     assert.equal(toolQuery('unb64 aGFsbw==', env).copy, 'halo');
     assert.equal(toolQuery('sha256 abc', env).copy, 'sha256:abc');
     assert.equal(toolQuery('firefox', env), null);
+});
+
+test('lookups: translate and define are built from what is typed, and read from the reply', () => {
+    const t = translateQuery('tr id good morning');
+    assert.deepEqual([t.text, t.to], ['good morning', 'id']);
+    assert.match(t.url, /^https:\/\/api\.mymemory\.translated\.net\/get\?q=good%20morning&langpair=Autodetect\|id$/);
+    assert.equal(translateQuery('translate selamat pagi to english').to, 'en');
+    assert.equal(translateQuery('terjemah hello ke jepang').to, 'ja');
+    assert.equal(translateQuery('tr xx hello'), null);                // not a language
+    assert.equal(translateQuery('truck id 5'), null);
+    assert.equal(translated({responseData: {translatedText: ' Halo '}, responseStatus: 200}), 'Halo');
+    assert.equal(translated({responseData: {translatedText: ''}}), null);
+    assert.equal(defineQuery('define serendipity').word, 'serendipity');
+    assert.equal(defineQuery('define two words'), null);
+    assert.deepEqual(definitions([{meanings: [{partOfSpeech: 'noun', definitions: [{definition: 'luck'}, {definition: 'x'}]}, {partOfSpeech: 'verb', definitions: [{definition: 'to find'}]}]}]), ['noun: luck', 'verb: to find']);
+    assert.deepEqual(definitions({title: 'No Definitions Found'}), []);
+});
+
+test('lookups: qr, kill, history, contents', () => {
+    assert.equal(qrText('qr https://a.b'), 'https://a.b');
+    assert.equal(qrText('qrcode  hi there '), 'hi there');
+    assert.equal(qrText('qrs'), null);
+    assert.equal(killName('kill firefox'), 'firefox');
+    assert.equal(killName('kill x'), null);
+    assert.equal(killName('kill -9 1'), null);
+    const ps = ' 100 firefox\n 200 firefox-bin\n 300 gnome-shell\n   1 systemd\n 400 bash\n 500 my-firefox-helper';
+    assert.deepEqual(matchProcesses(ps, 'firefox', 999).map(p => p.pid), [100, 200, 500]);
+    assert.deepEqual(matchProcesses(ps, 'gnome', 999), []);        // the session is never offered
+    assert.deepEqual(matchProcesses(' 100 firefox', 'firefox', 100), []);
+    assert.equal(historyNeedle('h docker run'), 'docker run');
+    assert.equal(historyNeedle('hello'), null);
+    assert.deepEqual(historyMatches(': 1:0;git push\ngit status\n: 2:0;git push\n# note\nls', 'git'), ['git push', 'git status']);
+    assert.equal(contentNeedle('fc invoice 2026'), 'invoice 2026');
+    assert.equal(contentNeedle('fc ab'), null);
+    const args = grepArgs('a b', ['/home/u/Documents']);
+    assert.ok(args.includes('-F') && args.includes('--') && args.at(-1) === '/home/u/Documents' && args[args.indexOf('-e') + 1] === 'a b');
+});
+
+test('qr: the cells and the PNG exist, and refuse what will not scan', () => {
+    const cells = qrMatrix('https://example.com');
+    assert.ok(cells.length >= 21 && cells.every(r => r.length === cells.length));
+    assert.equal(qrMatrix(''), null);
+    assert.equal(qrMatrix('y'.repeat(1200)), null);
+    const png = qrPng(cells, 4);
+    assert.deepEqual([...png.slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+});
+
+test('system readings: battery, VPN, network, neighbours, autostart', () => {
+    assert.equal(batteryReport({fullNow: 45000000, fullDesign: 50000000, now: 20000000, rate: 10000000, status: 'Discharging', cycles: 214}), 'Health 90%, 214 cycles, discharging, about 2 h 0 min left');
+    assert.equal(batteryReport({fullNow: 50, fullDesign: 50, now: 25, rate: 10, status: 'Charging', cycles: null}), 'Health 100%, charging, about 2 h 30 min to full');
+    assert.equal(batteryReport({fullNow: 0, fullDesign: 0, now: 0, rate: 0, status: 'Full', cycles: 3}), '3 cycles, full');
+    assert.deepEqual(parseVpns('Wired:ethernet:enp1s0\nwork\\:vpn:vpn:tun0\nhome:wireguard:\nwifi:802-11-wireless:wlp2s0'), [{name: 'work:vpn', type: 'vpn', active: true}, {name: 'home', type: 'wireguard', active: false}]);
+    const dev = 'Inter-|   Receive\n face |bytes packets errs drop fifo frame compressed multicast|bytes packets errs drop fifo colls carrier compressed\n    lo: 500 5 0 0 0 0 0 0 500 5 0 0 0 0 0 0\n  eth0: 1000 10 0 0 0 0 0 0 2000 20 0 0 0 0 0 0\n wlan0: 300 3 0 0 0 0 0 0 400 4 0 0 0 0 0 0';
+    assert.deepEqual(netTotals(dev), {rx: 1300, tx: 2400});
+    assert.equal(formatRate(1234567), '1.2 MB/s');
+    assert.equal(formatRate(512), '512 B/s');
+    assert.deepEqual(parseNeighbours('192.168.1.1 dev wlan0 lladdr AA:BB:CC:DD:EE:FF REACHABLE\n192.168.1.9 dev wlan0  FAILED\n192.168.1.5 dev wlan0 lladdr 11:22:33:44:55:66 STALE').map(n => n.ip), ['192.168.1.1', '192.168.1.5']);
+    const d = '[Desktop Entry]\nName=Dropbox\nExec=dropbox\nX-GNOME-Autostart-enabled=true\n[Desktop Action x]\nName=Other';
+    assert.deepEqual(parseDesktop(d), {name: 'Dropbox', exec: 'dropbox', hidden: false});
+    assert.equal(parseDesktop('[Desktop Entry]\nName=A\nHidden=true').hidden, true);
+    assert.equal(parseDesktop('nothing'), null);
+    const off = autostartOverride(d, true);
+    assert.match(off, /\[Desktop Entry\]\nHidden=true/);
+    assert.equal(parseDesktop(off).hidden, true);
+    assert.equal(parseDesktop(autostartOverride(off, false)).hidden, false);
+});
+
+test('notes, to-dos, habits', () => {
+    assert.equal(noteText('note buy milk'), 'buy milk');
+    assert.equal(noteText('notes'), null);
+    assert.equal(noteLine('2026-11-21 10:30', ' buy   milk '), '- 2026-11-21 10:30 buy milk\n');
+    assert.deepEqual(recentNotes('- a\n- b\nnot a note\n- c'), ['c', 'b', 'a']);
+    assert.deepEqual(todoQuery('todo call bank'), {add: 'call bank'});
+    assert.deepEqual(todoQuery('todos'), {list: true});
+    assert.equal(todoQuery('todolist x'), null);
+    const file = '- [ ] one\n- [x] two\n- [ ] three\n';
+    assert.deepEqual(openTodos(file), ['one', 'three']);
+    assert.equal(markDone(file, 'three'), '- [ ] one\n- [x] two\n- [x] three\n');
+    assert.equal(markDone(file, 'two'), null);                       // already done
+    assert.equal(todoLine('x  y'), '- [ ] x y\n');
+    assert.deepEqual(habitQuery('habit Water'), {log: 'water'});
+    assert.deepEqual(habitQuery('habits'), {list: true});
+    assert.equal(habitQuery('habit a/b'), null);
+    const log = '2026-11-18\twater\n2026-11-19\twater\n2026-11-20\twater\n2026-11-20\tgym\n2026-11-15\tgym\n';
+    assert.deepEqual(habitStats(log, '2026-11-21'), [{name: 'gym', streak: 1, doneToday: false, total: 2}, {name: 'water', streak: 3, doneToday: false, total: 3}]);
+    assert.equal(habitStats(log + '2026-11-21\twater\n', '2026-11-21').find(h => h.name === 'water').streak, 4);
+    assert.equal(habitLog(log, '2026-11-20', 'gym'), null);
+    assert.equal(habitLog(log, '2026-11-21', 'gym'), '2026-11-21\tgym\n');
+});
+
+test('weather, world clock, layouts, Home Assistant', () => {
+    assert.equal(weatherQuery('cuaca bandung'), 'bandung');
+    assert.equal(weatherQuery('weather new york'), 'new york');
+    assert.equal(weatherQuery('weather'), null);
+    assert.equal(geocodeUrl('são paulo'), 'https://geocoding-api.open-meteo.com/v1/search?name=s%C3%A3o%20paulo&count=1&language=en&format=json');
+    const place = parsePlace({results: [{name: 'Bandung', country: 'Indonesia', latitude: -6.9, longitude: 107.6}]});
+    assert.deepEqual(place, {name: 'Bandung', country: 'Indonesia', lat: -6.9, lon: 107.6});
+    assert.equal(parsePlace({}), null);
+    assert.match(forecastUrl(place), /latitude=-6.9&longitude=107.6&current=/);
+    const lines = weatherLines({current: {temperature_2m: 24.4, weather_code: 61, wind_speed_10m: 8.2}, daily: {time: ['d1', 'd2'], temperature_2m_min: [21.2, 22], temperature_2m_max: [28.7, 29], precipitation_probability_max: [60, null], weather_code: [63, 2]}}, place);
+    assert.deepEqual(lines, ['Bandung, Indonesia: 24°C, light rain, wind 8 km/h', 'Today: 21–29°C, rain, rain 60%', 'Tomorrow: 22–29°C, partly cloudy, rain 0%']);
+    assert.equal(worldQuery('jam dunia'), true);
+    assert.equal(worldQuery('world map'), false);
+    assert.deepEqual(layoutQuery('layout save Work'), {save: 'work'});
+    assert.deepEqual(layoutQuery('layout work'), {restore: 'work'});
+    assert.deepEqual(layoutQuery('layouts'), {list: true});
+    assert.equal(layoutQuery('layout save'), null);
+    const moves = planMoves([{cls: 'a'}, {cls: 'a'}, {cls: 'b'}, {cls: 'c'}], [{cls: 'b'}, {cls: 'a'}, {cls: 'a'}, {cls: 'a'}]);
+    assert.deepEqual(moves.map(m => [m.saved.cls, m.index]), [['a', 1], ['a', 2], ['b', 0]]);      // each open window used once; 'c' is not open
+    assert.equal(haQuery('ha light'), 'light');
+    assert.equal(haQuery('ha'), '');
+    assert.equal(haQuery('hash'), null);
+    assert.equal(validBase('http://homeassistant.local:8123/'), 'http://homeassistant.local:8123');
+    assert.equal(validBase('javascript:alert(1)'), null);
+    assert.equal(validBase('ftp://x'), null);
+    assert.equal(validEntity('light.kamar_tidur'), true);
+    assert.equal(validEntity('lock.front_door'), false);              // locks are not offered
+    assert.equal(validEntity('light.x/../y'), false);
+    assert.deepEqual(serviceFor('scene.movie'), {domain: 'scene', service: 'turn_on'});
+    assert.deepEqual(serviceFor('light.x'), {domain: 'light', service: 'toggle'});
+    const list = entities([{entity_id: 'light.kamar', state: 'on', attributes: {friendly_name: 'Lampu Kamar'}}, {entity_id: 'lock.door', state: 'locked'}, {entity_id: 'sensor.t', state: '3'}], 'lampu');
+    assert.deepEqual(list, [{id: 'light.kamar', name: 'Lampu Kamar', state: 'on'}]);
+});
+
+test('agenda: the coming events with the time left', () => {
+    assert.equal(agendaQuery('rapat'), true);
+    assert.equal(agendaQuery('rapat tim'), false);
+    const events = parseEvents(JSON.stringify([
+        {id: 1, title: 'Standup', date: '2026-11-21', start: '09:30', end: '10:00'}, {id: 2, title: 'Past', date: '2026-11-21', start: '08:00'},
+        {id: 3, title: 'Dentist', date: '2026-11-22', start: '14:00'}, {id: 4, title: 'Holiday', date: '2026-11-21', start: null},
+        {id: 5, title: 'Old', date: '2026-11-20', start: '10:00'}, {id: 6, title: 'Bad', date: 'x'}, {title: 7}]));
+    assert.equal(events.length, 5);
+    const c = upcoming(events, '2026-11-21', 8 * 60 + 45);
+    assert.deepEqual(c.map(e => [e.title, e.text]), [['Holiday', 'today, all day'], ['Standup', 'in 45 min, at 09:30'], ['Dentist', 'in 29 h 15 min, at 14:00']]);
+    assert.deepEqual(parseEvents('nonsense'), []);
 });

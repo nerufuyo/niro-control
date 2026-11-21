@@ -223,6 +223,16 @@
       <summary>Downloads stack</summary>
       <description>A Downloads folder at the dock's end: a click lists its newest files</description>
     </key>
+    <key name="stack-trash" type="b">
+      <default>false</default>
+      <summary>Trash stack</summary>
+      <description>The Trash at the dock's end: a click lists what is in it, with a way to empty it</description>
+    </key>
+    <key name="stack-custom" type="s">
+      <default>''</default>
+      <summary>Folder stack</summary>
+      <description>A folder of your choice (its full path, such as /home/you/Projects) as a stack at the dock's end. Empty means none.</description>
+    </key>
     <key name="stack-documents" type="b">
       <default>false</default>
       <summary>Documents stack</summary>

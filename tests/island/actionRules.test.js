@@ -121,3 +121,10 @@ test('a window names the agent\'s project only as a word of its own', () => {
     assert.equal(namesProject('c++ notes', 'c++'), true);
     assert.equal(namesProject('anything', ''), false);
 });
+
+import {readFileSync} from 'node:fs';
+test('action titles and descriptions have no apostrophe or quote: gdbus prints such a reply in another form and the shell checks that count on it', () => {
+    const src = readFileSync(new URL('../../shell/search/actions.ts', import.meta.url), 'utf8');
+    for (const m of src.matchAll(/id: '([a-z.]+)', title: '((?:[^'\\]|\\.)*)', description: '((?:[^'\\]|\\.)*)'/g))
+        assert.ok(!/['"\\]/.test(m[2] + m[3]), `${m[1]}: ${m[2]} / ${m[3]}`);
+});

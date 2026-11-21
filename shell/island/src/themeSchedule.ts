@@ -4,7 +4,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
-import {isDarkAt, minutesOf} from './themeRules.js';
+import {isDarkAt, isInside, minutesOf} from './themeRules.js';
 
 export class ThemeSchedule {
     private _shared: Gio.Settings | null = null;
@@ -12,6 +12,7 @@ export class ThemeSchedule {
     private _ids: number[] = [];
     private _timer = 0;
     private _last: boolean | null = null;
+    private _lastQuiet: boolean | null = null;
 
     constructor() {
         const source = Gio.SettingsSchemaSource.get_default();
@@ -19,21 +20,36 @@ export class ThemeSchedule {
         if (!schema?.has_key('theme-schedule')) return;          // the package (or its newest schemas) is not installed
         this._shared = new Gio.Settings({schema_id: 'org.niro.control'});
         this._iface = new Gio.Settings({schema_id: 'org.gnome.desktop.interface'});
-        for (const key of ['theme-schedule', 'theme-light-from', 'theme-dark-from']) this._ids.push(this._shared.connect(`changed::${key}`, () => { this._last = null; this._tick(); }));
+        for (const key of ['theme-schedule', 'theme-light-from', 'theme-dark-from', 'dnd-schedule', 'dnd-from', 'dnd-until']) {
+            if (schema.has_key(key)) this._ids.push(this._shared.connect(`changed::${key}`, () => { this._last = null; this._lastQuiet = null; this._tick(); }));
+        }
         this._timer = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 30, () => { this._tick(); return GLib.SOURCE_CONTINUE; });
         this._tick();
     }
 
     private _tick(): void {
         if (!this._shared || !this._iface) return;
-        if (!this._shared.get_boolean('theme-schedule')) { this._last = null; return; }
         const now = GLib.DateTime.new_now_local();
+        this._tickQuiet(now);
+        if (!this._shared.get_boolean('theme-schedule')) { this._last = null; return; }
         const dark = isDarkAt(now.get_hour() * 60 + now.get_minute(),
             minutesOf(this._shared.get_string('theme-light-from'), 7 * 60), minutesOf(this._shared.get_string('theme-dark-from'), 18 * 60));
         if (dark === this._last) return;                          // no change of period since the last look
         this._last = dark;
         const want = dark ? 'prefer-dark' : 'default';
         if (this._iface.get_string('color-scheme') !== want) this._iface.set_string('color-scheme', want);
+    }
+
+    /** Do Not Disturb at set hours: banners go away at `dnd-from` and come back at `dnd-until`, at those moments only. */
+    private _tickQuiet(now: GLib.DateTime): void {
+        const shared = this._shared;
+        if (!shared || !Gio.SettingsSchemaSource.get_default()?.lookup('org.niro.control', true)?.has_key('dnd-schedule')) return;
+        if (!shared.get_boolean('dnd-schedule')) { this._lastQuiet = null; return; }
+        const quiet = isInside(now.get_hour() * 60 + now.get_minute(), minutesOf(shared.get_string('dnd-from'), 22 * 60), minutesOf(shared.get_string('dnd-until'), 7 * 60));
+        if (quiet === this._lastQuiet) return;
+        this._lastQuiet = quiet;
+        const banners = new Gio.Settings({schema_id: 'org.gnome.desktop.notifications'});
+        if (banners.get_boolean('show-banners') === quiet) banners.set_boolean('show-banners', !quiet);
     }
 
     destroy(): void {

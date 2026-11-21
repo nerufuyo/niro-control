@@ -11,6 +11,12 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {ModalDialog} from 'resource:///org/gnome/shell/ui/modalDialog.js';
 
 import {Registry} from './registry.js';
+import {qrMatrix, qrPng} from './qrmatrix.js';
+import Soup from 'gi://Soup?version=3.0';
+import {habitLog, markDone, noteLine, todoLine} from './notes.js';
+import {planMoves, type SavedWindow} from './layouts.js';
+import {serviceFor, validBase, validEntity} from './homeAssistant.js';
+import {autostartOverride, batteryReport, formatRate, netTotals, parseDesktop, parseNeighbours, parseVpns} from './sysinfo.js';
 
 export const PAGES = ['look', 'island', 'dock', 'windows', 'search', 'profiles', 'about'];
 const NIRO = () => GLib.find_program_in_path('niro-control');
@@ -106,6 +112,56 @@ export function endPresentation(): void {
     try { new Gio.Settings({schema_id: 'org.gnome.desktop.notifications'}).set_boolean('show-banners', hadBanners); } catch (_e) { /* nothing to put back */ }
 }
 
+/** The pointer's spotlight: a soft circle that follows it, for demos. */
+let spotlight: {actor: any; timer: number} | null = null;
+export function endSpotlight(): void {
+    if (!spotlight) return;
+    GLib.source_remove(spotlight.timer);
+    spotlight.actor.destroy();
+    spotlight = null;
+}
+
+const readText = (path: string): string | null => { try { return new TextDecoder().decode(GLib.file_get_contents(path)[1]); } catch (_e) { return null; } };
+const readNumber = (path: string): number => { const t = readText(path); return t === null ? 0 : Number(t) || 0; };
+const sleep = (ms: number) => new Promise<void>(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => { resolve(); return GLib.SOURCE_REMOVE; }));
+
+/** The user's autostart entries: their own folder first, then the system's, one per file name. */
+export function autostartEntries(): {id: string; name: string; off: boolean; path: string}[] {
+    const seen = new Map<string, {id: string; name: string; off: boolean; path: string}>();
+    for (const dir of [`${GLib.get_user_config_dir()}/autostart`, ...GLib.get_system_config_dirs().map(d => `${d}/autostart`)]) {
+        try {
+            const it = Gio.File.new_for_path(dir).enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+            for (let i = it.next_file(null); i; i = it.next_file(null)) {
+                const id = i.get_name();
+                if (!id.endsWith('.desktop') || seen.has(id)) continue;
+                const entry = parseDesktop(readText(`${dir}/${id}`) ?? '');
+                if (entry) seen.set(id, {id, name: entry.name, off: entry.hidden, path: `${dir}/${id}`});
+            }
+            it.close(null);
+        } catch (_e) { /* no such folder */ }
+    }
+    return [...seen.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Documents/Niro, where notes, to-dos and habits are kept as plain files. */
+export function niroFolder(): string {
+    const dir = `${GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOCUMENTS) ?? GLib.get_home_dir()}/Niro`;
+    GLib.mkdir_with_parents(dir, 0o755);
+    return dir;
+}
+/** Adds one line (it ends with a newline) to a file, after what is there. */
+const appendLine = (path: string, line: string) => {
+    const old = readText(path);
+    const base = old ?? '';
+    GLib.file_set_contents(path, `${base}${base === '' || base.endsWith('\n') ? '' : '\n'}${line}`);
+};
+const today = () => GLib.DateTime.new_now_local().format('%Y-%m-%d');
+export const layoutsPath = () => `${GLib.get_user_config_dir()}/niro-search/layouts.json`;
+export function savedLayouts(): Record<string, SavedWindow[]> {
+    try { return JSON.parse(readText(layoutsPath()) ?? '{}'); } catch (_e) { return {}; }
+}
+const normalWindows = () => global.get_window_actors().map((a: any) => a.meta_window).filter((w: any) => w.get_window_type() === Meta.WindowType.NORMAL && !w.is_skip_taskbar());
+
 export function buildRegistry() {
     const r = new Registry();
     const needNiro = () => NIRO() ? null : 'Niro Control is not installed';
@@ -128,6 +184,182 @@ export function buildRegistry() {
             if (!file.query_exists(null)) throw new Error('that file is gone');
             Gio.AppInfo.launch_default_for_uri(file.get_uri(), null);
             return `Opened ${file.get_basename()}`;
+        }});
+    r.register({id: 'qr.make', title: 'Make a QR code', description: 'Draws the text as a QR code and opens it in Niro Snip', category: 'Tools', keywords: ['qr', 'code'],
+        params: [{name: 'text', type: 'string', required: true, maxLength: 1000}], permission: 'none',
+        run: async ({text}) => {
+            const cells = qrMatrix(text);
+            if (!cells) throw new Error('that text is too long for a QR code');
+            const dir = `${GLib.get_user_cache_dir()}/niro-search`;
+            GLib.mkdir_with_parents(dir, 0o700);
+            const path = `${dir}/qr-${Date.now()}.png`;
+            GLib.file_set_contents(path, qrPng(cells));
+            Gio.Subprocess.new(['niro-snip', path], Gio.SubprocessFlags.NONE);
+            return 'QR code opened';
+        }});
+    r.register({id: 'process.kill', title: 'Stop a process', description: 'Asks a process of yours to quit (TERM)', category: 'System', keywords: ['kill', 'quit', 'matikan'],
+        params: [{name: 'pid', type: 'number', required: true, min: 2}, {name: 'name', type: 'string', required: true, maxLength: 80}], permission: 'confirm',
+        confirm: 'Stop this process? Unsaved work in it is lost.', ask: ({pid, name}) => `Stop ${name} (process ${pid})? Unsaved work in it is lost.`,
+        run: async ({pid, name}) => {
+            // the number may be stale: it must still be this name, and the person's own
+            const comm = new TextDecoder().decode(GLib.file_get_contents(`/proc/${pid}/comm`)[1]).trim();
+            if (comm !== name) throw new Error('that process is gone or has changed');
+            await run(['kill', '-TERM', String(pid)]);
+            return `Asked ${name} to quit`;
+        }});
+    r.register({id: 'system.vpn.toggle', title: 'Toggle VPN', description: 'Turns the VPN on (the first one set up) or off', category: 'System', keywords: ['vpn', 'wireguard', 'tunnel'], permission: 'none',
+        run: async () => {
+            const vpns = parseVpns(await run(['nmcli', '-t', '-f', 'NAME,TYPE,DEVICE', 'connection', 'show']));
+            if (!vpns.length) throw new Error('no VPN is set up in NetworkManager');
+            const up = vpns.filter(v => v.active);
+            if (up.length) { for (const v of up) await run(['nmcli', 'connection', 'down', 'id', v.name]); return `VPN off (${up.map(v => v.name).join(', ')})`; }
+            await run(['nmcli', 'connection', 'up', 'id', vpns[0].name]);
+            return `VPN on (${vpns[0].name})`;
+        }});
+    r.register({id: 'system.battery.info', title: 'Battery health', description: 'Health, charge cycles and the time left', category: 'System', keywords: ['battery', 'baterai', 'health', 'cycles'], permission: 'none',
+        run: async () => {
+            const dir = ['BAT0', 'BAT1', 'BAT2'].map(n => `/sys/class/power_supply/${n}`).find(p => readText(`${p}/status`) !== null);
+            if (!dir) throw new Error('this computer has no battery');
+            const e = readText(`${dir}/energy_full`) !== null;
+            const unit = e ? 'energy' : 'charge', rate = e ? 'power_now' : 'current_now';
+            const cycles = readText(`${dir}/cycle_count`);
+            return batteryReport({fullNow: readNumber(`${dir}/${unit}_full`), fullDesign: readNumber(`${dir}/${unit}_full_design`), now: readNumber(`${dir}/${unit}_now`),
+                rate: readNumber(`${dir}/${rate}`), status: (readText(`${dir}/status`) ?? '').trim(), cycles: cycles === null ? null : Number(cycles)});
+        }});
+    r.register({id: 'system.network.speed', title: 'Network speed now', description: 'Download and upload over one second', category: 'System', keywords: ['network', 'speed', 'bandwidth', 'internet', 'jaringan'], permission: 'none',
+        run: async () => {
+            const a = netTotals(readText('/proc/net/dev') ?? '');
+            await sleep(1000);
+            const b = netTotals(readText('/proc/net/dev') ?? '');
+            return `Download ${formatRate(b.rx - a.rx)}, upload ${formatRate(b.tx - a.tx)}`;
+        }});
+    r.register({id: 'system.network.devices', title: 'Devices on the network', description: 'The other devices this computer has talked to lately', category: 'System', keywords: ['network', 'devices', 'lan', 'jaringan', 'perangkat'], permission: 'none',
+        run: async () => {
+            const list = parseNeighbours(await run(['ip', '-4', 'neigh']));
+            if (!list.length) return 'No other devices seen yet';
+            return `${list.length} device${list.length === 1 ? '' : 's'}: ${list.slice(0, 6).map(d => d.ip).join(', ')}${list.length > 6 ? '…' : ''}`;
+        }});
+    r.register({id: 'system.clean.trash', title: 'Empty the trash', description: 'Permanently deletes what is in the trash', category: 'System', keywords: ['trash', 'sampah', 'clean', 'bersihkan'], permission: 'confirm',
+        confirm: 'Empty the trash? Its files are deleted for good.', run: async () => { await run(['gio', 'trash', '--empty']); return 'Trash emptied'; }});
+    r.register({id: 'system.clean.thumbnails', title: 'Clear the thumbnail cache', description: 'Removes cached previews of pictures and files (they are made again when needed)', category: 'System', keywords: ['cache', 'thumbnails', 'clean', 'bersihkan'], permission: 'confirm',
+        confirm: 'Clear the thumbnail cache? Previews are made again when needed.', run: async () => { await run(['rm', '-rf', `${GLib.get_user_cache_dir()}/thumbnails`]); return 'Thumbnail cache cleared'; }});
+    r.register({id: 'autostart.toggle', title: 'Turn an autostart entry on or off', description: 'Whether an application starts when you log in', category: 'System', keywords: ['autostart', 'startup', 'login'],
+        params: [{name: 'id', type: 'string', required: true, maxLength: 200}], permission: 'none',
+        run: async ({id}) => {
+            const entry = autostartEntries().find(e => e.id === id);
+            if (!entry) throw new Error('that entry is gone');
+            const dir = `${GLib.get_user_config_dir()}/autostart`;
+            GLib.mkdir_with_parents(dir, 0o755);
+            GLib.file_set_contents(`${dir}/${id}`, autostartOverride(readText(entry.path) ?? '', !entry.off));
+            return `${entry.name} ${entry.off ? 'starts at login again' : 'will not start at login'}`;
+        }});
+    r.register({id: 'window.above.toggle', title: 'Keep window on top', description: 'Keeps the focused window above the others, or lets it go back', category: 'Windows', keywords: ['above', 'on top', 'pin', 'always'], permission: 'none',
+        run: async () => {
+            const win = global.display.focus_window;
+            if (!win) throw new Error('no window has the focus');
+            if (win.is_above()) { win.unmake_above(); return 'The window is no longer kept on top'; }
+            win.make_above();
+            return 'The window stays on top';
+        }});
+    r.register({id: 'system.spotlight.toggle', title: 'Pointer spotlight', description: 'A soft circle around the pointer, for demos', category: 'System', keywords: ['spotlight', 'pointer', 'cursor', 'highlight', 'demo'], permission: 'none',
+        run: async () => {
+            if (spotlight) { endSpotlight(); return 'Pointer spotlight off'; }
+            const actor = new St.Widget({style: 'background-color: rgba(255, 214, 0, 0.28); border: 2px solid rgba(255, 214, 0, 0.6); border-radius: 40px;', width: 80, height: 80, reactive: false});
+            Main.uiGroup.add_child(actor);
+            const timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => { const [x, y] = global.get_pointer(); actor.set_position(x - 40, y - 40); return GLib.SOURCE_CONTINUE; });
+            spotlight = {actor, timer};
+            return 'Pointer spotlight on';
+        }});
+    r.register({id: 'system.zoom.toggle', title: 'Screen magnifier', description: 'The GNOME screen magnifier, on or off', category: 'System', keywords: ['zoom', 'magnifier', 'magnify', 'perbesar'], permission: 'none',
+        run: async () => {
+            const s = new Gio.Settings({schema_id: 'org.gnome.desktop.a11y.applications'});
+            const on = s.get_boolean('screen-magnifier-enabled');
+            s.set_boolean('screen-magnifier-enabled', !on);
+            return on ? 'Magnifier off' : 'Magnifier on';
+        }});
+    r.register({id: 'snip.open', title: 'Open a snip', description: 'Opens a kept screenshot in Niro Snip', category: 'Tools', keywords: ['snip', 'screenshot'],
+        params: [{name: 'path', type: 'string', required: true, maxLength: 600}], permission: 'none',
+        run: async ({path}) => {
+            const dir = `${GLib.get_user_data_dir()}/niro-snip/history/`;
+            if (!path.startsWith(dir) || path.includes('..')) throw new Error('only kept snips open from here');
+            Gio.Subprocess.new(['niro-snip', path], Gio.SubprocessFlags.NONE);
+            return 'Snip opened';
+        }});
+    r.register({id: 'system.record', title: 'Record the screen', description: 'Opens the desktop screen recorder: pick an area or the whole screen, then start', category: 'System', keywords: ['record', 'screencast', 'video', 'rekam'], permission: 'none',
+        run: async () => { Main.screenshotUI.open(1); return 'Screen recorder opened'; }});
+    r.register({id: 'note.add', title: 'Save a note', description: 'Adds a line to Documents/Niro/notes.md', category: 'Tools', keywords: ['note', 'catat'],
+        params: [{name: 'text', type: 'string', required: true, maxLength: 500}], permission: 'none',
+        run: async ({text}) => { appendLine(`${niroFolder()}/notes.md`, noteLine(GLib.DateTime.new_now_local().format('%Y-%m-%d %H:%M'), text)); return 'Note saved'; }});
+    r.register({id: 'todo.add', title: 'Add a to-do', description: 'Adds an open item to Documents/Niro/todo.md', category: 'Tools', keywords: ['todo', 'tugas'],
+        params: [{name: 'text', type: 'string', required: true, maxLength: 300}], permission: 'none',
+        run: async ({text}) => { appendLine(`${niroFolder()}/todo.md`, todoLine(text)); return 'To-do added'; }});
+    r.register({id: 'todo.done', title: 'Tick off a to-do', description: 'Marks an item of Documents/Niro/todo.md as done', category: 'Tools', keywords: ['todo', 'done'],
+        params: [{name: 'text', type: 'string', required: true, maxLength: 300}], permission: 'none',
+        run: async ({text}) => {
+            const f = `${niroFolder()}/todo.md`;
+            const out = markDone(readText(f) ?? '', text);
+            if (out === null) throw new Error('that item is no longer open');
+            GLib.file_set_contents(f, out);
+            return 'Done';
+        }});
+    r.register({id: 'habit.log', title: 'Log a habit', description: 'Ticks a habit for today in Documents/Niro/habits.tsv', category: 'Tools', keywords: ['habit', 'kebiasaan'],
+        params: [{name: 'name', type: 'string', required: true, maxLength: 30}], permission: 'none',
+        run: async ({name}) => {
+            const f = `${niroFolder()}/habits.tsv`;
+            const line = habitLog(readText(f) ?? '', today(), name);
+            if (line === null) return `${name}: already done today`;
+            appendLine(f, line);
+            return `${name}: done for today`;
+        }});
+    r.register({id: 'ha.call', title: 'Switch something in Home Assistant', description: 'Toggles a light, switch or scene on your Home Assistant', category: 'Home', keywords: ['home assistant', 'light', 'lampu'],
+        params: [{name: 'id', type: 'string', required: true, maxLength: 80}], permission: 'confirm',
+        confirm: 'Switch this on your Home Assistant?', ask: ({id}) => `Switch ${id} on your Home Assistant?`,
+        run: async ({id}) => {
+            if (!validEntity(id)) throw new Error('that is not a switchable thing');
+            const base = validBase(new Gio.Settings({schema_id: 'org.niro.control'}).get_string('ha-url'));
+            const token = readText(`${GLib.get_user_config_dir()}/niro-control/ha-token`)?.trim();
+            if (!base || !token) throw new Error('set the Home Assistant address in Niro Control › Search, and put the token in ~/.config/niro-control/ha-token');
+            const {domain, service} = serviceFor(id);
+            const msg = Soup.Message.new('POST', `${base}/api/services/${domain}/${service}`);
+            msg.get_request_headers().append('Authorization', `Bearer ${token}`);
+            msg.set_request_body_from_bytes('application/json', new GLib.Bytes(new TextEncoder().encode(JSON.stringify({entity_id: id}))));
+            const session = new Soup.Session({timeout: 8});
+            await new Promise<void>((resolve, reject) => session.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (s: any, res: any) => {
+                try { s.send_and_read_finish(res); if (msg.get_status() >= 300) throw new Error(`Home Assistant answered ${msg.get_status()}`); resolve(); } catch (e) { reject(e); } finally { session.abort(); }
+            }));
+            return `${id}: done`;
+        }});
+    r.register({id: 'layout.save', title: 'Save the window layout', description: 'Remembers where the open windows are, under a name', category: 'Windows', keywords: ['layout', 'workspace', 'save'],
+        params: [{name: 'name', type: 'string', required: true, maxLength: 24}], permission: 'none',
+        run: async ({name}) => {
+            const saved: SavedWindow[] = normalWindows().map((w: any) => {
+                const f = w.get_frame_rect();
+                return {cls: w.get_wm_class() ?? '', x: f.x, y: f.y, w: f.width, h: f.height, ws: w.get_workspace()?.index() ?? 0, max: !!(w.is_maximized?.() ?? (w.maximized_horizontally && w.maximized_vertically))};
+            }).filter((w: SavedWindow) => w.cls);
+            if (!saved.length) throw new Error('there are no windows to remember');
+            const all = savedLayouts();
+            all[name] = saved;
+            GLib.mkdir_with_parents(`${GLib.get_user_config_dir()}/niro-search`, 0o700);
+            GLib.file_set_contents(layoutsPath(), JSON.stringify(all));
+            return `Layout "${name}" saved (${saved.length} windows)`;
+        }});
+    r.register({id: 'layout.restore', title: 'Restore a window layout', description: 'Puts the open windows back where a saved layout had them', category: 'Windows', keywords: ['layout', 'restore'],
+        params: [{name: 'name', type: 'string', required: true, maxLength: 24}], permission: 'none',
+        run: async ({name}) => {
+            const saved = savedLayouts()[name];
+            if (!saved) throw new Error(`no layout called "${name}"`);
+            const open = normalWindows();
+            const moves = planMoves(saved, open.map((w: any) => ({cls: w.get_wm_class() ?? ''})));
+            for (const {index, saved: s} of moves) {
+                const w = open[index];
+                try {
+                    if (s.ws < global.workspace_manager.get_n_workspaces()) w.change_workspace_by_index(s.ws, false);
+                    try { w.unmaximize(Meta.MaximizeFlags.BOTH); } catch (_e) { w.unmaximize(); }
+                    if (s.max) w.maximize(Meta.MaximizeFlags.BOTH);
+                    else w.move_resize_frame(false, s.x, s.y, s.w, s.h);
+                } catch (_e) { try { w.move_resize_frame(false, s.x, s.y, s.w, s.h); } catch (_e2) { /* leave it */ } }
+            }
+            return `Layout "${name}": ${moves.length} of ${saved.length} windows placed`;
         }});
     r.register({id: 'window.activate', title: 'Switch to window', description: 'Brings an open window to the front', category: 'Windows', keywords: ['focus', 'switch'],
         params: [{name: 'id', type: 'number', required: true, min: 0}], permission: 'none',

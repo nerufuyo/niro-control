@@ -48,5 +48,20 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 42 | Light by day, dark by night | Niro Control → Look → Schedule: switch it on, set "Dark from" two minutes ahead | At that minute GNOME's style turns dark; a manual switch in between stays until the next time; switched off, nothing changes |
 | 43 | Download indicator | Start a download in the browser; look at the Downloads folder at the dock's end | A red bar pulses under the folder while the file is being written, and is gone when it ends; the tooltip says how many are downloading |
 | 44 | Hide private details | Niro Snip on a screenshot with an e-mail address and a phone number, the eye button | Pixelated boxes over them (undo removes one at a time); "Nothing private found" when there is none |
+| 45 | QR code | Search: `qr https://example.com`, Enter | Niro Snip opens the code; a phone's camera reads it |
+| 46 | Translate and meaning | Search: `tr id good morning`; `define serendipity` | The translation / meanings appear within a second or two; offline, "Lookup failed" |
+| 47 | Weather and clocks | Search: `cuaca bandung`; `world` | Now and three days; five clocks |
+| 48 | Notes, to-dos, habits | Search: `note buy milk`, `todo call the bank`, `todos` (Enter ticks one), `habit water`, `habits` | Files in Documents/Niro (`notes.md`, `todo.md`, `habits.tsv`) change as typed; a streak counts days in a row |
+| 49 | Next events | Add an event in the island's calendar; Search: `next` | The coming events with the time left |
+| 50 | Kill a process | Search: `kill gedit` (with it open), Enter, confirm | It asks first, then the application quits |
+| 51 | Terminal history and contents | Search: `h git`; `fc` plus a word that is inside a document | Matching commands (Enter copies); files whose text has the word |
+| 52 | Layouts | Arrange two windows; Search: `layout save work`; move them; `layout work` | They go back where they were |
+| 53 | Home Assistant | Set the address in Niro Control › Search › Home Assistant, put the token in `~/.config/niro-control/ha-token`; Search: `ha light` | Your lights listed; Enter asks, then toggles one |
+| 54 | System actions | Search: `battery`, `network speed`, `vpn`, `spotlight`, `zoom`, `record`, `on top`, `autostart` | Each does what its name says; the trash and thumbnail cleaners ask first |
+| 55 | Do Not Disturb hours | Niro Control → Look → Schedule: switch on, set "from" two minutes ahead | Banners are hidden from then until the end time, and come back |
+| 56 | Niro Snip: ruler, picker, frame | Tools: ruler (drag), colour picker (click), the frame button, then Copy | The pixel distance is drawn; the colour code is copied; the copy has a gradient and rounded corners |
+| 57 | Trash and folder stacks | Niro Control → Dock: switch on Trash stack and set a folder stack | Icons at the dock's end; Trash lists deleted files, "Empty Trash" needs two clicks |
+| 58 | Recurring reminder | Add a reminder `stretch /daily` (a minute from now) | It shows as `stretch` and is back tomorrow |
+| 59 | Snip history and upload | Niro Control → Search → Screenshots: switch history on, take a snip; Search: `snips` | The kept snips; Enter opens one. With an upload address set, an Upload button copies the answer |
 
 Nothing in this list has been run by the author yet; the report says so.

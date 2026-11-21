@@ -87,6 +87,36 @@
       <summary>Dark from</summary>
       <description>The time the dark style starts, as HH:MM (24 hours).</description>
     </key>
+    <key name="dnd-schedule" type="b">
+      <default>false</default>
+      <summary>Do Not Disturb on a schedule</summary>
+      <description>Hides notification banners from the first time below until the second, every day, and shows them again after. A manual change in between stays until the next change.</description>
+    </key>
+    <key name="dnd-from" type="s">
+      <default>'22:00'</default>
+      <summary>Do Not Disturb from</summary>
+      <description>The time banners are hidden from, as HH:MM (24 hours).</description>
+    </key>
+    <key name="dnd-until" type="s">
+      <default>'07:00'</default>
+      <summary>Do Not Disturb until</summary>
+      <description>The time banners come back, as HH:MM (24 hours).</description>
+    </key>
+    <key name="ha-url" type="s">
+      <default>''</default>
+      <summary>Home Assistant address</summary>
+      <description>The address of your Home Assistant (http://homeassistant.local:8123). Search then lists and toggles its lights and switches with "ha". The access token is read from ~/.config/niro-control/ha-token, never from a setting.</description>
+    </key>
+    <key name="snip-history" type="b">
+      <default>false</default>
+      <summary>Keep a history of snips</summary>
+      <description>Keeps the last 30 screenshots taken with Niro Snip in your data folder (niro-snip/history), so Search can open them again with "snips". Off by default: a screenshot can hold private things.</description>
+    </key>
+    <key name="snip-upload-url" type="s">
+      <default>''</default>
+      <summary>Upload address</summary>
+      <description>An address (https://…) that accepts a PNG sent as a POST; Niro Snip then offers an Upload button and copies the answer (usually a link). Empty means no upload. Nothing is sent anywhere else.</description>
+    </key>
     <key name="performance-mode" type="b">
       <default>false</default>
       <summary>Performance mode</summary>

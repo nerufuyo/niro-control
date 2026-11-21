@@ -143,9 +143,11 @@ for name, k in schema_keys('niro').items():
     grp = 'Tone' if name in ('accent', 'tint') else 'Universal Appearance' if name in UNIVERSAL else 'Glass'
     if name == 'search-shortcut':
         items.append(build('niro', 'Search', name, 'Application Search', k)); continue
-    if name == 'snip-shortcut':
+    if name.startswith('snip-'):
         items.append(build('niro', 'Search', name, 'Screenshots', k)); continue
-    if name.startswith('theme-'): grp = 'Schedule'
+    if name.startswith(('theme-', 'dnd-')): grp = 'Schedule'
+    if name == 'ha-url':
+        items.append(build('niro', 'Search', name, 'Home Assistant', k)); continue
     items.append(build('niro', 'Look', name, grp, k))
 # Island
 for name, k in schema_keys('island').items():
@@ -261,7 +263,7 @@ items += [
 ids = [i['id'] for i in items]
 assert len(ids) == len(set(ids)), 'duplicate ids'
 from collections import Counter; print(dict(Counter(i['menu'] for i in items)), dict(Counter((i['menu'],i['group']) for i in items if i['menu']=='Dock')))
-assert len(items) == 207, f'expected 207 items, got {len(items)}'
+assert len(items) == 215, f'expected 215 items, got {len(items)}'
 for i in items:
     assert '&' not in re.sub(r'&\s', '', i['title'] + i['help']) or '&apos;' not in i['title'], i
 
