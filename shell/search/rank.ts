@@ -22,7 +22,7 @@ export function bestScore(query: string, texts: string[]): number {
 }
 
 /** A bonus for the kind of result: what a person typing most likely wants when the match is equal. */
-export const KIND_BONUS: Record<string, number> = {Calculator: 200, Conversion: 200, Clipboard: 60, Applications: 12, Actions: 10, Profiles: 8, Windows: 6, Settings: 0};
+export const KIND_BONUS: Record<string, number> = {Calculator: 200, Conversion: 200, Clipboard: 60, Files: 40, Applications: 12, Actions: 10, Profiles: 8, Windows: 6, Settings: 0};
 
 export interface Scored {section: string; score: number}
 

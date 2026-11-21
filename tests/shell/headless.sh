@@ -60,7 +60,7 @@ kill $SP; wait $SP 2>/dev/null' > /tmp/niro_headless.out 2>&1
 
 OUT=$(grep -E "^(STATE|ACTIONS|NOHANDLER|AVAIL|COPY|UNKNOWN|EXTRA|AI_|MODAL|MODAL_BASE|DUP|DECLINED|QUERY|HISTORY|KEYS|ONCE|FOCUS_)" /tmp/niro_headless.out)
 has "all eight extensions active" "$OUT" "island=State:ACTIVE dock=State:ACTIVE search=State:ACTIVE blur=State:ACTIVE corners=State:ACTIVE emoji=State:ACTIVE emulator=State:ACTIVE tile=State:ACTIVE"
-has "twenty actions listed" "$OUT" "ACTIONS 20"
+has "twenty-one actions listed" "$OUT" "ACTIONS 21"
 has "no handlers exposed" "$OUT" "NOHANDLER 0"
 has "availability answers" "$OUT" 'available":true'
 has "harmless action runs" "$OUT" 'COPY "ok":true'
