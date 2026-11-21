@@ -39,3 +39,6 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 33 | Dock stacks | Click the Downloads folder at the dock's end; minimize a pinned app's window | The newest 12 files, newest first; one opens in its app; "Open Downloads" opens Files; the minimized thumbnail sits before the stacks, the app icons keep their order |
 
 Nothing in this list has been run by the author yet; the report says so.
+
+34. **Time zones in Search.** `Super+Space`, type `jam di tokyo`, then `10:00 jakarta to london`: the time appears under Conversion, Enter copies it.
+35. **Quicklist.** Right-click Firefox (or any app whose launcher has actions) in the dock: its own actions, such as "New Private Window", sit under "New Window".
