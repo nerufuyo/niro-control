@@ -107,6 +107,11 @@
       <summary>Home Assistant address</summary>
       <description>The address of your Home Assistant (http://homeassistant.local:8123). Search then lists and toggles its lights and switches with "ha". The access token is read from ~/.config/niro-control/ha-token, never from a setting.</description>
     </key>
+    <key name="switcher-shortcut" type="as">
+      <default>[]</default>
+      <summary>Window switcher</summary>
+      <description>A shortcut that opens a switcher with a live picture of every window, most recently used first. Empty means off: Alt+Tab is not changed. Arrows or Tab move, Enter or a click brings the window forward, Esc closes.</description>
+    </key>
     <key name="snip-history" type="b">
       <default>false</default>
       <summary>Keep a history of snips</summary>

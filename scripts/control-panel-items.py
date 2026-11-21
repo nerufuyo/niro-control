@@ -35,7 +35,7 @@ ADVANCED = {'app-rules', 'legacy-global-fade', 'custom-css', 'dock-background-co
             'voice-claude-model', 'voice-codex-model', 'voice-grok-model', 'voice-opencode-model', 'voice-agy-model',
             'voice-speech-model', 'voice-language', 'bot-glow', 'border-width', 'skip-libhandy-app', 'whitelist', 'blacklist',
             'notch-depth', 'hover-delay', 'auto-hide-delay'}
-SHORTCUT_KEYS = re.compile(r'^(shortcut-|voice-shortcut|toggle-dock|focus-app-|search-shortcut|snip-shortcut|emoji-keybind)')
+SHORTCUT_KEYS = re.compile(r'^(shortcut-|voice-shortcut|toggle-dock|focus-app-|search-shortcut|snip-shortcut|switcher-shortcut|emoji-keybind)')
 # Look owns these: the island, the dock and the windows copy them from org.niro.control (niroSync.ts).
 MANAGED = {('island', 'glass-tint'): 'niro.opacity', ('dock', 'dock-opacity'): 'niro.opacity',
            ('dock', 'dock-blur-enabled'): 'niro.blur', ('dock', 'dock-background-color'): 'niro.tint',
@@ -146,6 +146,8 @@ for name, k in schema_keys('niro').items():
     if name.startswith('snip-'):
         items.append(build('niro', 'Search', name, 'Screenshots', k)); continue
     if name.startswith(('theme-', 'dnd-')): grp = 'Schedule'
+    if name == 'switcher-shortcut':
+        items.append(build('niro', 'Search', name, 'Window Switcher', k)); continue
     if name == 'ha-url':
         items.append(build('niro', 'Search', name, 'Home Assistant', k)); continue
     items.append(build('niro', 'Look', name, grp, k))
@@ -263,7 +265,7 @@ items += [
 ids = [i['id'] for i in items]
 assert len(ids) == len(set(ids)), 'duplicate ids'
 from collections import Counter; print(dict(Counter(i['menu'] for i in items)), dict(Counter((i['menu'],i['group']) for i in items if i['menu']=='Dock')))
-assert len(items) == 215, f'expected 215 items, got {len(items)}'
+assert len(items) == 216, f'expected 216 items, got {len(items)}'
 for i in items:
     assert '&' not in re.sub(r'&\s', '', i['title'] + i['help']) or '&apos;' not in i['title'], i
 

@@ -63,5 +63,6 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 57 | Trash and folder stacks | Niro Control → Dock: switch on Trash stack and set a folder stack | Icons at the dock's end; Trash lists deleted files, "Empty Trash" needs two clicks |
 | 58 | Recurring reminder | Add a reminder `stretch /daily` (a minute from now) | It shows as `stretch` and is back tomorrow |
 | 59 | Snip history and upload | Niro Control → Search → Screenshots: switch history on, take a snip; Search: `snips` | The kept snips; Enter opens one. With an upload address set, an Upload button copies the answer |
+| 60 | Window switcher | Niro Control → Search → Window Switcher: record a shortcut; open two windows; press it | Cards with a live picture of each window, the previous one selected; arrows or Tab move, Enter or a click brings it forward, Esc closes; Alt+Tab is unchanged |
 
 Nothing in this list has been run by the author yet; the report says so.

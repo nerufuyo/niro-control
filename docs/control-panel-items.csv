@@ -17,6 +17,7 @@ Look,Schedule,Do Not Disturb on a schedule,switch,,false,"Hides notification ban
 Look,Schedule,Do Not Disturb from,text,,22:00,"The time banners are hidden from, as HH:MM (24 hours).",dnd-from,niro.dnd-from
 Look,Schedule,Do Not Disturb until,text,,07:00,"The time banners come back, as HH:MM (24 hours).",dnd-until,niro.dnd-until
 Search,Home Assistant,Home Assistant address,text,,,The address of your Home Assistant (http://homeassistant.local:8123).,ha-url,niro.ha-url
+Search,Window Switcher,Window switcher,shortcut,,[],"A shortcut that opens a switcher with a live picture of every window, most recently used first.",switcher-shortcut,niro.switcher-shortcut
 Search,Screenshots,Keep a history of snips,switch,,false,"Keeps the last 30 screenshots taken with Niro Snip in your data folder (niro-snip/history), so Search can open them again with ""snips"".",snip-history,niro.snip-history
 Search,Screenshots,Upload address,text,,,An address (https://…) that accepts a PNG sent as a POST; Niro Snip then offers an Upload button and copies the answer (usually a link).,snip-upload-url,niro.snip-upload-url
 Look,Universal Appearance,Performance mode,switch,,false,Fewer effects for battery and weaker hardware: the blur is left out and surfaces are more solid.,performance-mode,niro.performance-mode
