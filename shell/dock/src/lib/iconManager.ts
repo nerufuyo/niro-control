@@ -9,7 +9,7 @@ import * as DND from "resource:///org/gnome/shell/ui/dnd.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import { box } from "./compat.js";
-import { partialDownloads, stackTitle } from "./downloadRules.js";
+import { appTitle, partialDownloads, stackTitle } from "./downloadRules.js";
 import { ThemeResolver } from "./iconTheme.js";
 import { SignalManager } from "./signalManager.js";
 import type { WindowPreviewPopup } from "./windowPreview.js";
@@ -48,20 +48,19 @@ export type Rect = { x: number; y: number; width: number; height: number };
 type ContextMenu = InstanceType<typeof PopupMenu.PopupMenu>;
 
 /** A folder shown as a stack: an XDG folder by its name. */
-export type StackFolder = "downloads" | "documents";
-const STACKS: Record<StackFolder, { dir: GLib.UserDirectory; icon: string; name: string }> = {
-  downloads: {
-    dir: GLib.UserDirectory.DIRECTORY_DOWNLOAD,
-    icon: "folder-download",
-    name: "Downloads",
-  },
-  documents: {
-    dir: GLib.UserDirectory.DIRECTORY_DOCUMENTS,
-    icon: "folder-documents",
-    name: "Documents",
-  },
+export type StackFolder = "downloads" | "documents" | "trash" | "custom";
+
+/** What a stack shows: where it looks, the icon and the name. The Trash is the desktop's own `trash:///`. */
+interface StackSpec {
+  icon: string;
+  name: string;
+  file: Gio.File | null;
+}
+
+const userFolder = (dir: GLib.UserDirectory): Gio.File | null => {
+  const path = GLib.get_user_special_dir(dir);
+  return path ? Gio.File.new_for_path(path) : null;
 };
-/** How many of a stack's newest files its menu lists. */
 const STACK_FILES = 12;
 type MenuManager = InstanceType<typeof PopupMenu.PopupMenuManager>;
 
@@ -148,6 +147,8 @@ export class IconManager {
   private _badgesEnabled: boolean = true;
   /** Folder stacks at the dock's very end (after the minimized windows): which, and their actors. */
   private _stackFolders: StackFolder[] = [];
+  private _customStackPath = "";
+  private _trashArmed = false;
   private _stackActors: IconActor[] = [];
   private _downloadMonitor: Gio.FileMonitor | null = null;
   private _downloadBar: InstanceType<typeof St.Widget> | null = null;
@@ -860,7 +861,7 @@ export class IconManager {
         return Clutter.EVENT_PROPAGATE;
       }
       if (actor.hover) {
-        this._showTooltip(actor, app.get_name());
+        this._showTooltip(actor, appTitle(app.get_name(), this._residentBytes(app)));
         // Show window preview popup
         if (this._windowPreviewsEnabled && this._previewPopup) {
           this._previewPopup.cancelScheduledHide();
@@ -1884,6 +1885,43 @@ export class IconManager {
     return this._minChildCount() + this._stackChildCount();
   }
 
+  /** The folder of the "custom" stack (an absolute path; empty or missing means no such stack). */
+  setCustomStackPath(path: string): void {
+    const clean = path.startsWith("/") ? path : "";
+    if (clean === this._customStackPath) return;
+    this._customStackPath = clean;
+    if (this._stackFolders.includes("custom")) {
+      this._syncStacks();
+      if (this._onIconsChanged) this._onIconsChanged();
+    }
+  }
+
+  private _stackSpec(folder: StackFolder): StackSpec {
+    switch (folder) {
+      case "downloads":
+        return {
+          icon: "folder-download",
+          name: "Downloads",
+          file: userFolder(GLib.UserDirectory.DIRECTORY_DOWNLOAD),
+        };
+      case "documents":
+        return {
+          icon: "folder-documents",
+          name: "Documents",
+          file: userFolder(GLib.UserDirectory.DIRECTORY_DOCUMENTS),
+        };
+      case "trash":
+        return { icon: "user-trash", name: "Trash", file: Gio.File.new_for_uri("trash:///") };
+      default: {
+        const file = this._customStackPath ? Gio.File.new_for_path(this._customStackPath) : null;
+        const ok =
+          file?.query_exists(null) &&
+          file.query_file_type(Gio.FileQueryInfoFlags.NONE, null) === Gio.FileType.DIRECTORY;
+        return { icon: "folder", name: file?.get_basename() ?? "Folder", file: ok ? file : null };
+      }
+    }
+  }
+
   /** Which folders are stacks; the dock is rebuilt with them. */
   setStackFolders(folders: StackFolder[]): void {
     if (folders.join() === this._stackFolders.join()) return;
@@ -1901,7 +1939,7 @@ export class IconManager {
   /** The stacks, put at the very end (after the minimized windows). */
   private _syncStacks(): void {
     this._clearStacks();
-    const folders = this._stackFolders.filter((f) => GLib.get_user_special_dir(STACKS[f].dir));
+    const folders = this._stackFolders.filter((f) => this._stackSpec(f).file !== null);
     if (folders.length === 0) return;
     this._stackSeparator = new St.Widget({
       style_class: "dock-separator",
@@ -1912,7 +1950,7 @@ export class IconManager {
     });
     this._container.add_child(this._stackSeparator);
     for (const folder of folders) {
-      const { icon, name } = STACKS[folder];
+      const { icon, name } = this._stackSpec(folder);
       const actor = new St.BoxLayout({
         style_class: "dock-icon dock-stack",
         reactive: true,
@@ -1998,21 +2036,39 @@ export class IconManager {
     });
   }
 
+  /** Resident memory of a running app's processes, read from /proc when the pointer is over its icon (0 when it is not running or unreadable). */
+  private _residentBytes(app: Shell.App): number {
+    if (app.get_state() !== Shell.AppState.RUNNING) return 0;
+    let pages = 0;
+    for (const pid of app.get_pids()) {
+      try {
+        const text = new TextDecoder().decode(GLib.file_get_contents(`/proc/${pid}/statm`)[1]);
+        pages += Number(text.split(" ")[1]) || 0;
+      } catch (_e) {
+        // the process is gone
+      }
+    }
+    return pages * 4096;
+  }
+
   private _countPartial(path: string): number {
-    const names: string[] = [];
+    const entries: { name: string; modified: number }[] = [];
     try {
       const it = Gio.File.new_for_path(path).enumerate_children(
-        "standard::name",
+        "standard::name,time::modified",
         Gio.FileQueryInfoFlags.NONE,
         null,
       );
-      for (let info = it.next_file(null); info && names.length < 5000; info = it.next_file(null))
-        names.push(info.get_name());
+      for (let info = it.next_file(null); info && entries.length < 5000; info = it.next_file(null))
+        entries.push({
+          name: info.get_name(),
+          modified: info.get_attribute_uint64("time::modified"),
+        });
       it.close(null);
     } catch (_e) {
       return 0;
     }
-    return partialDownloads(names);
+    return partialDownloads(entries, Math.floor(Date.now() / 1000));
   }
 
   private _showDownloadBar(): void {
@@ -2055,10 +2111,9 @@ export class IconManager {
   }
 
   /** The folder's newest files, newest first (hidden ones left out). */
-  private _stackFiles(dir: string): { file: Gio.File; name: string; icon: Gio.Icon | null }[] {
+  private _stackFiles(folder: Gio.File): { file: Gio.File; name: string; icon: Gio.Icon | null }[] {
     const out: { file: Gio.File; name: string; icon: Gio.Icon | null; at: number }[] = [];
     try {
-      const folder = Gio.File.new_for_path(dir);
       const it = folder.enumerate_children(
         "standard::name,standard::display-name,standard::icon,standard::is-hidden,time::modified",
         Gio.FileQueryInfoFlags.NONE,
@@ -2086,9 +2141,9 @@ export class IconManager {
     this._closeStackMenu();
     this._hideTooltip();
     if (!this._menuManager) return;
-    const { dir, name } = STACKS[folder];
-    const path = GLib.get_user_special_dir(dir);
-    if (!path) return;
+    const { name, file: root } = this._stackSpec(folder);
+    if (!root) return;
+    this._trashArmed = false;
     const menu = new PopupMenu.PopupMenu(actor, 0.5, St.Side.TOP);
     menu.box.add_style_class_name("dock-popup-menu");
     Main.uiGroup.add_child(menu.actor);
@@ -2100,7 +2155,7 @@ export class IconManager {
         Main.notify(name, `Could not open ${file.get_basename()}: ${(e as Error).message}`);
       }
     };
-    const files = this._stackFiles(path);
+    const files = this._stackFiles(root);
     if (files.length === 0) {
       const empty = new PopupMenu.PopupMenuItem(`${name} is empty`, { reactive: false });
       menu.addMenuItem(empty);
@@ -2114,8 +2169,27 @@ export class IconManager {
     }
     menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
     const folderItem = new PopupMenu.PopupImageMenuItem(`Open ${name}`, "folder-open-symbolic");
-    folderItem.connect("activate", () => open(Gio.File.new_for_path(path)));
+    folderItem.connect("activate", () => open(root));
     menu.addMenuItem(folderItem);
+    if (folder === "trash" && files.length > 0) {
+      // Two clicks, so that emptying it for good is never an accident: the first one changes the line, the second one empties.
+      const empty = new PopupMenu.PopupImageMenuItem("Empty Trash", "edit-delete-symbolic");
+      empty.connect("activate", () => {
+        if (!this._trashArmed) {
+          this._trashArmed = true;
+          empty.label.text = "Click again to empty it for good";
+          return;
+        }
+        this._trashArmed = false;
+        try {
+          Gio.Subprocess.new(["gio", "trash", "--empty"], Gio.SubprocessFlags.NONE);
+        } catch (e) {
+          Main.notify(name, `Could not empty the Trash: ${(e as Error).message}`);
+        }
+        this._closeStackMenu();
+      });
+      menu.addMenuItem(empty);
+    }
     menu.connect("open-state-changed", (_m: unknown, isOpen: boolean) => {
       if (!isOpen && this._stackMenu === menu) {
         this._onContextMenuActorChanged?.(null);

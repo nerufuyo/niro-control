@@ -7,6 +7,8 @@
 
 import GLib from 'gi://GLib';
 
+import {nextDue, recurrence} from './reminderRules.js';
+
 /** Waits are cut into naps this long: GLib's clock stops during suspend, the wall clock does not. */
 const MAX_NAP_MS = 30 * 1000;
 
@@ -41,7 +43,13 @@ export class ReminderWatcher {
                 continue;
             this._shown.add(item.id);
             // island-daemon keeps it until it was really shown (the island may be hidden by a fullscreen window).
-            this._onDue(item, () => this._daemon.call('reminders', 'Dismiss', item.id));
+            // One marked /daily or /weekly is put back for its next time once it was shown, and is shown without the marker.
+            const again = recurrence(item.text);
+            this._onDue(again ? {...item, text: again.text} : item, () => {
+                this._daemon.call('reminders', 'Dismiss', item.id);
+                if (again)
+                    this._daemon.call('reminders', 'Add', Math.max(1000, nextDue(item.due_ms, Date.now(), again.period) - Date.now()), again.marked);
+            });
         }
         const next = items.find(item => item.due_ms > now);
         if (!next)

@@ -326,7 +326,7 @@ export function lookPage(model: Model) {
     const universal = model.section('Universal Appearance', items.filter(i => i.group === 'Universal Appearance'),
         'Glass for the background, solid for what you read. Presets set the values below; per-application rules and the GTK theme integration are under Compatibility');
     const schedule = model.section('Schedule', items.filter(i => i.group === 'Schedule'),
-        'Light by day, dark by night: GNOME switches its own style at the two times. Turned off, nothing changes.');
+        'Light by day, dark by night, and Do Not Disturb at set hours. Turned off, nothing changes.');
     return page(previewBlock(model, lookPreview(model.read)), tone && box, toneGroup, glass, universal, schedule);
 }
 
@@ -393,6 +393,7 @@ export function searchPage(model: Model) {
     const items = CATALOG.filter(i => i.menu === 'Search');
     return page(model.section('Application Search', items.filter(i => i.group === 'Application Search'), 'Finds the applications you have installed as you type. Its tone and opacity follow Look.'),
         model.section('Screenshots', items.filter(i => i.group === 'Screenshots'), 'Niro Snip: a screenshot opened in an editor, with its own shortcut. PrtSc stays as it is.'),
+        model.section('Home Assistant', items.filter(i => i.group === 'Home Assistant'), 'Search lists and toggles your lights and switches with "ha". The access token is read from ~/.config/niro-control/ha-token.'),
         model.section('Emoji Picker', items.filter(i => i.group === 'Emoji Picker'), 'Emoji, Kaomoji and text symbols, searched by name in English or Indonesian.'));
 }
 

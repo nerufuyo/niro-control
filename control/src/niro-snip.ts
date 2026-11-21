@@ -8,6 +8,7 @@ import GdkPixbuf from 'gi://GdkPixbuf';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
+import Soup from 'gi://Soup?version=3.0';
 import cairo from 'cairo';
 import System from 'system';
 
@@ -23,9 +24,59 @@ const TOOLS = [
     ['step', 'emblem-ok-symbolic', 'Numbered step'],
     ['pixelate', 'view-grid-symbolic', 'Hide (pixelate)'],
     ['crop', 'edit-cut-symbolic', 'Crop'],
+    ['ruler', 'object-straighten-symbolic', 'Ruler: the distance in pixels'],
+    ['picker', 'color-select-symbolic', 'Pick a colour: copies its code'],
 ];
 const COLORS = ['#e8472b', '#f5c518', '#2ecc71', '#2d8cff', '#111111', '#ffffff'];
 const BLOCK = 14;
+const HISTORY_KEEP = 30;
+
+/** The settings Niro Control keeps for Niro Snip (history, upload address); null when the package's schema is not installed. */
+function snipSettings() {
+    try {
+        const source = Gio.SettingsSchemaSource.get_default();
+        const schema = source?.lookup('org.niro.control', true);
+        return schema?.has_key('snip-history') ? new Gio.Settings({schema_id: 'org.niro.control'}) : null;
+    } catch (_e) { return null; }
+}
+
+/** Keeps a copy of a fresh capture, when the person asked for a history (Search › Screenshots), and forgets the oldest past 30. */
+function keepInHistory(path) {
+    const settings = snipSettings();
+    if (!settings?.get_boolean('snip-history')) return;
+    try {
+        const dir = `${GLib.get_user_data_dir()}/niro-snip/history`;
+        GLib.mkdir_with_parents(dir, 0o700);
+        Gio.File.new_for_path(path).copy(Gio.File.new_for_path(`${dir}/snip-${Date.now()}.png`), Gio.FileCopyFlags.OVERWRITE, null, null);
+        const names = [];
+        const it = Gio.File.new_for_path(dir).enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
+        for (let i = it.next_file(null); i; i = it.next_file(null)) if (i.get_name().endsWith('.png')) names.push(i.get_name());
+        it.close(null);
+        names.sort().slice(0, Math.max(0, names.length - HISTORY_KEEP)).forEach(n => GLib.unlink(`${dir}/${n}`));
+    } catch (e) { printerr(`niro-snip: history: ${e.message}`); }
+}
+
+/** The picture on a soft gradient with a rounded corner and a shadow, as a slide or a post would show it. */
+function framed(surface) {
+    const pad = Math.round(Math.max(surface.getWidth(), surface.getHeight()) * 0.07) + 24;
+    const w = surface.getWidth() + pad * 2, h = surface.getHeight() + pad * 2;
+    const out = new cairo.ImageSurface(cairo.Format.ARGB32, w, h);
+    const cr = new cairo.Context(out);
+    const g = new cairo.LinearGradient(0, 0, w, h);
+    g.addColorStopRGB(0, 0.36, 0.49, 0.98); g.addColorStopRGB(1, 0.69, 0.36, 0.94);
+    cr.setSource(g); cr.paint();
+    const radius = 14, x = pad, y = pad, iw = surface.getWidth(), ih = surface.getHeight();
+    const roundRect = (rx, ry, rw, rh, r) => {
+        cr.newSubPath();
+        cr.arc(rx + rw - r, ry + r, r, -Math.PI / 2, 0); cr.arc(rx + rw - r, ry + rh - r, r, 0, Math.PI / 2);
+        cr.arc(rx + r, ry + rh - r, r, Math.PI / 2, Math.PI); cr.arc(rx + r, ry + r, r, Math.PI, Math.PI * 1.5); cr.closePath();
+    };
+    for (let i = 10; i >= 1; i--) { cr.setSourceRGBA(0, 0, 0, 0.035); roundRect(x - i + 2, y - i + 12, iw + i * 2, ih + i * 2, radius + i); cr.fill(); }
+    cr.save(); roundRect(x, y, iw, ih, radius); cr.clip();
+    cr.setSourceSurface(surface, x, y); cr.paint(); cr.restore();
+    cr.$dispose();
+    return out;
+}
 
 /** The screenshot, taken through the desktop portal: the shell's own picker, nothing of ours on the screen. */
 function capture(interactive = true) {
@@ -74,6 +125,23 @@ function paintMark(cr, m, pixbuf) {
         cr.moveTo(x1, y1); cr.lineTo(x2, y2); cr.stroke();
         cr.moveTo(x2, y2); cr.lineTo(x2 - head * Math.cos(angle - 0.45), y2 - head * Math.sin(angle - 0.45));
         cr.lineTo(x2 - head * Math.cos(angle + 0.45), y2 - head * Math.sin(angle + 0.45)); cr.closePath(); cr.fill();
+        break;
+    }
+    case 'ruler': {
+        const [x1, y1, x2, y2] = m.box;
+        const px = Math.round(Math.hypot(x2 - x1, y2 - y1));
+        cr.setSourceRGBA(c.red, c.green, c.blue, 1);
+        cr.setLineWidth(2);
+        cr.moveTo(x1, y1); cr.lineTo(x2, y2); cr.stroke();
+        const angle = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
+        for (const [ex, ey] of [[x1, y1], [x2, y2]]) { cr.moveTo(ex - 6 * Math.cos(angle), ey - 6 * Math.sin(angle)); cr.lineTo(ex + 6 * Math.cos(angle), ey + 6 * Math.sin(angle)); cr.stroke(); }
+        cr.selectFontFace('Sans', cairo.FontSlant.NORMAL, cairo.FontWeight.BOLD);
+        cr.setFontSize(13);
+        const label = `${px} px`, ext = cr.textExtents(label), mx = (x1 + x2) / 2, my = (y1 + y2) / 2 - 10;
+        cr.setSourceRGBA(0, 0, 0, 0.75);
+        cr.rectangle(mx - ext.width / 2 - 5, my - ext.height - 4, ext.width + 10, ext.height + 8); cr.fill();
+        cr.setSourceRGBA(1, 1, 1, 1);
+        cr.moveTo(mx - ext.width / 2 - ext.xBearing, my - ext.yBearing - ext.height); cr.showText(label);
         break;
     }
     case 'rect': {
@@ -135,6 +203,7 @@ class Editor {
         this.color = COLORS[0];
         this.size = 4;
         this.drawing = null;
+        this.frame = false;
         this.scale = 1; this.offX = 0; this.offY = 0;
 
         this.win = new Gtk.ApplicationWindow({application: app, title: 'Niro Snip', default_width: 980, default_height: 680});
@@ -182,7 +251,13 @@ class Editor {
         textBtn.connect('clicked', () => this.copyText());
         const hideBtn = new Gtk.Button({icon_name: 'view-conceal-symbolic', tooltip_text: 'Hide private details: e-mail addresses, phone and card numbers, keys (pixelated; undo removes them one by one)'});
         hideBtn.connect('clicked', () => this.hidePrivate());
+        const frameBtn = new Gtk.ToggleButton({icon_name: 'image-x-generic-symbolic', tooltip_text: 'Frame: a gradient, rounded corners and a shadow around the picture (for the copy and the saved file)'});
+        frameBtn.connect('toggled', () => { this.frame = frameBtn.get_active(); });
+        const upBtn = new Gtk.Button({icon_name: 'send-to-symbolic', tooltip_text: 'Upload to the address set in Search › Screenshots', visible: /^https?:\/\//.test(snipSettings()?.get_string('snip-upload-url') ?? '')});
+        upBtn.connect('clicked', () => this.upload());
         header.pack_end(saveBtn);
+        header.pack_end(upBtn);
+        header.pack_end(frameBtn);
         header.pack_end(hideBtn);
         header.pack_end(textBtn);
         header.pack_end(closeBtn); header.pack_end(asBtn); header.pack_end(copyBtn); header.pack_end(undoBtn);
@@ -259,6 +334,7 @@ class Editor {
         const [px, py] = this.point(x, y);
         this.redo = [];
         if (this.tool === 'text') { this.askText(x, y, px, py); return; }
+        if (this.tool === 'picker') { this.pickColour(px, py); return; }
         if (this.tool === 'step') {
             const n = this.marks.filter(k => k.tool === 'step').length + 1;
             this.marks.push({tool: 'step', color: this.color, size: this.size, points: [[px, py]], n});
@@ -314,13 +390,13 @@ class Editor {
         this.paintAll(cr);
         cr.$dispose();
         const [x, y, w, h] = this.cropBox();
-        if (w === surface.getWidth() && h === surface.getHeight()) return surface;
+        if (w === surface.getWidth() && h === surface.getHeight()) return this.frame ? framed(surface) : surface;
         const cropped = new cairo.ImageSurface(cairo.Format.ARGB32, w, h);
         const cc = new cairo.Context(cropped);
         cc.setSourceSurface(surface, -x, -y);
         cc.paint();
         cc.$dispose();
-        return cropped;
+        return this.frame ? framed(cropped) : cropped;
     }
 
     say(text) {
@@ -350,6 +426,37 @@ class Editor {
                 this.write(file.get_path());
                 this.say(`Saved ${file.get_basename()}`);
             } catch (e) { if (!e.matches?.(Gtk.DialogError, Gtk.DialogError.DISMISSED)) this.say(`Could not save: ${e.message}`); }
+        });
+    }
+
+    /** Copies the colour under the pointer as #RRGGBB. */
+    pickColour(px, py) {
+        const x = Math.floor(px), y = Math.floor(py);
+        if (x < 0 || y < 0 || x >= this.pixbuf.get_width() || y >= this.pixbuf.get_height()) return;
+        const n = this.pixbuf.get_n_channels(), stride = this.pixbuf.get_rowstride(), px8 = this.pixbuf.get_pixels(), i = y * stride + x * n;
+        const hex = `#${[px8[i], px8[i + 1], px8[i + 2]].map(v => v.toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+        this.win.get_clipboard().set(hex);
+        this.say(`Copied ${hex}`);
+    }
+
+    /** POSTs the picture to the address set in Search › Screenshots (the person's own server) and copies what the server answers (usually a link). */
+    upload() {
+        const url = snipSettings()?.get_string('snip-upload-url') ?? '';
+        if (!/^https?:\/\//.test(url)) { this.say('Set the upload address first (Niro Control › Search › Screenshots)'); return; }
+        const tmp = GLib.build_filenamev([GLib.get_tmp_dir(), `niro-snip-up-${GLib.get_monotonic_time()}.png`]);
+        try { this.write(tmp); } catch (e) { this.say(`Could not upload: ${e.message}`); return; }
+        const bytes = GLib.file_get_contents(tmp)[1];
+        GLib.unlink(tmp);
+        const msg = Soup.Message.new('POST', url);
+        msg.set_request_body_from_bytes('image/png', new GLib.Bytes(bytes));
+        this.say('Uploading…');
+        new Soup.Session({timeout: 20}).send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (session, res) => {
+            try {
+                const reply = new TextDecoder().decode(session.send_and_read_finish(res).get_data()).trim().slice(0, 500);
+                if (msg.get_status() >= 300) throw new Error(`HTTP ${msg.get_status()}`);
+                this.win.get_clipboard().set(reply);
+                this.say(reply ? `Uploaded: ${reply.slice(0, 80)} (copied)` : 'Uploaded');
+            } catch (e) { this.say(`Could not upload: ${e.message}`); }
         });
     }
 
@@ -442,6 +549,7 @@ app.connect('activate', () => {
     const full = ARGV.includes('--full');
     // With a delay the screen is taken after it, so a menu can be opened first; the picker comes after, as before.
     const start = () => capture(!full);
-    (delay ? new Promise(resolve => GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, delay, () => { resolve(); return GLib.SOURCE_REMOVE; })).then(start) : start()).then(open).catch(e => { app.release(); if (e.message !== 'cancelled') printerr(`niro-snip: ${e.message}`); });
+    const kept = path => { keepInHistory(path); return path; };
+    (delay ? new Promise(resolve => GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, delay, () => { resolve(); return GLib.SOURCE_REMOVE; })).then(start) : start()).then(kept).then(open).catch(e => { app.release(); if (e.message !== 'cancelled') printerr(`niro-snip: ${e.message}`); });
 });
 System.exit(app.run([]));

@@ -182,11 +182,16 @@ export class DockManager {
       const folders: StackFolder[] = [];
       if (settings.get_boolean("stack-downloads")) folders.push("downloads");
       if (settings.get_boolean("stack-documents")) folders.push("documents");
+      if (settings.get_boolean("stack-trash")) folders.push("trash");
+      if (settings.get_string("stack-custom").startsWith("/")) folders.push("custom");
+      iconManager.setCustomStackPath(settings.get_string("stack-custom"));
       iconManager.setStackFolders(folders);
     };
     stacks();
     this._signals.connect(settings, "changed::stack-downloads", stacks);
     this._signals.connect(settings, "changed::stack-documents", stacks);
+    this._signals.connect(settings, "changed::stack-trash", stacks);
+    this._signals.connect(settings, "changed::stack-custom", stacks);
     iconManager.setShowRunningApps(settings.get_boolean("show-running-apps"));
     iconManager.setAppButtonPosition(settings.get_int("show-applications-button-position"));
     iconManager.setWorkspaceMode(settings.get_int("dock-workspace-mode"));
