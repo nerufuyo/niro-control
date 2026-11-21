@@ -393,6 +393,7 @@ export function searchPage(model: Model) {
     const items = CATALOG.filter(i => i.menu === 'Search');
     return page(model.section('Application Search', items.filter(i => i.group === 'Application Search'), 'Finds the applications you have installed as you type. Its tone and opacity follow Look.'),
         model.section('Screenshots', items.filter(i => i.group === 'Screenshots'), 'Niro Snip: a screenshot opened in an editor, with its own shortcut. PrtSc stays as it is.'),
+        model.section('Window Switcher', items.filter(i => i.group === 'Window Switcher'), 'A switcher with a live picture of each window, on a shortcut of your own. Off until you set one; Alt+Tab stays as it is.'),
         model.section('Home Assistant', items.filter(i => i.group === 'Home Assistant'), 'Search lists and toggles your lights and switches with "ha". The access token is read from ~/.config/niro-control/ha-token.'),
         model.section('Emoji Picker', items.filter(i => i.group === 'Emoji Picker'), 'Emoji, Kaomoji and text symbols, searched by name in English or Indonesian.'));
 }

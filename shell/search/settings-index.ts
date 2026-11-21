@@ -183,6 +183,16 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "niro.switcher-shortcut",
+  "menu": "Search",
+  "group": "Window Switcher",
+  "title": "Window switcher",
+  "help": "A shortcut that opens a switcher with a live picture of every window, most recently used first.",
+  "key": "switcher-shortcut",
+  "kind": "shortcut",
+  "managed": false
+ },
+ {
   "id": "niro.snip-history",
   "menu": "Search",
   "group": "Screenshots",

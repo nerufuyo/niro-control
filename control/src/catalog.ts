@@ -311,6 +311,20 @@ export const CATALOG: Item[] = [
   "kind": "text"
  },
  {
+  "id": "niro.switcher-shortcut",
+  "menu": "Search",
+  "group": "Window Switcher",
+  "title": "Window switcher",
+  "help": "A shortcut that opens a switcher with a live picture of every window, most recently used first.",
+  "detail": "A shortcut that opens a switcher with a live picture of every window, most recently used first. Empty means off: Alt+Tab is not changed. Arrows or Tab move, Enter or a click brings the window forward, Esc closes.",
+  "source": "niro",
+  "key": "switcher-shortcut",
+  "type": "as",
+  "default": "[]",
+  "unit": "",
+  "kind": "shortcut"
+ },
+ {
   "id": "niro.snip-history",
   "menu": "Search",
   "group": "Screenshots",

@@ -13,6 +13,7 @@ import {qrMatrix, qrPng} from '../../shell/search/build/qrmatrix.js';
 import {habitLog, habitQuery, habitStats, markDone, noteLine, noteText, openTodos, recentNotes, todoLine, todoQuery} from '../../shell/search/build/notes.js';
 import {describe as weatherLines, forecastUrl, geocodeUrl, parsePlace, weatherQuery, worldQuery} from '../../shell/search/build/weather.js';
 import {entities, haQuery, serviceFor, validBase, validEntity} from '../../shell/search/build/homeAssistant.js';
+import {columnsFor, move} from '../../shell/search/build/switcherRules.js';
 import {agendaQuery, parseEvents, upcoming} from '../../shell/search/build/agenda.js';
 import {layoutQuery, planMoves} from '../../shell/search/build/layouts.js';
 import {autostartOverride, batteryReport, formatRate, netTotals, parseDesktop, parseNeighbours, parseVpns} from '../../shell/search/build/sysinfo.js';
@@ -352,4 +353,20 @@ test('agenda: the coming events with the time left', () => {
     const c = upcoming(events, '2026-11-21', 8 * 60 + 45);
     assert.deepEqual(c.map(e => [e.title, e.text]), [['Holiday', 'today, all day'], ['Standup', 'in 45 min, at 09:30'], ['Dentist', 'in 29 h 15 min, at 14:00']]);
     assert.deepEqual(parseEvents('nonsense'), []);
+});
+
+test('window switcher: the grid and moving about it', () => {
+    assert.deepEqual([1, 3, 4, 5, 8, 9, 20].map(columnsFor), [1, 3, 4, 4, 4, 5, 5]);
+    assert.equal(move(0, 5, 4, 'right'), 1);
+    assert.equal(move(4, 5, 4, 'right'), 0);              // past the last: round to the first
+    assert.equal(move(0, 5, 4, 'left'), 4);
+    assert.equal(move(2, 5, 4, 'next'), 3);
+    assert.equal(move(0, 5, 4, 'prev'), 4);
+    assert.equal(move(1, 7, 4, 'down'), 5);
+    assert.equal(move(5, 7, 4, 'down'), 1);               // from the last row back to the top of the column
+    assert.equal(move(5, 7, 4, 'up'), 1);
+    assert.equal(move(2, 7, 4, 'up'), 6);                 // from the top of column 2 to its bottom (index 6)
+    assert.equal(move(3, 7, 4, 'up'), 3);                 // column 3 has one row: stays
+    assert.equal(move(1, 7, 4, 'up'), 5);                 // from the top to the bottom of the column
+    assert.equal(move(0, 0, 1, 'next'), 0);
 });
