@@ -72,6 +72,21 @@
       <summary>Light or dark</summary>
       <description>The scheme of the control panel. System follows GNOME. Other applications keep following GNOME (GTK 4) or their theme (GTK 3): this choice does not change them.</description>
     </key>
+    <key name="theme-schedule" type="b">
+      <default>false</default>
+      <summary>Light by day, dark by night</summary>
+      <description>Switches GNOME between its light and dark style at the two times below. A manual switch in between stays until the next change.</description>
+    </key>
+    <key name="theme-light-from" type="s">
+      <default>'07:00'</default>
+      <summary>Light from</summary>
+      <description>The time the light style starts, as HH:MM (24 hours).</description>
+    </key>
+    <key name="theme-dark-from" type="s">
+      <default>'18:00'</default>
+      <summary>Dark from</summary>
+      <description>The time the dark style starts, as HH:MM (24 hours).</description>
+    </key>
     <key name="performance-mode" type="b">
       <default>false</default>
       <summary>Performance mode</summary>
