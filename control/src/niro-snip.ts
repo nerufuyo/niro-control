@@ -11,6 +11,8 @@ import Gtk from 'gi://Gtk?version=4.0';
 import cairo from 'cairo';
 import System from 'system';
 
+import {parseTsv, sensitiveBoxes} from './ocrRules.js';
+
 const APP_ID = 'org.niro.Snip';
 const TOOLS = [
     ['pen', 'document-edit-symbolic', 'Pen'],
@@ -178,7 +180,10 @@ class Editor {
         closeBtn.connect('clicked', () => { this.copy(); GLib.timeout_add(GLib.PRIORITY_DEFAULT, 150, () => { this.win.close(); return GLib.SOURCE_REMOVE; }); });
         const textBtn = new Gtk.Button({icon_name: 'insert-text-symbolic', tooltip_text: 'Copy the text in the picture, or in the cropped area (Ctrl+T)'});
         textBtn.connect('clicked', () => this.copyText());
+        const hideBtn = new Gtk.Button({icon_name: 'view-conceal-symbolic', tooltip_text: 'Hide private details: e-mail addresses, phone and card numbers, keys (pixelated; undo removes them one by one)'});
+        hideBtn.connect('clicked', () => this.hidePrivate());
         header.pack_end(saveBtn);
+        header.pack_end(hideBtn);
         header.pack_end(textBtn);
         header.pack_end(closeBtn); header.pack_end(asBtn); header.pack_end(copyBtn); header.pack_end(undoBtn);
 
@@ -345,6 +350,39 @@ class Editor {
                 this.write(file.get_path());
                 this.say(`Saved ${file.get_basename()}`);
             } catch (e) { if (!e.matches?.(Gtk.DialogError, Gtk.DialogError.DISMISSED)) this.say(`Could not save: ${e.message}`); }
+        });
+    }
+
+    /** Finds private-looking words with `tesseract` (TSV: where each word is) and puts a pixelate mark over each. */
+    hidePrivate() {
+        const tmp = GLib.build_filenamev([GLib.get_tmp_dir(), `niro-snip-hide-${GLib.get_monotonic_time()}.png`]);
+        try {
+            const surface = new cairo.ImageSurface(cairo.Format.ARGB32, this.pixbuf.get_width(), this.pixbuf.get_height());
+            const cr = new cairo.Context(surface);
+            Gdk.cairo_set_source_pixbuf(cr, this.pixbuf, 0, 0);
+            cr.paint(); cr.$dispose();
+            surface.writeToPNG(tmp);                                   // the picture itself, without marks, so nothing drawn gets in the way
+        } catch (e) { this.say(`Could not read the picture: ${e.message}`); return; }
+        this.say('Looking for private details…');
+        let proc;
+        try {
+            proc = Gio.Subprocess.new(['tesseract', tmp, 'stdout', '--psm', '11', 'tsv'], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+        } catch (e) {
+            GLib.unlink(tmp);
+            this.say('Needs tesseract: sudo dnf install tesseract tesseract-langpack-ind');
+            return;
+        }
+        proc.communicate_utf8_async(null, null, (p, res) => {
+            GLib.unlink(tmp);
+            try {
+                const [, out, err] = p.communicate_utf8_finish(res);
+                if (!p.get_successful()) { this.say(`Could not read the text: ${(err ?? '').split('\n')[0]}`); return; }
+                const boxes = sensitiveBoxes(parseTsv(out ?? ''));
+                for (const box of boxes) this.marks.push({tool: 'pixelate', color: this.color, size: this.size, points: [[box[0], box[1]]], box});
+                this.redo = [];
+                this.area.queue_draw();
+                this.say(boxes.length ? `Hid ${boxes.length} private ${boxes.length === 1 ? 'detail' : 'details'}: check the picture` : 'Nothing private found');
+            } catch (e) { this.say(`Could not read the text: ${e.message}`); }
         });
     }
 

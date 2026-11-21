@@ -16,7 +16,14 @@ function tokenize(src: string): Tok[] | null {
         const c = s[i];
         if (/\s/.test(c)) { i++; continue; }
         const num = /^(\d+\.?\d*|\.\d+)(e[+-]?\d+)?/i.exec(s.slice(i));
-        if (num) { out.push({t: 'num', v: parseFloat(num[0])}); i += num[0].length; continue; }
+        if (num) {
+            i += num[0].length;
+            const suffix = /^(jt|juta|rb|ribu|k)(?![a-z])/i.exec(s.slice(i));   // 8jt = 8,000,000, 5rb = 5,000, 2k = 2,000
+            const scale = suffix ? (/^(jt|juta)$/i.test(suffix[1]) ? 1e6 : 1e3) : 1;
+            if (suffix) i += suffix[0].length;
+            out.push({t: 'num', v: parseFloat(num[0]) * scale});
+            continue;
+        }
         const id = /^[a-z]+/i.exec(s.slice(i));
         if (id) { out.push(id[0].toLowerCase() === 'x' ? {t: 'op', v: '*'} : {t: 'id', v: id[0].toLowerCase()}); i += id[0].length; continue; }
         if ('+-*/%^()x'.includes(c)) { out.push({t: 'op', v: c === 'x' ? '*' : c}); i++; continue; }
@@ -27,7 +34,7 @@ function tokenize(src: string): Tok[] | null {
 
 class Parser {
     i = 0;
-    constructor(private toks: Tok[]) {}
+    constructor(private toks: Tok[], private vars: Record<string, number> = {}) {}
     private peek() { return this.toks[this.i]; }
     private isOp(v: string) { const t = this.peek(); return t?.t === 'op' && t.v === v; }
     private isWord(v: string) { const t = this.peek(); return t?.t === 'id' && t.v === v; }
@@ -88,6 +95,7 @@ class Parser {
         }
         if (t.t === 'id') {
             this.i++;
+            if (t.v in this.vars) return this.vars[t.v];
             if (t.v in CONSTS) return CONSTS[t.v];
             const f = FUNCS[t.v];
             if (!f) throw new Error(`unknown "${t.v}"`);
@@ -116,20 +124,29 @@ export function formatNumber(n: number): string {
     return int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (frac ? `.${frac}` : '');
 }
 
-export interface Calc {value: number; text: string}
+export interface Calc {value: number; text: string; assign?: string}
 
-/** The result when `query` is a calculation (it needs an operator, a function or a percentage: a lone number is not one). */
-export function calculate(query: string): Calc | null {
-    const q = query.trim().replace(/=\s*$/, '');
-    if (!q || q.length > 120 || !/\d/.test(q)) return null;
-    if (!/[-+*/%^×÷−]|\*\*|\b(?:sqrt|abs|sin|cos|tan|ln|log|exp|round|floor|ceil|of)\b|\dx\d|\d\s+x\s+\d/i.test(q)) return null;
+const RESERVED = new Set([...Object.keys(FUNCS), ...Object.keys(CONSTS), 'of', 'x']);
+
+/** The result when `query` is a calculation (it needs an operator, a function or a percentage: a lone number is not one).
+ * `vars` are the names the person has set (`gaji = 8jt`, then `gaji * 12`), and `ans` is the last result; an assignment answers with its `assign` name. */
+export function calculate(query: string, vars: Record<string, number> = {}): Calc | null {
+    let q = query.trim().replace(/=\s*$/, '');
+    if (!q || q.length > 120) return null;
+    const set = /^([a-z][a-z_]{0,15})\s*=\s*(.+)$/i.exec(q);
+    const assign = set && !RESERVED.has(set[1].toLowerCase()) && set[1].toLowerCase() !== 'ans' ? set[1].toLowerCase() : undefined;
+    if (assign) q = set![2];
+    if (!/\d|\bans\b/i.test(q) && !Object.keys(vars).some(k => new RegExp(`\\b${k}\\b`, 'i').test(q))) return null;
+    const named = Object.keys(vars).some(k => new RegExp(`\\b${k}\\b`, 'i').test(q));
+    if (!assign && !/[-+*/%^×÷−]|\*\*|\b(?:sqrt|abs|sin|cos|tan|ln|log|exp|round|floor|ceil|of)\b|\dx\d|\d\s+x\s+\d/i.test(q)) return null;
+    if (assign && !/[-+*/%^×÷−\d]/.test(q)) return null;
     const toks = tokenize(q);
     if (!toks) return null;
     try {
-        const p = new Parser(toks);
+        const p = new Parser(toks, vars);
         const value = p.expr();
         if (!p.done() || !Number.isFinite(value)) return null;
-        return {value, text: formatNumber(value)};
+        return {value, text: formatNumber(value), assign};
     } catch (_e) {
         return null;
     }

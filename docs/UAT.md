@@ -41,5 +41,12 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 35 | Dock quicklist | Right-click Firefox (or any app whose launcher has actions) in the dock | Its own actions, such as "New Private Window", sit under "New Window" |
 | 36 | Text from a screenshot | Super+Shift+S, pick an area with text, press the text button (or `Ctrl+T`) | "Copied N words"; paste shows the text. Without `tesseract` it says how to install it |
 | 37 | File search | Search: `f invoice` (any part of a file name in your home folder) | The matches with their folders; Enter opens one in its app; nothing is listed for an ordinary search |
+| 38 | Calculator names | Search: `gaji = 8jt`, Enter; then `gaji * 12` and `ans / 2` | 8,000,000; then 96,000,000; then half of the last result |
+| 39 | Dates | Search: `30 days from now`, `selisih 1 jan ke 17 agu`, `days until 25 dec` | The date or the number of days; Enter copies it |
+| 40 | Passwords and encodings | Search: `pass 20`, `uuid`, `b64 halo`, `sha256 halo` | The result under Tools; Enter copies it; it is not kept in Search's recent list |
+| 41 | Presentation mode | Search: `presentation`, Enter; leave the computer idle past the screen-off time; run it again | Banners are hidden and the screen stays on; running it again puts both back |
+| 42 | Light by day, dark by night | Niro Control → Look → Schedule: switch it on, set "Dark from" two minutes ahead | At that minute GNOME's style turns dark; a manual switch in between stays until the next time; switched off, nothing changes |
+| 43 | Download indicator | Start a download in the browser; look at the Downloads folder at the dock's end | A red bar pulses under the folder while the file is being written, and is gone when it ends; the tooltip says how many are downloading |
+| 44 | Hide private details | Niro Snip on a screenshot with an e-mail address and a phone number, the eye button | Pixelated boxes over them (undo removes one at a time); "Nothing private found" when there is none |
 
 Nothing in this list has been run by the author yet; the report says so.

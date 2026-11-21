@@ -13,6 +13,7 @@ import * as Signals from 'resource:///org/gnome/shell/misc/signals.js';
 
 import {clutterBackend, uiScale} from './compat.js';
 import {NiroSync} from './niroSync.js';
+import {ThemeSchedule} from './themeSchedule.js';
 import {normalized, restyle} from './panelStyle.js';
 import {sendSuperV, watchRecorder} from './shortcutRecorder.js';
 
@@ -101,6 +102,7 @@ export class TopBar extends Signals.EventEmitter {
         this._barReactive = [Main.layoutManager.panelBox, Main.panel].map(actor => [actor, actor.reactive]);
         this._barReactive.forEach(([actor]) => (actor.reactive = false));
         this._niroSync = new NiroSync(this._settings);
+        this._themeSchedule = new ThemeSchedule();
         // The bar floats over the windows: maximized ones run up to the top of the screen, the island on top of them.
         this._barTracked = Main.layoutManager._trackedActors?.find(t => t.actor === panelBox) ?? null;
         this._barStrutWas = this._barTracked?.affectsStruts;
@@ -366,6 +368,7 @@ export class TopBar extends Signals.EventEmitter {
         this._unwatchWindows();
         this._barMoved.forEach(id => Main.layoutManager.panelBox.disconnect(id));
         this._niroSync?.destroy();
+        this._themeSchedule?.destroy();
         this._barReactive?.forEach(([actor, was]) => (actor.reactive = was));
         if (this._barTracked) {
             this._barTracked.affectsStruts = this._barStrutWas;

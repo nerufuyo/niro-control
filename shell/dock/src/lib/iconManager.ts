@@ -9,6 +9,7 @@ import * as DND from "resource:///org/gnome/shell/ui/dnd.js";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import { box } from "./compat.js";
+import { partialDownloads, stackTitle } from "./downloadRules.js";
 import { ThemeResolver } from "./iconTheme.js";
 import { SignalManager } from "./signalManager.js";
 import type { WindowPreviewPopup } from "./windowPreview.js";
@@ -148,6 +149,11 @@ export class IconManager {
   /** Folder stacks at the dock's very end (after the minimized windows): which, and their actors. */
   private _stackFolders: StackFolder[] = [];
   private _stackActors: IconActor[] = [];
+  private _downloadMonitor: Gio.FileMonitor | null = null;
+  private _downloadBar: InstanceType<typeof St.Widget> | null = null;
+  private _downloadTimer = 0;
+  private _downloadPulse = 0;
+  private _downloading = 0;
   private _stackSeparator: InstanceType<typeof St.Widget> | null = null;
   private _stackMenu: ContextMenu | null = null;
   private _windowPreviewsEnabled: boolean = false;
@@ -1924,8 +1930,13 @@ export class IconManager {
         y_expand: true,
       });
       actor.add_child(glyph);
+      if (folder === "downloads") this._watchDownloads(actor);
       this._signals.connect(actor, "notify::hover", () => {
-        if (actor.hover) this._showTooltip(actor, name);
+        if (actor.hover)
+          this._showTooltip(
+            actor,
+            folder === "downloads" ? stackTitle(name, this._downloading) : name,
+          );
         else this._hideTooltip();
       });
       this._signals.connect(actor, "button-release-event", (_a, event) => {
@@ -1941,10 +1952,106 @@ export class IconManager {
   /** Takes the stacks away (a rebuild puts them back last). */
   private _clearStacks(): void {
     this._closeStackMenu();
+    this._unwatchDownloads();
     for (const actor of this._stackActors) actor.destroy();
     this._stackActors = [];
     this._stackSeparator?.destroy();
     this._stackSeparator = null;
+  }
+
+  /** A thin bar under the Downloads icon while a download is being written: its size is not known, so it pulses rather than fills. */
+  private _watchDownloads(actor: IconActor): void {
+    const path = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DOWNLOAD);
+    if (!path) return;
+    const bar = new St.Widget({
+      style_class: "dock-download-bar",
+      width: Math.round(this._iconSize * 0.6),
+      height: 3,
+      x_align: Clutter.ActorAlign.CENTER,
+      y_align: Clutter.ActorAlign.END,
+      visible: false,
+    });
+    actor.add_child(bar);
+    this._downloadBar = bar;
+    try {
+      this._downloadMonitor = Gio.File.new_for_path(path).monitor_directory(
+        Gio.FileMonitorFlags.NONE,
+        null,
+      );
+      this._signals.connect(this._downloadMonitor, "changed", () =>
+        this._scheduleDownloadScan(path),
+      );
+    } catch (_e) {
+      this._downloadMonitor = null;
+    }
+    this._scheduleDownloadScan(path);
+  }
+
+  /** One look at the folder after the changes settle (a download changes its file many times a second). */
+  private _scheduleDownloadScan(path: string): void {
+    if (this._downloadTimer) return;
+    this._downloadTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 800, () => {
+      this._downloadTimer = 0;
+      this._downloading = this._countPartial(path);
+      this._showDownloadBar();
+      return GLib.SOURCE_REMOVE;
+    });
+  }
+
+  private _countPartial(path: string): number {
+    const names: string[] = [];
+    try {
+      const it = Gio.File.new_for_path(path).enumerate_children(
+        "standard::name",
+        Gio.FileQueryInfoFlags.NONE,
+        null,
+      );
+      for (let info = it.next_file(null); info && names.length < 5000; info = it.next_file(null))
+        names.push(info.get_name());
+      it.close(null);
+    } catch (_e) {
+      return 0;
+    }
+    return partialDownloads(names);
+  }
+
+  private _showDownloadBar(): void {
+    const bar = this._downloadBar;
+    if (!bar) return;
+    bar.remove_all_transitions();
+    if (this._downloading === 0) {
+      bar.visible = false;
+      return;
+    }
+    bar.visible = true;
+    bar.opacity = 255;
+    // A timer, not a chain of animations: with animations switched off an animation ends at once and would call itself without end.
+    if (this._downloadPulse) return;
+    this._downloadPulse = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 800, () => {
+      const current = this._downloadBar;
+      if (!current?.visible) {
+        this._downloadPulse = 0;
+        return GLib.SOURCE_REMOVE;
+      }
+      current.ease({
+        opacity: current.opacity > 170 ? 90 : 255,
+        duration: 600,
+        mode: Clutter.AnimationMode.EASE_IN_OUT_QUAD,
+      });
+      return GLib.SOURCE_CONTINUE;
+    });
+  }
+
+  private _unwatchDownloads(): void {
+    if (this._downloadTimer) GLib.source_remove(this._downloadTimer);
+    this._downloadTimer = 0;
+    if (this._downloadPulse) GLib.source_remove(this._downloadPulse);
+    this._downloadPulse = 0;
+    this._downloadMonitor?.cancel();
+    this._downloadMonitor = null;
+    this._downloadBar?.remove_all_transitions();
+    this._downloadBar = null;
+    this._downloading = 0;
   }
 
   /** The folder's newest files, newest first (hidden ones left out). */

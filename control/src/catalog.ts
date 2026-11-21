@@ -213,6 +213,48 @@ export const CATALOG: Item[] = [
   ]
  },
  {
+  "id": "niro.theme-schedule",
+  "menu": "Look",
+  "group": "Schedule",
+  "title": "Light by day, dark by night",
+  "help": "Switches GNOME between its light and dark style at the two times below.",
+  "detail": "Switches GNOME between its light and dark style at the two times below. A manual switch in between stays until the next change.",
+  "source": "niro",
+  "key": "theme-schedule",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.theme-light-from",
+  "menu": "Look",
+  "group": "Schedule",
+  "title": "Light from",
+  "help": "The time the light style starts, as HH:MM (24 hours).",
+  "detail": "The time the light style starts, as HH:MM (24 hours).",
+  "source": "niro",
+  "key": "theme-light-from",
+  "type": "s",
+  "default": "07:00",
+  "unit": "",
+  "kind": "text"
+ },
+ {
+  "id": "niro.theme-dark-from",
+  "menu": "Look",
+  "group": "Schedule",
+  "title": "Dark from",
+  "help": "The time the dark style starts, as HH:MM (24 hours).",
+  "detail": "The time the dark style starts, as HH:MM (24 hours).",
+  "source": "niro",
+  "key": "theme-dark-from",
+  "type": "s",
+  "default": "18:00",
+  "unit": "",
+  "kind": "text"
+ },
+ {
   "id": "niro.performance-mode",
   "menu": "Look",
   "group": "Universal Appearance",
