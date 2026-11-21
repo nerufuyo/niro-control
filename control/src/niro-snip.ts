@@ -29,7 +29,6 @@ const TOOLS = [
 ];
 const COLORS = ['#e8472b', '#f5c518', '#2ecc71', '#2d8cff', '#111111', '#ffffff'];
 const BLOCK = 14;
-const HISTORY_KEEP = 30;
 
 /** The settings Niro Control keeps for Niro Snip (history, upload address); null when the package's schema is not installed. */
 function snipSettings() {
@@ -40,7 +39,7 @@ function snipSettings() {
     } catch (_e) { return null; }
 }
 
-/** Keeps a copy of a fresh capture, when the person asked for a history (Search › Screenshots), and forgets the oldest past 30. */
+/** Keeps a copy of a fresh capture, when the person asked for a history (Search › Screenshots), and forgets the oldest past the number set in Search › Screenshots (30 by default). */
 function keepInHistory(path) {
     const settings = snipSettings();
     if (!settings?.get_boolean('snip-history')) return;
@@ -52,7 +51,7 @@ function keepInHistory(path) {
         const it = Gio.File.new_for_path(dir).enumerate_children('standard::name', Gio.FileQueryInfoFlags.NONE, null);
         for (let i = it.next_file(null); i; i = it.next_file(null)) if (i.get_name().endsWith('.png')) names.push(i.get_name());
         it.close(null);
-        names.sort().slice(0, Math.max(0, names.length - HISTORY_KEEP)).forEach(n => GLib.unlink(`${dir}/${n}`));
+        names.sort().slice(0, Math.max(0, names.length - (settings.get_int('snip-history-keep') || 30))).forEach(n => GLib.unlink(`${dir}/${n}`));
     } catch (e) { printerr(`niro-snip: history: ${e.message}`); }
 }
 

@@ -42,3 +42,10 @@ test('app tooltip: the name and the memory it holds', () => {
     assert.equal(appTitle('Firefox', 1.2e9), 'Firefox · 1.2 GB');
     assert.equal(appTitle('Files', 0), 'Files');
 });
+
+test('downloads: the time that counts as going on can be changed', () => {
+    const now = 1000000, f = (name, ago) => ({name, modified: now - ago});
+    assert.equal(partialDownloads([f('a.part', 200)], now, 300), 1);
+    assert.equal(partialDownloads([f('a.part', 200)], now, 90), 0);
+    assert.equal(partialDownloads([f('a.part', 200)], now), 0);           // the default is 90 seconds
+});

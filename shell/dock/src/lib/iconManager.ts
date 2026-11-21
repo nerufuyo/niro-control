@@ -61,7 +61,7 @@ const userFolder = (dir: GLib.UserDirectory): Gio.File | null => {
   const path = GLib.get_user_special_dir(dir);
   return path ? Gio.File.new_for_path(path) : null;
 };
-const STACK_FILES = 12;
+
 type MenuManager = InstanceType<typeof PopupMenu.PopupMenuManager>;
 
 /** Delegate exposed on a dragged icon so the drop target knows the source. */
@@ -148,6 +148,8 @@ export class IconManager {
   /** Folder stacks at the dock's very end (after the minimized windows): which, and their actors. */
   private _stackFolders: StackFolder[] = [];
   private _customStackPath = "";
+  private _stackFileCount = 12;
+  private _downloadActiveSeconds = 90;
   private _trashArmed = false;
   private _stackActors: IconActor[] = [];
   private _downloadMonitor: Gio.FileMonitor | null = null;
@@ -1885,6 +1887,12 @@ export class IconManager {
     return this._minChildCount() + this._stackChildCount();
   }
 
+  /** How many files a stack lists, and how recently a partial download must have changed to count as going on. */
+  setStackLimits(files: number, activeSeconds: number): void {
+    this._stackFileCount = Math.min(30, Math.max(5, files));
+    this._downloadActiveSeconds = Math.min(600, Math.max(10, activeSeconds));
+  }
+
   /** The folder of the "custom" stack (an absolute path; empty or missing means no such stack). */
   setCustomStackPath(path: string): void {
     const clean = path.startsWith("/") ? path : "";
@@ -2068,7 +2076,7 @@ export class IconManager {
     } catch (_e) {
       return 0;
     }
-    return partialDownloads(entries, Math.floor(Date.now() / 1000));
+    return partialDownloads(entries, Math.floor(Date.now() / 1000), this._downloadActiveSeconds);
   }
 
   private _showDownloadBar(): void {
@@ -2133,7 +2141,7 @@ export class IconManager {
     } catch (_e) {
       return [];
     }
-    return out.sort((a, b) => b.at - a.at).slice(0, STACK_FILES);
+    return out.sort((a, b) => b.at - a.at).slice(0, this._stackFileCount);
   }
 
   private _openStack(actor: IconActor, folder: StackFolder): void {

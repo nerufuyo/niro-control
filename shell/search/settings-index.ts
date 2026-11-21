@@ -193,6 +193,66 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "niro.tools-above-apps",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "Tools above applications",
+  "help": "Search shows what it works out itself (a password, a UUID, a hash, a date) above matching applications.",
+  "key": "tools-above-apps",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.world-clock-cities",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "World clock cities",
+  "help": "The cities Search shows for \"world\", separated by commas (up to eight).",
+  "key": "world-clock-cities",
+  "kind": "text",
+  "managed": false
+ },
+ {
+  "id": "niro.search-language",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "Language of Search answers",
+  "help": "The language of dates, weather and times that Search works out.",
+  "key": "search-language",
+  "kind": "select",
+  "managed": false
+ },
+ {
+  "id": "niro.weather-days",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "Weather days",
+  "help": "How many days of forecast Search shows for a city (1 to 7).",
+  "key": "weather-days",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "niro.kill-protected",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "Processes \"kill\" never offers",
+  "help": "Names of programs, separated by commas, that Search never offers to stop, besides the desktop itself and the system, which are always left out.",
+  "key": "kill-protected",
+  "kind": "text",
+  "managed": false
+ },
+ {
+  "id": "niro.snip-history-keep",
+  "menu": "Search",
+  "group": "Screenshots",
+  "title": "Snips kept in the history",
+  "help": "How many screenshots the history keeps when it is on (5 to 200); the oldest go first.",
+  "key": "snip-history-keep",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
   "id": "niro.snip-history",
   "menu": "Search",
   "group": "Screenshots",
@@ -1500,6 +1560,26 @@ export const INDEX = [
   "help": "A Downloads folder at the dock's end: a click lists its newest files",
   "key": "stack-downloads",
   "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "dock.stack-files",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Files listed in a stack",
+  "help": "How many of the newest files a stack lists (5 to 30)",
+  "key": "stack-files",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "dock.download-active-seconds",
+  "menu": "Dock",
+  "group": "Applications and Indicators",
+  "title": "Download still going after (seconds)",
+  "help": "The bar under Downloads shows while a partly downloaded file changed this recently (10 to 600 seconds).",
+  "key": "download-active-seconds",
+  "kind": "stepper",
   "managed": false
  },
  {

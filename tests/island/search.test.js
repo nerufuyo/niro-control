@@ -11,7 +11,7 @@ import {toolQuery, parseDate, password} from '../../shell/search/build/tools.js'
 import {contentNeedle, defineQuery, definitions, grepArgs, historyMatches, historyNeedle, killName, matchProcesses, qrText, translateQuery, translated} from '../../shell/search/build/lookups.js';
 import {qrMatrix, qrPng} from '../../shell/search/build/qrmatrix.js';
 import {habitLog, habitQuery, habitStats, markDone, noteLine, noteText, openTodos, recentNotes, todoLine, todoQuery} from '../../shell/search/build/notes.js';
-import {describe as weatherLines, forecastUrl, geocodeUrl, parsePlace, weatherQuery, worldQuery} from '../../shell/search/build/weather.js';
+import {describe as weatherLines, forecastUrl, geocodeUrl, parseCities, parsePlace, weatherQuery, worldQuery} from '../../shell/search/build/weather.js';
 import {entities, haQuery, serviceFor, validBase, validEntity} from '../../shell/search/build/homeAssistant.js';
 import {columnsFor, move} from '../../shell/search/build/switcherRules.js';
 import {agendaQuery, parseEvents, upcoming} from '../../shell/search/build/agenda.js';
@@ -369,4 +369,26 @@ test('window switcher: the grid and moving about it', () => {
     assert.equal(move(3, 7, 4, 'up'), 3);                 // column 3 has one row: stays
     assert.equal(move(1, 7, 4, 'up'), 5);                 // from the top to the bottom of the column
     assert.equal(move(0, 0, 1, 'next'), 0);
+});
+
+test('adjustments: cities, language, forecast days, protected processes', () => {
+    assert.deepEqual(parseCities(' Jakarta, tokyo ,JAKARTA,, new york '), ['jakarta', 'tokyo', 'new york']);
+    assert.deepEqual(parseCities(''), ['jakarta', 'tokyo', 'london', 'new york', 'sydney']);
+    assert.equal(parseCities('a,b,c,d,e,f,g,h,i,j').length, 8);
+    const place = {name: 'Bandung', country: 'Indonesia', lat: -6.9, lon: 107.6};
+    assert.match(forecastUrl(place, 5), /forecast_days=5$/);
+    assert.match(forecastUrl(place, 99), /forecast_days=7$/);
+    assert.match(forecastUrl(place, 0), /forecast_days=1$/);
+    const wx = {current: {temperature_2m: 24, weather_code: 61, wind_speed_10m: 8}, daily: {time: ['d1', 'd2'], temperature_2m_min: [21, 22], temperature_2m_max: [28, 29], precipitation_probability_max: [60, 10], weather_code: [63, 2]}};
+    assert.deepEqual(weatherLines(wx, place, 'id'), ['Bandung, Indonesia: 24°C, hujan ringan, angin 8 km/h', 'Hari ini: 21–28°C, hujan, hujan 60%', 'Besok: 22–29°C, berawan sebagian, hujan 10%']);
+    const now = Date.UTC(2026, 10, 21, 3, 0);
+    assert.match(zoneQuery('jam di new york', now, 'Asia/Jakarta', 'id').title, /kemarin$/);
+    assert.equal(zoneQuery('9pm wib to tokyo', now, 'UTC', 'id').subtitle.includes('Enter menyalin'), true);
+    const idEnv = {...env, lang: 'id'};
+    assert.equal(toolQuery('30 days from now', idEnv).copy, 'Sen, 21 Des 2026');
+    assert.equal(toolQuery('selisih 1 jan ke 17 agu', idEnv).title, '228 hari');
+    assert.equal(toolQuery('selisih 1 jan ke 17 agu', env).title, '228 days');
+    const ps = ' 100 firefox\n 200 my-helper\n 300 Zoom';
+    assert.deepEqual(matchProcesses(ps, 'o', 999, 6, ['zoom']).map(p => p.pid), [100]);       // an extra protected name, whatever its case
+    assert.deepEqual(matchProcesses(ps, 'o', 999, 6, ['', ' firefox ']).map(p => p.pid), [300]);
 });
