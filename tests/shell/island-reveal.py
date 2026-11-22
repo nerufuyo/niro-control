@@ -96,7 +96,7 @@ for label, frames in by.items():
         rises = [reset_and_rise(s)[1] for s in ss]
         shown = [r for r in rises if r is not None]
         line += f"  piece rises at (ms) {[None if r is None else round(r) for r in rises]}"
-        if len(shown) < 2 or any(b < a for a, b in zip(shown, shown[1:])) or shown[-1] - shown[0] < 25:
+        if len(shown) < 2 or any(b < a for a, b in zip(shown, shown[1:])) or shown[-1] - shown[0] < 14:   # one painted frame (16.7 ms at 60 Hz) of slack: the nominal stagger is ~28 ms but frames quantise it to 16..33
             fail(f"{label}: a critical alert's pieces do not reveal in order {rises}")
     elif label == 'alert_routine':
         low = min(o for s in ss for _, o in s)
