@@ -11,6 +11,7 @@ import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import { box } from "./compat.js";
 import { appTitle, partialDownloads, stackTitle } from "./downloadRules.js";
 import { ThemeResolver } from "./iconTheme.js";
+import { animationsEnabled } from "./motion.js";
 import { SignalManager } from "./signalManager.js";
 import type { WindowPreviewPopup } from "./windowPreview.js";
 
@@ -1037,30 +1038,31 @@ export class IconManager {
 
     indicatorBox.visible = true;
 
-    // Clear all children before adding new style.
-    indicatorBox.remove_all_children();
-
-    if (this._indicatorStyle === 0) {
-      // Dots per window (macOS style).
-      const needed = focused ? Math.max(windowCount, 1) : windowCount;
-
-      // Add or remove dots to match window count.
-      while (indicatorBox.get_n_children() < needed) {
-        const dot = new St.Widget({
-          style_class: "dock-indicator-dot",
+    // Reconcile instead of rebuilding: focus changes call this for every icon, and a rebuild per switch both
+    // flickers and (remove_all_children does not destroy) leaks actors under rapid app switching.
+    const styleClass = this._indicatorStyle === 0 ? "dock-indicator-dot" : "dock-indicator-bar";
+    // Dots per window (macOS style), or one horizontal bar.
+    const needed =
+      this._indicatorStyle === 0 ? (focused ? Math.max(windowCount, 1) : windowCount) : 1;
+    for (const child of indicatorBox.get_children() as InstanceType<typeof St.Widget>[]) {
+      if (child.style_class !== styleClass) child.destroy();
+    }
+    while (indicatorBox.get_n_children() < needed) {
+      const mark = new St.Widget({ style_class: styleClass });
+      indicatorBox.add_child(mark);
+      // A new mark fades in instead of popping.
+      if (animationsEnabled()) {
+        mark.opacity = 0;
+        (mark as unknown as { ease(p: Record<string, unknown>): void }).ease({
+          opacity: 255,
+          duration: 160,
+          mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
-        indicatorBox.add_child(dot);
       }
-      while (indicatorBox.get_n_children() > needed) {
-        const last = indicatorBox.get_n_children() - 1;
-        (indicatorBox.get_child_at_index(last) as InstanceType<typeof St.Widget>).destroy();
-      }
-    } else {
-      // Horizontal bar style.
-      const bar = new St.Widget({
-        style_class: "dock-indicator-bar",
-      });
-      indicatorBox.add_child(bar);
+    }
+    while (indicatorBox.get_n_children() > needed) {
+      const last = indicatorBox.get_n_children() - 1;
+      (indicatorBox.get_child_at_index(last) as InstanceType<typeof St.Widget>).destroy();
     }
   }
 
@@ -1474,6 +1476,10 @@ export class IconManager {
   }
 
   private _bounce(actor: IconActor): void {
+    // Reduced motion: no jump. Rapid app switching: a bounce still running is cut short, so jumps never stack on each other.
+    if (!animationsEnabled()) return;
+    actor.remove_transition("translation_y");
+    actor.translation_y = 0;
     const baseY = 0;
     const up = -28;
     const small = -10;

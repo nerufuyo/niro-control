@@ -2,7 +2,20 @@ import Clutter from "gi://Clutter";
 import GLib from "gi://GLib";
 import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
+import {
+  type DockContext,
+  type DockEvent,
+  type DockState,
+  edgeDistance,
+  edgeThresholds,
+  isDockActive,
+  nextDockState,
+  pointerNearDock,
+  pointerOnMonitor,
+  springTimeScale,
+} from "./dockLogic.js";
 import type { Intellihide, OverlapStatus } from "./intellihide.js";
+import { dockSpring, edgeHysteresis, Spring } from "./motion.js";
 import { SignalManager } from "./signalManager.js";
 import type { WindowPreviewPopup } from "./windowPreview.js";
 
@@ -19,7 +32,11 @@ type Container = InstanceType<typeof St.BoxLayout>;
  *
  * Animations use translation_x/translation_y instead of modifying the
  * container's layout-owned position, avoiding conflicts with
- * DockManager._updatePosition().
+ * DockManager._updatePosition(). One spring (0 = off the edge, 1 = resting) is stepped from the
+ * actor's frame clock, so a dismissal that is cancelled mid-slide keeps its velocity, and nothing
+ * runs once the dock is at rest.
+ *
+ * States (dockLogic.ts): hidden, revealing, visible, magnifying, launching, dismissing.
  */
 export class DockVisibility {
   private _signals: SignalManager;
@@ -58,14 +75,15 @@ export class DockVisibility {
 
   private _hideSourceId: number | null = null;
   private _pollSourceId: number | null = null;
-  private _animationSourceId: number | null = null;
-  private _animationStartTime = 0;
-  private _animationFromX = 0;
-  private _animationFromY = 0;
-  private _animationFromOpacity = 0;
-  private _animationToX = 0;
-  private _animationToY = 0;
-  private _animationToOpacity = 0;
+  private _state: DockState = "hidden";
+  private _magnifying = false;
+  /** Slide progress: 0 = off the edge, 1 = resting. Overshoots a little on the way in. */
+  private _slide = new Spring(0, "snappy", { restDistance: 0.005, restSpeed: 0.05 });
+  private _slideTimeline: Clutter.Timeline | null = null;
+  private _slideLastMs = 0;
+  private _hiddenOffset: [number, number] = [0, 20];
+  /** Whether the pointer is in the edge zone, with hysteresis (see edgeThresholds). */
+  private _edgeLatched = false;
 
   constructor(
     container: Container,
@@ -114,7 +132,7 @@ export class DockVisibility {
 
   /** Whether the dock is on screen or on its way: shown, or a slide is not finished. */
   private _notifyActive(): void {
-    const active = this._shown || this._animationSourceId !== null;
+    const active = this._shown || this._slideTimeline !== null || isDockActive(this._state);
     if (active === this._active) return;
     this._active = active;
     this._onActiveChanged?.(active);
@@ -162,7 +180,27 @@ export class DockVisibility {
   }
 
   isAnimating(): boolean {
-    return this._animationSourceId !== null;
+    return this._slideTimeline !== null;
+  }
+
+  getState(): DockState {
+    return this._state;
+  }
+
+  private _dispatch(event: DockEvent): void {
+    const ctx: DockContext = { magnifying: this._magnifying };
+    this._state = nextDockState(this._state, event, ctx);
+  }
+
+  /** The pointer is (or is no longer) over the magnified icons. */
+  setMagnifying(on: boolean): void {
+    this._magnifying = on;
+    this._dispatch(on ? "magnify" : "relax");
+  }
+
+  /** An icon was clicked and its app is starting (true), or its window arrived / the wait ended (false). */
+  setLaunching(on: boolean): void {
+    this._dispatch(on ? "launch" : "launched");
   }
 
   isHidden(): boolean {
@@ -178,6 +216,10 @@ export class DockVisibility {
   start(): void {
     this._cancelHide();
     this._cancelAnimation();
+    this._state = "hidden";
+    this._magnifying = false;
+    this._edgeLatched = false;
+    this._slide.reset(0);
 
     this._monitor = Main.layoutManager.primaryMonitor;
     if (!this._monitor) {
@@ -193,6 +235,7 @@ export class DockVisibility {
     this._restingTranslationX = 0;
     this._restingTranslationY = 0;
     const [offsetX, offsetY] = this._getSlideOffset();
+    this._hiddenOffset = [offsetX, offsetY];
     this._container.translation_x = offsetX;
     this._container.translation_y = offsetY;
 
@@ -282,6 +325,8 @@ export class DockVisibility {
     this._cancelAnimation();
     this._dragActive = false;
     this._shown = false;
+    this._state = "hidden";
+    this._edgeLatched = false;
     this._notifyActive();
 
     this._container.translation_x = 0;
@@ -385,20 +430,18 @@ export class DockVisibility {
    * The dock only shows when the pointer enters this narrow zone.
    */
   private _isPointerInEdgeZone(): boolean {
-    if (!this._monitor) return false;
-
-    switch (this._edge) {
-      case 0:
-        return this._pointerY >= this._monitor.y + this._monitor.height - this._showThreshold;
-      case 1:
-        return this._pointerX <= this._monitor.x + this._showThreshold;
-      case 2:
-        return this._pointerX >= this._monitor.x + this._monitor.width - this._showThreshold;
-      case 3:
-        return this._pointerY <= this._monitor.y + this._showThreshold;
+    const monitor = this._monitor;
+    if (!monitor) return false;
+    // Bounded to the monitor on both axes: a pointer on a neighbouring monitor, or past the end of this one, is not "at the edge".
+    if (!pointerOnMonitor(monitor, this._pointerX, this._pointerY)) {
+      this._edgeLatched = false;
+      return false;
     }
-
-    return false;
+    const { enter, leave } = edgeThresholds(this._showThreshold);
+    const distance = edgeDistance(monitor, this._edge, this._pointerX, this._pointerY);
+    // Hysteresis: once the dock is up the zone is a little deeper, so a pointer resting on the boundary does not flicker it.
+    this._edgeLatched = edgeHysteresis(this._shown && this._edgeLatched, distance, enter, leave);
+    return this._edgeLatched;
   }
 
   /**
@@ -452,6 +495,11 @@ export class DockVisibility {
   }
 
   private _isPointerOverDockActor(): boolean {
+    // An actor pick is costly and this runs on every pointer motion: only near the dock can an icon be under the pointer.
+    const bounds = this._dockBounds;
+    if (!bounds) return false;
+    const reach = Math.max(8, this._dockHeight * Math.max(0, this._magnificationScale - 1) * 2);
+    if (!pointerNearDock(bounds, reach, this._pointerX, this._pointerY)) return false;
     const actor = global.stage.get_actor_at_pos(
       Clutter.PickMode.REACTIVE,
       this._pointerX,
@@ -548,58 +596,72 @@ export class DockVisibility {
   }
 
   private _animateVisibility(show: boolean, distance?: number): void {
-    this._cancelAnimation();
     this._container.visible = true;
+    this._hiddenOffset = this._getSlideOffset(distance);
+    this._dispatch(show ? "reveal" : "dismiss");
 
-    const [offsetX, offsetY] = this._getSlideOffset(distance);
-    this._animationFromX = this._container.translation_x;
-    this._animationFromY = this._container.translation_y;
-    this._animationFromOpacity = this._container.opacity;
-    this._animationToX = show ? this._restingTranslationX : this._restingTranslationX + offsetX;
-    this._animationToY = show ? this._restingTranslationY : this._restingTranslationY + offsetY;
-    this._animationToOpacity = show ? 255 : 0;
-
-    if (this._animationDuration === 0) {
+    // The slide time follows the animation-duration setting; with the desktop's animations off, or a zero duration, the dock jumps.
+    // Coming in the spring may overshoot a little; going out it is critically damped, so a dismissal never bounces.
+    const spec =
+      this._animationDuration === 0
+        ? null
+        : dockSpring({ calm: !show, timeScale: springTimeScale(this._animationDuration) });
+    if (!spec) {
+      this._stopSlideTimeline();
+      this._slide.reset(show ? 1 : 0);
+      this._applySlide();
       this._finishVisibilityAnimation(show);
       return;
     }
+    // Retargeting keeps the velocity: a dismissal cancelled halfway turns around smoothly.
+    this._slide.setTarget(show ? 1 : 0, spec);
+    this._startSlideTimeline();
+  }
 
-    this._animationStartTime = GLib.get_monotonic_time();
-    this._animationSourceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
-      const elapsedMs = (GLib.get_monotonic_time() - this._animationStartTime) / 1000;
-      const progress = Math.min(1, elapsedMs / this._animationDuration);
-      const easedProgress = show ? 1 - (1 - progress) ** 2 : progress ** 2;
-
-      this._container.translation_x =
-        this._animationFromX + (this._animationToX - this._animationFromX) * easedProgress;
-      this._container.translation_y =
-        this._animationFromY + (this._animationToY - this._animationFromY) * easedProgress;
-      this._container.opacity = Math.round(
-        this._animationFromOpacity +
-          (this._animationToOpacity - this._animationFromOpacity) * easedProgress,
-      );
-
-      if (progress < 1) return GLib.SOURCE_CONTINUE;
-
-      this._animationSourceId = null;
-      this._finishVisibilityAnimation(show);
-      return GLib.SOURCE_REMOVE;
+  private _startSlideTimeline(): void {
+    if (this._slideTimeline) return;
+    const tl = new Clutter.Timeline({ actor: this._container, duration: 3600000 });
+    tl.set_repeat_count(-1);
+    this._slideLastMs = 0;
+    tl.connect("new-frame", (_t: Clutter.Timeline, ms: number) => {
+      const dt = this._slideLastMs ? (ms - this._slideLastMs) / 1000 : 1 / 60;
+      this._slideLastMs = ms;
+      const rest = this._slide.step(dt);
+      this._applySlide();
+      if (rest) {
+        this._stopSlideTimeline();
+        this._finishVisibilityAnimation(this._slide.target === 1);
+      }
     });
+    this._slideTimeline = tl;
+    tl.start();
+  }
+
+  private _stopSlideTimeline(): void {
+    if (!this._slideTimeline) return;
+    this._slideTimeline.stop();
+    this._slideTimeline = null;
+  }
+
+  private _applySlide(): void {
+    const p = this._slide.value;
+    const away = 1 - p;
+    this._container.translation_x = this._restingTranslationX + this._hiddenOffset[0] * away;
+    this._container.translation_y = this._restingTranslationY + this._hiddenOffset[1] * away;
+    this._container.opacity = Math.round(255 * Math.max(0, Math.min(1, p)));
   }
 
   private _finishVisibilityAnimation(show: boolean): void {
-    this._container.translation_x = this._animationToX;
-    this._container.translation_y = this._animationToY;
-    this._container.opacity = this._animationToOpacity;
+    this._container.translation_x = this._restingTranslationX + (show ? 0 : this._hiddenOffset[0]);
+    this._container.translation_y = this._restingTranslationY + (show ? 0 : this._hiddenOffset[1]);
+    this._container.opacity = show ? 255 : 0;
     this._container.visible = show;
+    this._dispatch("settled");
     this._notifyActive();
   }
 
   private _cancelAnimation(): void {
-    if (this._animationSourceId === null) return;
-
-    GLib.Source.remove(this._animationSourceId);
-    this._animationSourceId = null;
+    this._stopSlideTimeline();
   }
 
   /** How far the dock goes to be fully off its edge: its own thickness and a little more. */
