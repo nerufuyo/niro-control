@@ -16,6 +16,7 @@ import * as Format from './format.js';
 import * as Playback from './playback.js';
 import {watchClock} from './wallClock.js';
 import {dur, motionOn} from './motion.js';
+import {roomGate} from './surfaceMotion.js';
 import {Bars, PrivacyDots, RecordingDot, Ring, easeTo, fence, icon, iconButton, label, slideBy} from './widgets.js';
 
 /** Sizes and distances in CSS pixels (see `px`). */
@@ -57,6 +58,11 @@ const SETTINGS_OPACITY = 153;
 const PAUSED_BARS_OPACITY = 110;
 const SLIDE_DISTANCE = 48;
 const SLIDE_DURATION = 260;
+/** The header's side padding, in CSS px: the content is inside the surface once it is that far in from each end (see `followSurface`). */
+const GATE_EDGE = 20;
+/** The last stretch (CSS px) of the surface's growth over which the content's room is made, and how long it then fades in (ms). */
+const GATE_RAMP = 6;
+const GATE_FADE = 240;
 /** While open, a page that changed out of sight is built and laid out ahead this long after, at most this
  * often (a download's notification updates every second), each shown out of sight for this long. */
 const OPEN_WARM_MS = 600;
@@ -103,6 +109,9 @@ export const ExpandedView = GObject.registerClass({
         this._index = Math.max(0, pages.findIndex(page => page.available));
         this._active = false;
         this._width = px(EXPANDED_WIDTH);
+        /** How far the content's fade-in has got (1: not waiting for room), and its timeline: see `followSurface`. */
+        this._fade = 1;
+        this._fadeTimeline = null;
         /** Set once smooth scrolling is seen; its click-style copies are then dropped. */
         this._smoothScrolling = false;
         this._lastFlip = 0;
@@ -629,6 +638,65 @@ export const ExpandedView = GObject.registerClass({
         return null;
     }
 
+    /** The island tells, every frame while it changes size, how far each edge of its surface is from where it will rest (null at rest) and
+     * how big it is against this view's size: the tabs keep with the surface's left edge (the status already does with the right, see
+     * `_followRoom`), and what the view holds shows only once the surface has the room for it (the header by the width, the page by both),
+     * fading in from then, not by time alone: nothing of it is ever cut by the surface's edge, opening or closing (see surfaceMotion.ts
+     * `roomGate`). Narrowing, the room goes and the content with it, before the edge reaches it. */
+    followSurface(state) {
+        if (!state) {
+            this._tabsBox.translation_x = 0;
+            this._gates = null;
+            this._stopFade();
+            this._fade = 1;
+            this._header.opacity = this._pagerArea.opacity = 255;
+            return;
+        }
+        const scale = uiScale();
+        this._tabsBox.translation_x = state.left;
+        const across = roomGate(state.width, state.finalWidth, {edge: GATE_EDGE * scale, ramp: GATE_RAMP * scale});
+        const down = roomGate(state.height, state.finalHeight, {edge: BOTTOM_PADDING * scale, ramp: GATE_RAMP * scale});
+        this._gates = {header: across, page: across * down};
+        // Room for the content: it fades in over its own short time from then (a gate alone would be a pop). Room gone: ready to again.
+        if (this._gates.header === 0) {
+            this._stopFade();
+            this._fade = 0;
+        } else if (this._fade === 0 && !this._fadeTimeline) {
+            this._startFade();
+        }
+        this._applyGates();
+    }
+
+    /** The gates' result: each part's opacity is its room's gate times the fade-in that began with it. */
+    _applyGates() {
+        const gates = this._gates;
+        if (!gates)
+            return;
+        const fade = motionOn() ? this._fade : 1;
+        this._header.opacity = Math.round(255 * gates.header * fade);
+        this._pagerArea.opacity = Math.round(255 * gates.page * fade);
+    }
+
+    _startFade() {
+        const timeline = new Clutter.Timeline({actor: this, duration: dur(GATE_FADE), progress_mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        timeline.connect('new-frame', () => {
+            this._fade = timeline.get_progress();
+            this._applyGates();
+        });
+        timeline.connect('completed', () => {
+            this._fade = 1;
+            this._fadeTimeline = null;
+            this._applyGates();
+        });
+        this._fadeTimeline = timeline;
+        timeline.start();
+    }
+
+    _stopFade() {
+        this._fadeTimeline?.stop();
+        this._fadeTimeline = null;
+    }
+
     /** Tells the island when the width it should have changed. */
     _syncWidth() {
         // Compare with the width we set, not `this.width`: reading that makes
@@ -920,6 +988,7 @@ export const ExpandedView = GObject.registerClass({
 
     /** Lets go of the timers and the signals of objects that outlive the view. */
     _onDestroy() {
+        this._stopFade();
         this._endOpenWarm();
         St.ThemeContext.get_for_stage(global.stage).disconnect(this._themeChanged);
         this._stopClock();

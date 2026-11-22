@@ -67,12 +67,26 @@ Runtime, a hermetic headless GNOME 51 with this checkout's island, own HOME/XDG/
 |---|---|
 | `island-steps-motion.sh` + `island-motion.py` | geometry every frame through compact, expanded, immersive, split, dismiss; the springs' value and velocity read in one call before and after each retarget (identical); no frame off its own velocity; width leads growing, height leads shrinking; overshoot about 3.3 % |
 | `island-steps-content.sh` + `island-reveal.py` | split zone wait, music reveal order, reverse retreat, retreat turned round, ghost fade, alert spring and reveal by priority, 60 volume events applied as 17 |
+| `island-steps-clip.sh` + `island-clip.py` | every painted frame's actor boxes: the first sign, clock, first tab and page never cut by the surface's clip while 25 % visible, never move more than the edge moved in a frame; 20 flips and retargets mid-flight; `MODE=minimal` and `MODE=off` |
 | `island-steps-reduced.sh` | full / minimal / off / GNOME animations off: overshoot, axis order, stagger, instant |
 | `island-steps-lifecycle.sh` + `island-lifecycle.py` | disable and enable five times with something live each time (the last mid-morph) |
 
 Limits of the headless runs: the virtual pointer cannot hover the island (the Search entry sits on top), so the island is opened and closed with `controller.expand()` and `collapse()`, which is what a hover calls; screenshots come from a service that lags the action by a few hundred ms, so frame-level evidence is the recorder, not the screenshots; the lifecycle census counts GLib timeouts made through `GLib.timeout_add` and signals connected through `GObject` on the shell's long-lived objects (stage, display, window manager, workspaces, `global`, `St.Settings`, layout manager, overview, message tray, session mode), not signals on JS-signal objects or on the extension's own actors (those die with it).
 
+## Content follows the surface's edge
+
+Root cause of the old "first sign jumps and is clipped" (measured per painted frame, `tests/shell/island-steps-clip.sh`, evidence in `docs/motion/evidence/island/frames-{before,after}.txt`): a view is laid out at the width it will have at rest and centred on the display, and stays still on screen while the shape springs around it. The controller sets the final size on the view in the same call that retargets the springs, so on the first frame of a widening the closed island's first sign was already at its final place (music + timer: 888 -> 869 px, 19 px in one frame) while the surface (the stage's clip) was still 152 px wide (884..1036) and reached 869 only about 170 ms later: 15 px of the sign cut for that long. The open island's first tab and page were the same: the view sits at its final x while the clip is 100 px narrower, and the content faded in (from 90 ms) inside a clip that cut up to 100 px of it. Narrowing, the sign teleported inward the same way. It was not caused by the axis lag (the width leads when growing, which only shortens the span); it is geometry: content placed against the final width, clipped by the animated one.
+
+The fix separates content placement from surface interpolation. `Island._followViews()` (every `_sync` frame and straight after a move's retargets, before the first frame) computes, per view, how far each edge of the animated surface is from where it will rest (`edgeShifts`, whole pixels) and tells the views that have `followSurface(state)` (null at rest):
+
+- **Compact** translates the left slot and the right side by those shifts: each sign keeps its inset from its edge and travels with it, both ways when the same view changes size (a sign moves in with a narrowing edge), only from past the edge for a view that comes in. The clock stays in the middle. A sign that arrives is revealed by `arrivalGate`: by how much of the way to the new width the surface has made (half to 95 %), not by time; it multiplies the existing timed fade on the slot, so it is retargetable and turns round with the surface.
+- **Expanded** pins its tabs to the left edge (the status already followed the right, `_followRoom`), and shows the header and the page only once the surface holds them (`roomGate`: width less the 20 px side padding, height less the bottom padding, after a 6 px ramp), then fades them in over 240 ms; closing, the room goes and the content with it before the edge reaches it. The content now appears about 120 ms later than before on an open (it waits for the room); that is the price of never being cut.
+
+The springs are untouched: width and height values and velocities before and after a retarget are identical (RETARGET1/2). Shifts are 0 at rest, and every view that is hidden is told once, so nothing stale remains.
+
 ## Known limits
 
-- When the island widens, the existing first sign sits at its new, wider place at once and is clipped by the shape's edge for the first ~100 ms; the new signs fade in after it, the existing one does not move with the edge (pre-existing: compact keeps its clock still and the views stay still on screen while the shape grows around them).
+- Content waits for room, so on an open the page is fully there about 450 ms after the move starts (before: about 410 ms, but cut).
+- The voice and the alerts (peek) views do not follow edges yet; they were not part of the measured defect.
+
 - The `Clutter.Clone` ghost of a leaving sign is drawn in the place the sign had in the compact view; it is not tracked if the layout moves under it in the 140 ms.

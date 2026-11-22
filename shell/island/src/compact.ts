@@ -21,7 +21,7 @@ import * as Palette from './palette.js';
 import * as Playback from './playback.js';
 import * as Theme from './theme.js';
 import {dur, motionMode, motionOn} from './motion.js';
-import {revealDelays, splitRevealDelay} from './surfaceMotion.js';
+import {arrivalGate, revealDelays, splitRevealDelay} from './surfaceMotion.js';
 import {watchClock} from './wallClock.js';
 import {Art, Bars, PrivacyDots, RecordingDot, Ring, icon, restsAt} from './widgets.js';
 
@@ -535,6 +535,13 @@ export const CompactView = GObject.registerClass({
             this.emit('activities-changed');
         if (this.preferredWidth !== widthBefore)
             this.emit('width-changed');
+        // No move came of it (the island has the width already): nothing to wait for.
+        for (const slot of [this._lead, this._right]) {
+            if (slot._arrival?.from === null) {
+                slot._arrival = null;
+                slot.opacity = 255;
+            }
+        }
     }
 
     /** How many activities (recording, call, music, timer) are live: two or more share the island (the surface is `split`). */
@@ -563,6 +570,31 @@ export const CompactView = GObject.registerClass({
         sign.opacity = 0;
         sign._revealDelay = delay;
         sign.ease({opacity: 255, delay: dur(delay), duration: dur(200), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        // It also waits for the surface to have the room: its slot is shown by how wide the surface is (see `followSurface`).
+        side._arrival = {from: null, to: null};
+    }
+
+    /** The island tells, every frame while it changes size, how far each edge of its surface is from where it will rest (null at
+     * rest): the sign at each end keeps its place from that edge instead of sitting at its final one at once (past the surface's clip
+     * when it widens, teleported when it narrows); the clock stays in the middle. A sign that arrives is shown by how much of the
+     * way to the new width the surface has made, not by time alone (see surfaceMotion.ts `arrivalGate`). */
+    followSurface(state) {
+        this._left.translation_x = state ? state.left : 0;
+        this._rightSide.translation_x = state ? state.right : 0;
+        for (const slot of [this._lead, this._right]) {
+            const arrival = slot._arrival;
+            if (!arrival)
+                continue;
+            if (state && arrival.from === null) {
+                arrival.from = state.width;
+                arrival.to = state.finalWidth;
+            }
+            const gate = state ? arrivalGate(state.width, arrival.from, arrival.to) : 1;
+            slot.opacity = Math.round(255 * gate);
+            // Settled, or nothing to wait for (the surface is not growing).
+            if (!state || arrival.to - arrival.from < 1)
+                slot._arrival = null;
+        }
     }
 
     /** A sign that leaves (the timer ended, the song stopped) fades out where it was, as a clone of it, while the slot is already given
