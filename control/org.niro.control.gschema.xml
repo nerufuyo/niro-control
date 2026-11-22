@@ -112,6 +112,82 @@
       <summary>Window switcher</summary>
       <description>A shortcut that opens a switcher with a live picture of every window, most recently used first. Empty means off: Alt+Tab is not changed. Arrows or Tab move, Enter or a click brings the window forward, Esc closes.</description>
     </key>
+    <key name="adaptive-suggestions" type="b">
+      <default>false</default>
+      <summary>Suggest a profile from the application in front</summary>
+      <description>When Search opens, offers one row that switches to a profile that fits the application in front (Gaming for a game launcher, Deep Work for a code editor, Creative for a design or video tool). Nothing is applied by itself, and the same suggestion stays quiet for 30 minutes.</description>
+    </key>
+    <key name="adaptive-live" type="b">
+      <default>false</default>
+      <summary>Watch for suggestions while you work</summary>
+      <description>Needs "Suggest a profile from the application in front". Instead of looking only when Search opens, Niro also looks when the focused window or the monitors change, so a suggestion can be waiting when you open Search. It only listens while this is on; nothing is applied by itself.</description>
+    </key>
+    <key name="permissions-enforced" type="b">
+      <default>false</default>
+      <summary>Ask before other programs use Search actions</summary>
+      <description>When on, a program that calls Search's actions over D-Bus (the voice assistant, a script) needs your permission for each kind of thing it does (launch, files, clipboard, windows, automation). You can allow once, or always; a program can be revoked at any time. Off keeps the current behaviour: only the actions that already ask you, ask you.</description>
+    </key>
+    <key name="smart-clipboard" type="b">
+      <default>false</default>
+      <summary>Keep secrets out of the clipboard history</summary>
+      <description>When on, Search checks the island's clipboard history about once a minute and removes unpinned text that looks like a password, a key, a token or a card number. Pinned items stay. The island saves a copy first, so a secret can sit in the history for up to a minute; a password manager's own copies are already left out. Nothing is logged and the text never leaves this computer.</description>
+    </key>
+    <key name="smart-clipboard-minutes" type="i">
+      <range min="0" max="1440"/>
+      <default>0</default>
+      <summary>Forget unpinned clipboard items after</summary>
+      <description>Needs "Keep secrets out of the clipboard history". Unpinned items older than this many minutes (0 to 1440) are removed from the history. 0 keeps them.</description>
+    </key>
+    <key name="notification-hub" type="b">
+      <default>false</default>
+      <summary>Apply notification rules</summary>
+      <description>When on, Search watches notifications as they arrive and keeps which application sent each one and how urgent it was (never the title or the text), only in memory and only the last 200. "notification summary" in Search shows the counts. Rules, quiet hours and snoozing are set with the notification actions in Search.</description>
+    </key>
+    <key name="notification-hub-apply" type="b">
+      <default>false</default>
+      <summary>Hide or silence notifications by rule</summary>
+      <description>Needs "Apply notification rules". A rule that says silent keeps the notification in the list without a banner; hide removes it. Urgent (critical) notifications are never hidden. Off: the rules are only counted and nothing is changed.</description>
+    </key>
+    <key name="perf-recording" type="b">
+      <default>false</default>
+      <summary>Record performance history</summary>
+      <description>When on, Search takes a reading of processor, memory, swap and load every 30 seconds (every 60 on battery) and keeps the last 360 in memory only. "performance" in Search shows them. Off: nothing is read except when you ask.</description>
+    </key>
+    <key name="privacy-dashboard" type="b">
+      <default>false</default>
+      <summary>Privacy overview in Search</summary>
+      <description>When on, "privacy" in Search says whether the microphone, the camera or the screen is in use now and by which application, as far as GNOME lets Niro see. What cannot be seen is shown as unknown, never as not in use. Nothing is kept.</description>
+    </key>
+    <key name="privacy-history" type="b">
+      <default>false</default>
+      <summary>Remember privacy events</summary>
+      <description>Needs "Privacy overview in Search". Keeps, in memory only, which application used the microphone, the camera or the screen and when, the last 200 events. Switching it off clears them. Looking costs a short check every 20 seconds while it is on.</description>
+    </key>
+    <key name="audio-router" type="b">
+      <default>false</default>
+      <summary>Audio router actions</summary>
+      <description>When on, Search can list sound outputs and playing applications ("audio devices", "audio streams"), set one application's volume and move its sound to another output. Nothing runs by itself, and the default output is never changed.</description>
+    </key>
+    <key name="universal-hud" type="b">
+      <default>false</default>
+      <summary>On-screen display action</summary>
+      <description>When on, the hud action shows a short message and level (volume, brightness, battery or your own) in GNOME's own on-screen display, so macros and plans can give feedback. GNOME places that display itself; its position and size cannot be changed.</description>
+    </key>
+    <key name="shelf-collections" type="b">
+      <default>false</default>
+      <summary>Shelf collections</summary>
+      <description>When on, Search can keep named collections of references (file paths, web addresses, short text) in a private file under your Niro Control settings. Removing an item or a collection never touches the original file. Text that looks like a secret is refused.</description>
+    </key>
+    <key name="widgets-in-search" type="b">
+      <default>false</default>
+      <summary>Widgets in Search</summary>
+      <description>When on, Search can list the built-in widgets (processor, memory, load, battery) and show their current values from one reading shared with the performance report. They appear only when you ask: there are no desktop widgets yet, and nothing polls in the background.</description>
+    </key>
+    <key name="flow-events" type="b">
+      <default>false</default>
+      <summary>Tell Niro Flow about desktop events</summary>
+      <description>When on, Search tells the Niro Flow service (in the island daemon) when the workspace changes, a monitor is plugged or unplugged, a profile is applied, or an application starts or comes to the front, so a workflow can start from them. Only the event kind and a number or an application or profile id are sent, never window titles or text. Nothing listens while this is off.</description>
+    </key>
     <key name="tools-above-apps" type="b">
       <default>true</default>
       <summary>Tools above applications</summary>

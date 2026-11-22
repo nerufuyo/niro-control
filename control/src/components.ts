@@ -7,6 +7,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
+import type {ColorAdvice} from './appearanceLogic.js';
 import {canonicalAccel, findConflict, hasModifier} from './logic.js';
 import type {Binding} from './store.js';
 import type {Item} from './types.js';
@@ -142,17 +143,52 @@ const hexOf = rgba => '#' + [rgba.red, rgba.green, rgba.blue].map(c => Math.roun
 const rgbaOf = hex => { const c = new Gdk.RGBA(); c.parse(hex); return c; };
 
 /** A colour swatch that opens the colour dialog; `withHex` adds a field for the hex value. */
-export function colorPicker(item: Item, binding: Binding, ctx: Context, withHex = false) {
+export interface ColorGate {
+    /** Advice for a colour about to be written (never changes it); null when it reads. */
+    advise?: (hex: string) => ColorAdvice | null;
+    /** Asked only for an unreadable colour: 'keep' writes it as chosen, 'suggested' writes the suggestion, 'cancel' writes nothing. */
+    /** false when the advice's suggestion is for ANOTHER colour (the tint's advice suggests a different accent): no one-click replace here. */
+    own?: boolean;
+    confirm?: (advice: ColorAdvice) => Promise<'keep' | 'suggested' | 'cancel'>;
+}
+
+function askUnreadable(ctx: Context, advice: ColorAdvice, offerSuggestion: boolean): Promise<'keep' | 'suggested' | 'cancel'> {
+    return new Promise(resolve => {
+        const dialog = Adw.AlertDialog.new('This colour is hard to see', `${advice.text}\n\nUse it anyway?`);
+        dialog.add_response('cancel', 'Keep the current colour');
+        if (offerSuggestion) dialog.add_response('suggested', `Use ${advice.suggestion}`);
+        dialog.add_response('keep', 'Use it anyway');
+        dialog.set_response_appearance('keep', Adw.ResponseAppearance.DESTRUCTIVE);
+        dialog.set_default_response('cancel'); dialog.set_close_response('cancel');
+        dialog.connect('response', (_d, response) => resolve(response === 'keep' || response === 'suggested' ? response : 'cancel'));
+        dialog.present(ctx.window ?? null);
+    });
+}
+
+export function colorPicker(item: Item, binding: Binding, ctx: Context, withHex = false, gate: ColorGate = {}) {
     const box = new Gtk.Box({spacing: 8, valign: Gtk.Align.CENTER});
     const button = new Gtk.ColorDialogButton({dialog: new Gtk.ColorDialog(), valign: Gtk.Align.CENTER});
     button.update_property([Gtk.AccessibleProperty.LABEL], [item.title]);
     const entry = new Gtk.Entry({max_length: 9, width_chars: 9, visible: withHex, css_classes: ['monospace']});
     let busy = false;
     bound(binding, v => { busy = true; button.set_rgba(rgbaOf(v)); entry.set_text(String(v).toUpperCase()); busy = false; });
+    // Every way in (dialog, hex field, a test) goes through here: a colour that cannot be seen asks first; the rest is written, with the note
+    // shown by the page. Nothing is ever changed without the user's say.
+    const commit = async (hex: string) => {
+        const advice = gate.advise?.(hex) ?? null;
+        if (advice?.level === 'unreadable') {
+            const answer = await (gate.confirm ?? (a => askUnreadable(ctx, a, gate.own !== false)))(advice);
+            if (answer === 'cancel') { busy = true; button.set_rgba(rgbaOf(binding.read())); entry.set_text(String(binding.read()).toUpperCase()); busy = false; return 'cancel'; }
+            if (answer === 'suggested' && gate.own !== false) hex = advice.suggestion;
+            guard(ctx, item.title, () => binding.write(hex));
+            return answer;
+        }
+        guard(ctx, item.title, () => binding.write(hex));
+        return 'written';
+    };
     button.connect('notify::rgba', () => {
         if (busy) return;
-        const hex = hexOf(button.get_rgba());
-        guard(ctx, item.title, () => binding.write(hex));
+        void commit(hexOf(button.get_rgba()));
     });
     const applyHex = () => {
         const text = entry.get_text().trim();
@@ -162,11 +198,11 @@ export function colorPicker(item: Item, binding: Binding, ctx: Context, withHex 
             entry.set_text(binding.read());
             return;
         }
-        guard(ctx, item.title, () => binding.write(text.toUpperCase()));
+        void commit(text.toUpperCase());
     };
     entry.connect('activate', applyHex);
     box.append(button); if (withHex) box.append(entry);
-    return {widget: box, focus: button};
+    return {widget: box, focus: button, commit, entry};
 }
 
 export function settingsText(item: Item, binding: Binding, ctx: Context, list = false) {

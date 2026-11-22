@@ -211,6 +211,8 @@ async fn publish(
     let mut service = iface.get_mut().await;
     let before = service.state.clone();
     update(&mut service.state);
+    // Niro Flow's triggers (battery, AC, network); a no-op unless Flow is on.
+    crate::flow::observe_system(&before, &service.state);
     let emitter = iface.signal_emitter();
     let result = async {
         if service.state != before {

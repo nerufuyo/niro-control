@@ -4,6 +4,8 @@
 # Needs the staged extensions (tests/shell/run-staged.sh) or the installed package.
 set -u
 cd "$(dirname "$0")/../.."
+# The test must not write the real ~/.local/share (Search's audit log, snips): run-staged.sh already isolates it, a direct run does here.
+[ -n "${NIRO_TEST_ISOLATED:-}" ] || { export XDG_DATA_HOME; XDG_DATA_HOME=$(mktemp -d); }
 LOG=$(mktemp); WORK=$(mktemp -d); trap 'rm -f "$LOG"; rm -rf "$WORK"; rm -f /run/user/$UID/gnome-shell-disable-extensions' EXIT
 FAILS=0
 rm -f /run/user/$UID/gnome-shell-disable-extensions
@@ -30,7 +32,7 @@ $TS enabled true
 R="JSON.stringify({area: (function(){const a=Main.layoutManager.getWorkAreaForMonitor(0); return {x:a.x,y:a.y,width:a.width,height:a.height}})(), focus: global.get_window_actors().map(a=>a.meta_window).filter(w=>/^w[0-9][0-9]$/.test(w.title)).sort((a,b)=>a.title<b.title?-1:1).indexOf(global.display.focus_window), windows: global.get_window_actors().map(a=>a.meta_window).filter(w=>/^w[0-9][0-9]$/.test(w.title)).sort((a,b)=>a.title<b.title?-1:1).map(w=>{const f=w.get_frame_rect(); return {title:w.title,x:f.x,y:f.y,width:f.width,height:f.height}})})"
 opened=0
 for n in 1 2 3 4 6 10; do
-  while [ $opened -lt $n ]; do opened=$((opened+1)); (WAYLAND_DISPLAY=niro-tiletest GDK_BACKEND=wayland gjs "$WORK/app.js" $opened >/dev/null 2>&1 &); sleep 2.5; ev "Main.overview.hide(); 1" >/dev/null; done
+  while [ $opened -lt $n ]; do opened=$((opened+1)); (WAYLAND_DISPLAY=niro-tiletest GDK_BACKEND=wayland gjs "$WORK/app.js" $opened >/dev/null 2>&1 & echo $! >> "$WORK/app.pids"); sleep 2.5; ev "Main.overview.hide(); 1" >/dev/null; done
   for layout in dwindle master-left master-right center-master grid three-columns horizontal vertical scrolling monocle; do
     $TS layout $layout; sleep 1.6
     ev "$R" | python3 tests/shell/tileState.py $layout > "$WORK/state.json"
@@ -45,7 +47,7 @@ ev "global.get_window_actors().map(a=>a.meta_window).find(w=>w.title===\"w10\").
 ev "$R" | python3 tests/shell/tileState.py master-left > "$WORK/state.json"
 PROBLEMS=$(node tests/shell/tileExpect.mjs < "$WORK/state.json" 2>/dev/null); COUNT=$(python3 -c "import json; print(len(json.load(open(\"$WORK/state.json\"))[\"windows\"]))")
 if [ -z "$PROBLEMS" ] && [ "$COUNT" = "9" ]; then echo "ok   after a window is closed, the other nine are laid out again"; else echo "FAIL after a window closed (saw $COUNT): $PROBLEMS"; fi
-pkill -f "gjs $WORK/app.js"; kill %1' 2>&1 | grep -E "^(ok|FAIL)" | tee "$WORK/out.txt"
+[ -s "$WORK/app.pids" ] && kill $(cat "$WORK/app.pids") 2>/dev/null; kill %1' 2>&1 | grep -E "^(ok|FAIL)" | tee "$WORK/out.txt"
 FAILS=$(grep -c "^FAIL" "$WORK/out.txt"); OKS=$(grep -c "^ok" "$WORK/out.txt")
 echo
 [ "$OKS" -ge 61 ] || { echo "FAIL only $OKS checks ran, wanted 61"; FAILS=$((FAILS+1)); }

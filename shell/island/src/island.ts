@@ -16,6 +16,7 @@ import {RIM_FUNCTIONS, RIM_UNIFORMS, rimCode, rimUniforms} from './glow.js';
 import {effectPoint, shaderEffect} from './shader.js';
 import {GENTLE, Spring, SpringDriver} from './spring.js';
 import * as Theme from './theme.js';
+import {dur, motionOn} from './motion.js';
 import {fence, setEnabled, slideBy} from './widgets.js';
 
 
@@ -361,7 +362,7 @@ export const Island = GObject.registerClass({
         const [fadeIn, fadeOut] = TINT_FADE[this._tintStyle];
         this.remove_transition('tint-strength');
         this.ease_property('tint-strength', rgb ? 1 : 0, {
-            duration: rgb ? fadeIn : fadeOut,
+            duration: dur(rgb ? fadeIn : fadeOut),
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
     }
@@ -378,7 +379,7 @@ export const Island = GObject.registerClass({
     pulseTint(time, level) {
         this._pulse?.stop();
         this._pulse = null;
-        if (!St.Settings.get().enable_animations) {
+        if (!motionOn()) {
             this.setTintMotion(time, level);
             return;
         }
@@ -410,7 +411,7 @@ export const Island = GObject.registerClass({
             return;
         }
         this._glow.opacity = 255;
-        if (this._glow.mapped && St.Settings.get().enable_animations) {
+        if (this._glow.mapped && motionOn()) {
             // A few breaths, then still and bright: nothing redrawn while it waits on.
             this._glow.ease({opacity: BREATH_OPACITY, duration: BREATH_MS, mode: Clutter.AnimationMode.EASE_IN_OUT_SINE,
                 repeatCount: 2 * BREATHS - 1, autoReverse: true});
@@ -469,7 +470,7 @@ export const Island = GObject.registerClass({
         // The first shape appears without animating: an island of zero size
         // is on no monitor, so it would get no frames to animate with.
         const firstShow = this._view === null;
-        if (firstShow || !St.Settings.get().enable_animations) {
+        if (firstShow || !motionOn()) {
             for (const spring of this._springs)
                 spring.reset(spring.target);
             this._sync();
@@ -509,7 +510,7 @@ export const Island = GObject.registerClass({
         if (!hidden)
             this._showSettledView();
         const out = -Math.ceil(this.height);
-        if (!St.Settings.get().enable_animations) {
+        if (!motionOn()) {
             this._setLift(hidden ? out : 0);
             this.opacity = hidden ? 0 : 255;
             if (hidden) {
@@ -519,7 +520,7 @@ export const Island = GObject.registerClass({
             }
             return;
         }
-        const duration = hidden ? AUTO_HIDE_UP : AUTO_HIDE_DOWN;
+        const duration = dur(hidden ? AUTO_HIDE_UP : AUTO_HIDE_DOWN);
         const fade = Math.round(duration * AUTO_HIDE_FADE_SHARE);
         // Going: it speeds up into the edge, and fades only at the end. Coming: in at once, slowing as it lands.
         this.ease({
@@ -695,7 +696,7 @@ export const Island = GObject.registerClass({
 
     /** A quick rubber-band stretch, e.g. pressing volume up at 100%. */
     nudge() {
-        if (!St.Settings.get().enable_animations)
+        if (!motionOn())
             return;
         this._width.velocity += px(NUDGE_VELOCITY);
         this._driver.start();
@@ -707,12 +708,12 @@ export const Island = GObject.registerClass({
         const before = this._monitor ? view.x + this._islandX + this._stageX : null;
         this._placeView(view);
         // One that keeps its middle still (the closed island's clock) grows at its sides instead.
-        if (before === null || view !== this._view || !view.mapped || view.keepsMiddle || !St.Settings.get().enable_animations)
+        if (before === null || view !== this._view || !view.mapped || view.keepsMiddle || !motionOn())
             return;
         const offset = view.translation_x + before - (view.x + this._islandX + this._stageX);
         if (offset === 0)
             return;
-        slideBy(view, 'x', offset, 0, {duration: GLIDE_MS});
+        slideBy(view, 'x', offset, 0, {duration: dur(GLIDE_MS)});
     }
 
     /** Where `view` sits on screen: centred on the monitor, in whole pixels. */
@@ -739,10 +740,10 @@ export const Island = GObject.registerClass({
         // Down as the island takes room, up as it gives it; never sideways, it hangs from the top.
         if (previous) {
             previous.remove_all_transitions();
-            slideBy(previous, 'y', previous.translation_y, growing ? shift : -shift, {duration: FADE_OUT});
+            slideBy(previous, 'y', previous.translation_y, growing ? shift : -shift, {duration: dur(FADE_OUT)});
             previous.ease({
                 opacity: 0,
-                duration: FADE_OUT,
+                duration: dur(FADE_OUT),
                 // Stays whole at first and goes at the end, so the next view comes in before this one is gone.
                 mode: Clutter.AnimationMode.EASE_IN_QUAD,
                 onStopped: finished => {
@@ -765,9 +766,9 @@ export const Island = GObject.registerClass({
         if (!returning)
             view.opacity = 0;
         const delay = previous && !returning ? FADE_IN_DELAY : 0;
-        view.ease({opacity: 255, delay, duration: FADE_IN, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        view.ease({opacity: 255, delay: dur(delay), duration: dur(FADE_IN), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
         // Settles as the shape does.
-        slideBy(view, 'y', from, 0, {delay, duration: FADE_IN + 80});
+        slideBy(view, 'y', from, 0, {delay: dur(delay), duration: dur(FADE_IN + 80)});
     }
 
     /** Sizes and places everything from the springs' current values; runs every animation frame. */

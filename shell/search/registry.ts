@@ -32,7 +32,7 @@ export interface Action<Env = unknown> {
     run: (args: Record<string, unknown>, env: Env) => Promise<string | void>;
 }
 
-export type Code = 'unknown' | 'invalid' | 'unavailable' | 'declined' | 'failed';
+export type Code = 'unknown' | 'invalid' | 'unavailable' | 'declined' | 'failed' | 'denied' | 'duplicate';
 export interface Outcome {ok: boolean; message?: string; error?: string; code?: Code}
 
 /** What is wrong with `args` for `params`, or null. Unknown arguments are refused too: nothing slips in unchecked. */

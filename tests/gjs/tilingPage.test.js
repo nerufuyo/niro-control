@@ -18,7 +18,8 @@ const {tilingPage} = await import('../../control/build/tilingPage.js');
 const {TileBackend} = await import('../../control/build/tileBackend.js');
 
 const toasts = [];
-const ctx = {toast: m => toasts.push(m), openLook: () => {}, inhibitShortcuts: () => {}, takenShortcuts: e => model.takenShortcuts(e), window: null};
+const asked = []; let agree = false;
+const ctx = {confirm: (t, _b, _l, done) => { asked.push(t); if (agree) done(); }, toast: m => toasts.push(m), openLook: () => {}, inhibitShortcuts: () => {}, takenShortcuts: e => model.takenShortcuts(e), window: null};
 const model = new Model(ctx);
 const backend = new TileBackend(model.stores);
 const widget = tilingPage(model, ctx);
@@ -74,7 +75,206 @@ all(widget, w => w instanceof Gtk.Button && w.label === 'Check and save')[0].emi
 if (!toasts.some(t => /not a layout/.test(t))) fail(`a bad edit was not explained (${toasts})`);
 if (backend.settings.get_string('layout-map') !== before) fail('a bad edit changed the map');
 
+
+// ---- Advanced Rules: the engine switch, a rule list with add/edit/remove, conflicts and a dry run that applies nothing
+const entryOf = t => all(widget, w => w instanceof Adw.EntryRow && w.title === t)[0] ?? fail(`no entry "${t}"`);
+const spinOf = t => all(widget, w => w instanceof Adw.SpinRow && w.title === t)[0] ?? fail(`no spin "${t}"`);
+const comboOf = t => all(widget, w => w instanceof Adw.ComboRow && w.title === t)[0] ?? fail(`no combo "${t}"`);
+const btn = l => all(widget, w => w instanceof Gtk.Button && w.label === l)[0] ?? fail(`no button "${l}"`);
+// a rule's buttons are found through its row (the accessible label is checked separately below)
+const inRow = (id, test) => { const row = rows(new RegExp(`^${id}$`))[0] ?? fail(`no row for ${id}`); return all(row, test)[0] ?? fail(`nothing in row ${id}`); };
+const ruleButton = (id, icon) => inRow(id, w => w instanceof Gtk.Button && w.icon_name === icon);
+const rows = t => all(widget, w => w instanceof Adw.ActionRow && w.title && t.test(w.title));
+const adv = () => JSON.parse(backend.settings.get_string('advanced-rules'));
+
+if (!rows(/No advanced rules yet/).length) fail('no empty state for the advanced rules');
+if (!rows(/There are no rules to compare|No conflicts/).length && !all(widget, w => w instanceof Adw.ActionRow && w.title === 'No conflicts').length) fail('no empty state for conflicts');
+// the engine switch writes the setting, and is off to start with
+const engine = all(widget, w => w instanceof Adw.SwitchRow && w.title === 'Use the advanced rules')[0] ?? fail('no engine switch');
+if (engine.active || backend.settings.get_boolean('rules-engine')) fail('the engine is not off by default');
+engine.set_active(true);
+if (!backend.settings.get_boolean('rules-engine')) fail('the switch did not write rules-engine');
+engine.set_active(false);
+if (backend.settings.get_boolean('rules-engine')) fail('the switch did not turn it off');
+// an empty name, and a rule with no condition, are refused with a sentence and write nothing
+btn('Add the advanced rule').emit('clicked');
+if (!toasts.some(t => /name first/.test(t))) fail(`no sentence for a nameless rule (${toasts})`);
+entryOf('Rule name (letters, digits, dot, dash)').set_text('empty');
+comboOf('Action: tiling').set_selected(1);
+btn('Add the advanced rule').emit('clicked');
+if (!toasts.some(t => /Not saved: .*no condition/.test(t))) fail(`a rule without a condition was not explained (${toasts})`);
+if (adv().length) fail('a refused rule was written');
+// a valid rule is added, listed, and the form is cleared
+entryOf('Rule name (letters, digits, dot, dash)').set_text('calc');
+entryOf('Condition: application (window class)').set_text('org.gnome.Calculator');
+comboOf('Action: tiling').set_selected(1);
+spinOf('Priority').set_value(5);
+spinOf('Action: opacity').set_value(0.8);
+btn('Add the advanced rule').emit('clicked');
+let list = adv();
+if (list.length !== 1 || list[0].id !== 'calc' || list[0].conditions.appId !== 'org.gnome.Calculator' || list[0].actions.tile !== 'float' || list[0].priority !== 5 || list[0].actions.opacity !== 0.8) fail(`rules: ${JSON.stringify(list)}`);
+if (!rows(/^calc$/).length) fail('the rule is not listed');
+if (entryOf('Rule name (letters, digits, dot, dash)').get_text() !== '') fail('the form was not cleared');
+// a duplicate name is refused
+entryOf('Rule name (letters, digits, dot, dash)').set_text('calc');
+entryOf('Condition: application (window class)').set_text('firefox');
+comboOf('Action: tiling').set_selected(2);
+btn('Add the advanced rule').emit('clicked');
+if (!toasts.some(t => /already a rule named "calc"/.test(t))) fail(`a duplicate was not explained (${toasts})`);
+// a second rule that disagrees shows up under Conflicts
+entryOf('Rule name (letters, digits, dot, dash)').set_text('calc-tile');
+entryOf('Condition: application (window class)').set_text('org.gnome.Calculator');
+comboOf('Action: tiling').set_selected(2);
+spinOf('Action: move to workspace').set_value(3);
+btn('Add the advanced rule').emit('clicked');
+if (adv().length !== 2) fail(`two rules expected: ${JSON.stringify(adv())}`);
+if (!rows(/&quot;calc&quot; and &quot;calc-tile&quot; both set tile/).length) fail('the conflict is not listed');
+// the dry run: matched, trace, what would be done; nothing marked as not applied; nothing written
+const before2 = backend.settings.get_string('advanced-rules');
+entryOf('Dry run: application (window class)').set_text('org.gnome.calculator');
+btn('Run the dry run').emit('clicked');
+if (!rows(/^calc: matched$/).length || !rows(/^calc-tile: matched$/).length) fail('the trace does not show the matches');
+if (!rows(/^Would do$/).some(r => /tile float \(from calc\)/.test(r.subtitle) && /workspace 3 \(from calc-tile\)/.test(r.subtitle))) fail('the result is not shown');
+if (rows(/not applied on this system/).length) fail('an action is marked as not applied, but every rule action is applied now');
+if (!rows(/The engine is off/).length) fail('the dry run does not say the engine is off');
+if (backend.settings.get_string('advanced-rules') !== before2 || backend.settings.get_boolean('rules-engine')) fail('the dry run changed a setting');
+// a window no rule matches
+entryOf('Dry run: application (window class)').set_text('firefox');
+btn('Run the dry run').emit('clicked');
+if (!rows(/^Would do nothing$/).length || !rows(/^calc: did not match$/).length) fail('no result for an unmatched window');
+// editing keeps the name and changes the rule in place
+ruleButton('calc-tile', 'document-edit-symbolic').emit('clicked');
+if (entryOf('Rule name (letters, digits, dot, dash)').get_text() !== 'calc-tile') fail('the form did not load the rule');
+if (btn('Save the advanced rule') === null) fail('no save button while editing');
+spinOf('Priority').set_value(9);
+btn('Save the advanced rule').emit('clicked');
+list = adv();
+if (list.length !== 2 || list[1].id !== 'calc-tile' || list[1].priority !== 9 || list[1].actions.workspace !== 3) fail(`edit: ${JSON.stringify(list)}`);
+// the per-rule switch
+const sw = inRow('calc', w => w instanceof Gtk.Switch);
+sw.emit('state-set', false);
+if (adv()[0].enabled !== false) fail('the rule switch did not write');
+// removing asks first; a no leaves it, a yes removes it
+ruleButton('calc', 'user-trash-symbolic').emit('clicked');
+if (asked.length !== 1 || adv().length !== 2) fail('removing did not ask first');
+agree = true;
+ruleButton('calc', 'user-trash-symbolic').emit('clicked');
+if (adv().length !== 1 || adv()[0].id !== 'calc-tile') fail(`remove: ${JSON.stringify(adv())}`);
+// a stored list that is not valid is shown as a problem, not hidden
+backend.settings.set_string('advanced-rules', '[{"id":"broken"}]');
+engine.set_active(true);   // any change redraws from what is stored
+if (!all(widget, w => w instanceof Adw.ActionRow && w.title === 'Invalid').length) fail('a stored invalid rule is not reported');
+backend.settings.set_string('advanced-rules', '[]');
+engine.set_active(false);
+if (!rows(/No advanced rules yet/).length) fail('the empty state did not come back');
+
 // without the extension the pages say so rather than showing nothing
 if (!all(widget, w => w instanceof Adw.ActionRow && /extension is not running/.test(w.subtitle ?? '')).length) fail('no word about the extension not running');
+
+
+// ---- Groups, Snapshots and monitor recovery, against the real workspace service behind a fake transport
+{
+    const {installFakeShell} = await import('./tileFakeShell.js');
+    const {TileBackend: TB} = await import('../../control/build/tileBackend.js');
+    const shell = installFakeShell(TB, {windows: [
+        {id: 1, appId: 'org.a.Edit', title: 'one', workspace: 1, monitor: 0}, {id: 2, appId: 'org.b.Term', title: 'sh', workspace: 2, monitor: 1}]});
+    const w2 = tilingPage(model, ctx);
+    const sections = all(w2, w => w instanceof Gtk.Label && ['Groups', 'Snapshots'].includes(w.label)).length;
+    if (sections < 2) fail('the Groups and Snapshots sections are not in the list');
+    const rowsOf = re => all(w2, w => w instanceof Adw.ActionRow && re.test(w.title ?? ''));
+    const entryW = t2 => all(w2, w => w instanceof Adw.EntryRow && w.title === t2)[0] ?? fail(`no entry ${t2}`);
+    const button = l => all(w2, w => w instanceof Gtk.Button && w.label === l)[0] ?? null;
+    const expanders = () => all(w2, w => w instanceof Adw.ExpanderRow);
+    const reread = () => w2.emit('map');   // the page follows the shell when it is shown
+
+    // monitor recovery: off, and the switch writes the setting
+    const rec = all(w2, w => w instanceof Adw.SwitchRow && /Move windows off a monitor/.test(w.title))[0] ?? fail('no monitor recovery switch');
+    if (rec.active) fail('monitor recovery is not off by default');
+    rec.set_active(true);
+    if (!backend.settings.get_boolean('monitor-recovery')) fail('the recovery switch did not write');
+    rec.set_active(false);
+
+    // groups: create (empty), add an open window, activate, delete
+    reread();
+    entryW('New group (empty)').set_text('Work');
+    entryW('New group (empty)').emit('apply');
+    if (!backend.groups().some(g => g.name === 'Work')) fail('the group was not created');
+    const ex = expanders().find(e => e.title === 'Work') ?? fail('the group is not listed');
+    if (backend.groups()[0].members.length !== 0) fail('a group made in the panel must not contain the panel window');
+    const pick = all(ex, w => w instanceof Adw.ComboRow && w.title === 'Add a window')[0] ?? fail('no add-a-window row');
+    pick.set_selected(1);
+    all(pick, w => w instanceof Gtk.Button && w.label === 'Add')[0].emit('clicked');
+    if (backend.groups()[0].members[0]?.windowId !== 2) fail(`the chosen window was not added: ${JSON.stringify(backend.groups()[0].members)}`);
+    shell.wins.find(w => w.id === 2).workspace = 3;
+    all(expanders().find(e => e.title === 'Work'), w => w instanceof Gtk.Button && w.label === 'Activate')[0].emit('clicked');
+    if (!shell.moved.length) fail('Activate did not move the window');
+    if (!toasts.some(t => /^Moved 1 window/.test(t))) fail(`no sentence for the activation (${toasts.slice(-3)})`);
+    shell.wins = shell.wins.filter(w => w.id !== 2);   // the app is closed: still not an error
+    toasts.length = 0;
+    all(expanders().find(e => e.title === 'Work'), w => w instanceof Gtk.Button && w.label === 'Activate')[0].emit('clicked');
+    if (!toasts.some(t => /1 not open/.test(t))) fail(`a closed window is not reported (${toasts})`);
+    agree = false; asked.length = 0;
+    all(expanders().find(e => e.title === 'Work'), w => w instanceof Gtk.Button && /^Delete the group/.test(w.tooltip_text ?? ''))[0].emit('clicked');
+    if (!asked.some(a => /Delete the group/.test(a)) || !backend.groups().length) fail('deleting did not ask first');
+    agree = true;
+    all(expanders().find(e => e.title === 'Work'), w => w instanceof Gtk.Button && /^Delete the group/.test(w.tooltip_text ?? ''))[0].emit('clicked');
+    if (backend.groups().length) fail('the group was not deleted after yes');
+
+    // snapshots: take, preview (nothing moves), restore after a yes, partial results
+    shell.wins = [{id: 1, appId: 'org.a.Edit', title: 'one', workspace: 1, monitor: 0}, {id: 3, appId: 'org.c.Gone', title: 'g', workspace: 2, monitor: 0}];
+    entryW('Take a snapshot now (a name is optional)').set_text('Morning');
+    entryW('Take a snapshot now (a name is optional)').emit('apply');
+    if (backend.snapshots().snapshots.length !== 1) fail('the snapshot was not taken');
+    shell.wins = [{id: 1, appId: 'org.a.Edit', title: 'one', workspace: 3, monitor: 0}];   // moved, and one app closed
+    const snap = expanders().find(e => e.title === 'Morning') ?? fail('the snapshot is not listed');
+    const restoreB = all(snap, w => w instanceof Gtk.Button && w.label === 'Restore…')[0];
+    if (restoreB.sensitive) fail('Restore is enabled before a preview');
+    shell.moved.length = 0;
+    all(snap, w => w instanceof Gtk.Button && w.label === 'Preview')[0].emit('clicked');
+    if (shell.moved.length) fail('a preview moved a window');
+    if (!restoreB.sensitive) fail('Restore stayed disabled after a preview with work to do');
+    if (!all(snap, w => w instanceof Adw.ActionRow && /not running/.test(w.subtitle ?? '')).length) fail('the app that is not running is not listed');
+    const startB = all(snap, w => w instanceof Gtk.Button && w.label === 'Start')[0] ?? fail('no Start button for an app that is not running');
+    if (shell.launched.length) fail('something was launched before Start was pressed');
+    agree = false; asked.length = 0;
+    restoreB.emit('clicked');
+    if (shell.moved.length || !asked.length) fail('restore did not ask first');
+    agree = true;
+    restoreB.emit('clicked');
+    if (shell.moved.length !== 1 || shell.moved[0].workspace !== 1) fail(`restore moved ${JSON.stringify(shell.moved)}`);
+    if (shell.launched.length) fail('restore launched an app');
+    startB.emit('clicked');
+    if (shell.launched.join() !== 'org.c.gone') fail(`Start launched ${shell.launched}`);
+    // advanced rules over the open windows: the fullscreen action in the form, a preview first, a confirmation, then the shell applies it once
+    shell.wins = [{id: 1, appId: 'org.a.Edit', title: 'one', workspace: 1, monitor: 0}];
+    const sw = all(w2, w => w instanceof Adw.SwitchRow && w.title === 'Action: make full screen')[0] ?? fail('no fullscreen action switch');
+    entryW('Rule name (letters, digits, dot, dash)').set_text('full');
+    entryW('Condition: application (window class)').set_text('org.a.Edit');
+    sw.set_active(true);
+    all(w2, w => w instanceof Gtk.Button && w.label === 'Add the advanced rule')[0].emit('clicked');
+    if (!adv().some(r => r.id === 'full' && r.actions.fullscreen === true)) fail(`the fullscreen action was not saved: ${JSON.stringify(adv())}`);
+    const applyBtn = all(w2, w => w instanceof Gtk.Button && w.label === 'Apply to open windows')[0] ?? fail('no Apply to open windows button');
+    shell.ruleCalls.length = 0; asked.length = 0; agree = false;
+    applyBtn.emit('clicked');
+    if (shell.ruleCalls.join() !== 'ApplyRulesPreview') fail(`the button must preview first: ${shell.ruleCalls}`);
+    if (!asked.some(a => /Apply the rules to 1 open window/.test(a))) fail(`no confirmation (${asked})`);
+    if (shell.wins[0].workspace !== 1) fail('a window moved before the person confirmed');
+    if (!all(w2, w => w instanceof Adw.ActionRow && /fullscreen true/.test(w.title ?? '')).length) fail('the preview does not list what would change');
+    agree = true;
+    applyBtn.emit('clicked');
+    if (shell.ruleCalls.join() !== 'ApplyRulesPreview,ApplyRulesPreview,ApplyRules') fail(`calls: ${shell.ruleCalls}`);
+    if (!toasts.some(t => /^Applied to 1 window/.test(t))) fail(`no sentence after applying (${toasts.slice(-3)})`);
+    toasts.length = 0;
+    shell.wins[0].workspace = 2;   // nothing left to change
+    applyBtn.emit('clicked');
+    if (!toasts.some(t => /Nothing to change/.test(t))) fail('a run with nothing pending is not said');
+    shell.engine = false; toasts.length = 0;
+    applyBtn.emit('clicked');
+    if (!toasts.some(t => /engine is off/.test(t))) fail(`the engine being off is not explained (${toasts})`);
+    shell.engine = true;
+    // without the shell the sections still draw and say why
+    shell.on = false;
+    reread();
+}
 
 print('tilingPage: ok');

@@ -12,13 +12,14 @@ import {
 } from './components.js';
 import type {Context} from './components.js';
 import {aiConnectionsGroup} from './aiConnections.js';
+import {colorAdvice} from './appearanceLogic.js';
 import {dependencyBlocks, dependencyMet} from './logic.js';
 import {dockPreview, lookPreview, windowsPreview} from './previews.js';
 import {ProfileEngine} from './profiles.js';
 import {bindingFor, Stores} from './store.js';
 import type {Item} from './types.js';
 
-const TONES = [['Ember', '#E8472B', '#1C1C1E'], ['Ocean', '#0A84FF', '#10161F'], ['Mint', '#30D158', '#101A14'],
+export const TONES = [['Ember', '#E8472B', '#1C1C1E'], ['Ocean', '#0A84FF', '#10161F'], ['Mint', '#30D158', '#101A14'],
     ['Violet', '#5E5CE6', '#171527'], ['Amber', '#FF9F0A', '#1C1810'], ['Mono', '#8E8E93', '#1C1C1E']];
 const SYSTEM_SHORTCUT_SCHEMAS = ['org.gnome.desktop.wm.keybindings', 'org.gnome.shell.keybindings', 'org.gnome.mutter.keybindings',
     'org.gnome.settings-daemon.plugins.media-keys'];
@@ -65,6 +66,13 @@ export class Model {
 
     item(id: string): Item {
         return this.byId.get(id);
+    }
+
+    /** The contrast gate of the accent and the tint (an accent that cannot be seen on the tint is warned about, never changed). */
+    colorGate(item: Item) {
+        if (item.id === 'niro.accent') return {own: true, advise: (v: string) => colorAdvice(v, String(this.read('niro.tint') ?? ''))};
+        if (item.id === 'niro.tint') return {own: false, advise: (v: string) => colorAdvice(String(this.read('niro.accent') ?? ''), v)};
+        return {};
     }
 
     /** Where an item's value lives: a managed one reads the Look item that owns it. */
@@ -194,7 +202,7 @@ export class Model {
             case 'slider': control = settingsSlider(item, b, ctx); break;
             case 'stepper': control = settingsStepper(item, b, ctx); break;
             case 'select': control = settingsSelect(item, b, ctx); break;
-            case 'color': control = colorPicker(item, b, ctx); break;
+            case 'color': control = colorPicker(item, b, ctx, false, this.colorGate(item)); break;
             case 'shortcut': control = shortcutRecorder(item.title, b, ctx); break;
             case 'list': control = settingsText(item, b, ctx, true); break;
             default: control = settingsText(item, b, ctx); break;
@@ -282,6 +290,7 @@ function previewBlock(model: Model, p) {
 }
 
 // ---- Look
+export const lookPickers: Record<string, any> = {};   // the hex pickers of the Look page (a test drives them)
 export function lookPage(model: Model) {
     const items = CATALOG.filter(i => i.menu === 'Look');
     const accent = model.item('niro.accent'), tint = model.item('niro.tint');
@@ -314,11 +323,33 @@ export function lookPage(model: Model) {
     const toneGroup = settingsSection('Tone', '', () => model.confirmReset('Tone', items.filter(i => i.group === 'Tone')));
     items.filter(i => i.group === 'Tone').forEach(i => toneGroup.add(model.row(i)));
     const more = advancedDisclosure();
+    // contrast: the accent on the panel surface (the tint). Warned about with the ratio and a suggestion, never changed for the user.
+    // The hex rows sit in the advanced disclosure, so the note sits in the Tone group where everyone sees it.
+    const adviceNow = () => colorAdvice(String(model.read('niro.accent') ?? ''), String(model.read('niro.tint') ?? ''));
+    const noteRow = new Adw.ActionRow({title_lines: 0, subtitle_lines: 0}); noteRow.set_name('look-contrast-note');
+    const useSuggestion = new Gtk.Button({label: 'Use suggestion', valign: Gtk.Align.CENTER, css_classes: ['flat']}); useSuggestion.set_name('look-contrast-use');
+    useSuggestion.connect('clicked', () => { const a = adviceNow(); if (a) model.binding(accent).write(a.suggestion); });
+    noteRow.add_suffix(useSuggestion);
+    const showAdvice = () => {
+        const a = adviceNow();
+        noteRow.set_visible(a !== null);
+        if (!a) return;
+        noteRow.set_title(a.level === 'unreadable' ? 'The accent is hard to see on this surface' : 'The accent is a little weak for text on this surface');
+        noteRow.set_subtitle(GLib.markup_escape_text(a.text, -1));
+        for (const c of ['warning', 'error']) noteRow.remove_css_class(c);
+        // under 3:1 it is an error colour; 3 to 4.5 is a calm note (fine for shapes, which is how the accent is mostly used; two shipped tones sit there)
+        if (a.level === 'unreadable') noteRow.add_css_class('error');
+    };
     for (const it of [accent, tint]) {
-        const hex = colorPicker(it, model.binding(it), model.ctx, true);
+        const hex = colorPicker(it, model.binding(it), model.ctx, true, {
+            ...model.colorGate(it),
+        });
         const row = new Adw.ActionRow({title: `${it.title} (hex)`, subtitle: 'Write it as #RRGGBB'});
         row.add_suffix(hex.widget); more.add_row(row);
+        lookPickers[it.id] = hex;
     }
+    toneGroup.add(noteRow);
+    showAdvice(); model.binding(accent).subscribe(showAdvice); model.binding(tint).subscribe(showAdvice);
     toneGroup.add(more);
     model.advancedWidgets.push(more);
     more.set_visible(model.mode === 'advanced');
@@ -396,6 +427,7 @@ export function searchPage(model: Model) {
         model.section('Search Behaviour', items.filter(i => i.group === 'Search Behaviour'), 'How Search orders and words its own answers, which cities it shows, and what it never offers to stop.'),
         model.section('Window Switcher', items.filter(i => i.group === 'Window Switcher'), 'A switcher with a live picture of each window, on a shortcut of your own. Off until you set one; Alt+Tab stays as it is.'),
         model.section('Home Assistant', items.filter(i => i.group === 'Home Assistant'), 'Search lists and toggles your lights and switches with "ha". The access token is read from ~/.config/niro-control/ha-token.'),
+        model.section('System Experience', items.filter(i => i.group === 'System Experience'), 'What Search keeps an eye on and offers to do about it: the clipboard history, notifications, performance, privacy, audio, the on-screen display and shelves. Each is off until you switch it on.'),
         model.section('Emoji Picker', items.filter(i => i.group === 'Emoji Picker'), 'Emoji, Kaomoji and text symbols, searched by name in English or Indonesian.'));
 }
 

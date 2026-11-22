@@ -8,11 +8,16 @@ import GLib from 'gi://GLib';
 import {Stores} from './store.js';
 import {checkLayoutMap, checkRules} from './tile/config.js';
 import {LAYOUT_IDS, LAYOUTS} from './tile/layouts.js';
+import {checkRules as checkAdvanced, evaluate, findConflicts, parseRules as parseAdvanced} from './tile/windowRules.js';
 
 export const PROFILE_VERSION = 1;
 /** The settings a profile (and a reset) carries: how the tiles are laid out and sized, never the shortcuts or whether tiling is on. */
-export const MANAGED = ['layout', 'gap-inner', 'gap-outer', 'master-factor', 'column-width', 'animate', 'layout-map', 'window-rules', 'floating-apps'];
+export const MANAGED = ['layout', 'gap-inner', 'gap-outer', 'master-factor', 'column-width', 'animate', 'layout-map', 'window-rules', 'floating-apps', 'rules-engine', 'advanced-rules'];
+/** Actions the advanced rules accept but this system does not carry out: none now (opacity is applied by the extension). */
+export const UNSUPPORTED_ACTIONS: string[] = [];
 const BUS = 'org.niro.Tile', PATH = '/org/niro/Tile';
+/** The version of the groups / snapshots D-Bus methods this backend speaks (shell/tile/workspace.js API). */
+export const WORKSPACE_API = 1;
 
 export const profileDir = () => GLib.build_filenamev([GLib.get_user_config_dir(), 'niro', 'tile-profiles']);
 export const backupDir = () => GLib.build_filenamev([GLib.get_user_state_dir(), 'niro', 'tile-backups']);
@@ -77,6 +82,78 @@ export class TileBackend {
         return LAYOUTS.map(([id, title, description]) => ({id, title, description}));
     }
 
+    // ---- Groups, snapshots and monitor recovery (the shell does the work; these are its D-Bus methods, version WORKSPACE_API)
+
+    /** One call to GroupsCall / SnapshotsCall / MonitorStatus. Throws a sentence when the shell cannot answer or refuses. */
+    _workspace(method, params = null) {
+        let r;
+        try {
+            r = this._call(method, params);
+        } catch (e) {
+            if (/UnknownMethod|No such method|not implemented/i.test(e.message))
+                throw new Error('the running Tile is older than this panel: log out and in (or run: gnome-extensions disable tile@niro.local; gnome-extensions enable tile@niro.local)');
+            throw e;
+        }
+        if (!r)
+            throw new Error('the tiling extension is not running, so this is not available (groups, snapshots and applying rules need the shell)');
+        const answer = JSON.parse(r[0]);
+        if (answer.api !== WORKSPACE_API)
+            throw new Error(`the shell speaks workspace API ${answer.api}, this panel ${WORKSPACE_API}: update both to the same version`);
+        if (!answer.ok)
+            throw new Error(answer.error || 'the shell refused');
+        return answer;
+    }
+
+    /** The versions and operations the running Tile offers, or null when it is not running. Throws when it has no workspace features. */
+    workspaceApi() {
+        return this.live ? this._workspace('GetWorkspaceApi') : null;
+    }
+
+    _groups(op, args = {}) {
+        return this._workspace('GroupsCall', new GLib.Variant('(ss)', [op, JSON.stringify(args)]));
+    }
+
+    _snapshots(op, args = {}) {
+        return this._workspace('SnapshotsCall', new GLib.Variant('(ss)', [op, JSON.stringify(args)]));
+    }
+
+    /** The groups. Without the shell the stored file is read as it is (no open/closed information). */
+    groups() {
+        if (this.live)
+            return this._groups('list').groups;
+        const text = read(GLib.build_filenamev([GLib.get_user_config_dir(), 'niro', 'tile-groups.json']));
+        try {
+            return (JSON.parse(text ?? '{}').groups ?? []).map(g => ({id: g.id, name: g.name, members: g.members.map(m => ({...m, open: false, windowId: null})), open: 0, closed: g.members.length, target: g.target ?? null, offline: true}));
+        } catch (_e) {
+            return [];
+        }
+    }
+
+    /** `windowIds` null: the focused window of the shell; a list (even empty) is used as given. */
+    createGroup(name, windowIds = null) { return this._groups('create', {name, windowIds}); }
+    addToGroup(id, windowId = 0) { return this._groups('add', {id, windowId}); }
+    removeFromGroup(id, windowId) { return this._groups('remove', {id, windowId}); }
+    renameGroup(id, name) { return this._groups('rename', {id, name}); }
+    deleteGroup(id) { return this._groups('delete', {id}); }
+    rememberGroup(id) { return this._groups('remember', {id}); }
+    activateGroup(id, preview = false) { return this._groups('activate', {id, preview}); }
+    restoreGroup(id, preview = false) { return this._groups('restore', {id, preview}); }
+
+    snapshots() { return this._snapshots('list'); }
+    takeSnapshot(name = '', pinned = false) { return this._snapshots('take', {name, pinned}); }
+    deleteSnapshot(id) { return this._snapshots('delete', {id}); }
+    pinSnapshot(id, pinned = true) { return this._snapshots('pin', {id, pinned}); }
+    diffSnapshots(a, b = null) { return this._snapshots('diff', b ? {a, b} : {a}); }
+    planSnapshot(id) { return this._snapshots('plan', {id}); }
+    /** The preview unless `confirm`; with it only the windows that run are moved (workspace and monitor), nothing is closed or launched. */
+    restoreSnapshot(id, confirm = false) { return this._snapshots('restore', {id, confirm}); }
+    launchFromSnapshot(id, appId) { return this._snapshots('launch', {id, appId}); }
+    retainSnapshots(max = 20, days = 30) { return this._snapshots('retain', {max, days}); }
+
+    monitorStatus() { return this._workspace('MonitorStatus'); }
+    get monitorRecovery() { return this.settings.get_boolean('monitor-recovery'); }
+    setMonitorRecovery(on) { this.settings.set_boolean('monitor-recovery', on); }
+
     // ---- Applying
 
     /** Gives the general layout, a workspace (from 1) or a monitor (from 0) a layout. Throws a sentence when it cannot. */
@@ -135,6 +212,10 @@ export class TileBackend {
             problems.push(...checkLayoutMap(typeof values['layout-map'] === 'string' ? values['layout-map'] : JSON.stringify(values['layout-map'])));
         if ('window-rules' in values)
             problems.push(...checkRules(typeof values['window-rules'] === 'string' ? values['window-rules'] : JSON.stringify(values['window-rules'])));
+        if ('rules-engine' in values && typeof values['rules-engine'] !== 'boolean')
+            problems.push('rules-engine must be true or false');
+        if ('advanced-rules' in values)
+            problems.push(...checkAdvanced(typeof values['advanced-rules'] === 'string' ? values['advanced-rules'] : JSON.stringify(values['advanced-rules'])).map(p => `advanced-rules: ${p}`));
         if ('floating-apps' in values && !(Array.isArray(values['floating-apps']) && values['floating-apps'].every(x => typeof x === 'string')))
             problems.push('floating-apps must be a list of names');
         for (const key of Object.keys(values))
@@ -150,16 +231,17 @@ export class TileBackend {
             layout: s.get_string('layout'), 'gap-inner': s.get_int('gap-inner'), 'gap-outer': s.get_int('gap-outer'),
             'master-factor': Math.round(s.get_double('master-factor') * 100) / 100, 'column-width': Math.round(s.get_double('column-width') * 100) / 100,
             animate: s.get_boolean('animate'), 'layout-map': s.get_string('layout-map'), 'window-rules': s.get_string('window-rules'), 'floating-apps': s.get_strv('floating-apps'),
+            'rules-engine': s.get_boolean('rules-engine'), 'advanced-rules': s.get_string('advanced-rules'),
         };
     }
 
     _put(values) {
         const s = this.settings;
         for (const [key, v] of Object.entries(values)) {
-            if (key === 'layout' || key === 'layout-map' || key === 'window-rules') s.set_string(key, typeof v === 'string' ? v : JSON.stringify(v));
+            if (key === 'layout' || key === 'layout-map' || key === 'window-rules' || key === 'advanced-rules') s.set_string(key, typeof v === 'string' ? v : JSON.stringify(v));
             else if (key === 'gap-inner' || key === 'gap-outer') s.set_int(key, v);
             else if (key === 'master-factor' || key === 'column-width') s.set_double(key, v);
-            else if (key === 'animate') s.set_boolean(key, v);
+            else if (key === 'animate' || key === 'rules-engine') s.set_boolean(key, v);
             else if (key === 'floating-apps') s.set_strv(key, v);
         }
         Gio.Settings.sync();
@@ -196,6 +278,50 @@ export class TileBackend {
             throw new Error(`Nothing changed: ${e.message}`);
         }
         return changed;
+    }
+
+    // ---- Advanced window rules (read here, applied only by the shell extension; nothing below touches a window)
+
+    /** The advanced rules as stored: the raw list the editor changes. Throws a sentence when the stored text is not a list. */
+    advancedRules() {
+        const data = JSON.parse(this.settings.get_string('advanced-rules') || '[]');
+        if (!Array.isArray(data))
+            throw new Error('advanced-rules is not a list');
+        return data;
+    }
+
+    /** Writes the advanced rules as one checked change (backup first). Returns what changed. */
+    saveAdvancedRules(list) {
+        return this.change({'advanced-rules': JSON.stringify(list)}, 'advanced rules');
+    }
+
+    /**
+     * The advanced rules over the windows already open, through the running shell. Without `confirm` it is a preview (nothing is changed);
+     * with it the pending actions are applied once. Answer: `{ok, dryRun, applied: [{windowId, appId, title, actions, from}], skipped: [...], notes}`.
+     * Throws a sentence when the shell is not running, is too old, or the rules engine is off.
+     */
+    applyRules(confirm = false) {
+        return this._workspace(confirm ? 'ApplyRules' : 'ApplyRulesPreview');
+    }
+
+    /** What is wrong with the stored (or given) rule text, the rules that would run, and where they disagree. */
+    rulesReport(text = this.settings.get_string('advanced-rules')) {
+        const problems = checkAdvanced(text);
+        const rules = parseAdvanced(text);
+        return {problems, rules, conflicts: findConflicts(rules), unsupported: UNSUPPORTED_ACTIONS};
+    }
+
+    /**
+     * What the rules would do to a window described by `win` ({appId, title, workspace, monitor, type}), with the per-rule trace. Applies nothing.
+     * `text` defaults to the stored rules; the engine switch is reported, not required, so a person can try rules before turning them on.
+     */
+    dryRun(win, text = this.settings.get_string('advanced-rules'), now = new Date()) {
+        const rules = parseAdvanced(text);
+        const result = evaluate(rules, {
+            appIds: win.appId ? [win.appId] : [], title: win.title ?? '', workspace: win.workspace ?? undefined, monitor: win.monitor ?? undefined, type: win.type || 'normal',
+        }, {now});
+        const unsupported = Object.keys(result.actions).filter(k => UNSUPPORTED_ACTIONS.includes(k));
+        return {...result, unsupported, engineOn: this.settings.get_boolean('rules-engine'), ruleCount: rules.length};
     }
 
     // ---- Backups (made before every change; keeps the newest 20) and the undo
@@ -325,6 +451,9 @@ export class TileBackend {
         if (state) {
             add('compositor is Wayland', state.session.type === 'wayland', `${state.session.type}, GNOME Shell ${state.session.shell}`);
             add('monitors seen', state.monitors.length > 0, `${state.monitors.length} monitor(s)`);
+            let features = '';
+            try { features = this.workspaceApi() ? '' : 'no answer'; } catch (e) { features = e.message; }
+            add('groups and snapshots available', features === '', features || `API ${WORKSPACE_API}`);
         }
         return out;
     }

@@ -6,7 +6,7 @@ set -u
 cd "$(dirname "$0")/../.."
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 SHARE="$WORK/share"; mkdir -p "$SHARE/gnome-shell/extensions"
-for e in "$HOME"/.local/share/*; do [ "$(basename "$e")" = gnome-shell ] || ln -s "$e" "$SHARE/$(basename "$e")"; done
+for e in "$HOME"/.local/share/*; do case "$(basename "$e")" in gnome-shell|niro-control|niro-snip|island) ;; *) ln -s "$e" "$SHARE/$(basename "$e")";; esac; done
 cp -r ${NIRO_EXT_ROOT:-/usr/share/gnome-shell/extensions}/blur@niro.local "$SHARE/gnome-shell/extensions/"; chmod -R u+w "$SHARE/gnome-shell/extensions/blur@niro.local"
 cp shell/blur/components/applications/index.js "$SHARE/gnome-shell/extensions/blur@niro.local/components/applications/index.js"
 SCHEMAS="$WORK/schemas"; mkdir "$SCHEMAS"; cp control/org.niro.control.gschema.xml "$SCHEMAS/"; glib-compile-schemas "$SCHEMAS"   # the repository's schema, not the installed one
