@@ -62,13 +62,44 @@ Unlisted events keep the state. `DockVisibility` dispatches reveal/dismiss/settl
 Cleanup: `stop()`/`disable()` stop the slide timeline, the coalescing source and the existing sources; signals go through
 `SignalManager`.
 
+## Lifecycle fix
+
+`SignalManager.disconnectAll()` at `disable()` raised "already disposed" when a connection was on an actor that had been destroyed
+meanwhile (the apps button, stacks, minimized thumbnails): GJS throws on any call on a disposed object. Reproduced on the
+merge-base build as well, so it predates the motion work (`motion-engine` does not touch signal handling in `iconManager.ts`). The
+same audit found that `_reload()` used `remove_all_children()` and `_doWindowChange()` used `remove_child()`: icons were detached
+but never destroyed, and their button-press, button-release and notify::hover handlers stayed connected (their closures keep the
+icon alive): 66 connections grew to 180 after twelve favorite-apps changes. Now `_reload()` uses `destroy_all_children()`, the
+removal in `_doWindowChange()` destroys the actor, and actors connect through `SignalManager.connectActor()`, which forgets that
+actor's connections when it emits `destroy` (and `disconnectSource()` lets an owner let one go earlier, as the download monitor
+is). After twelve changes the count is flat (27 then 23). Unit tests: `tests/island/dockSignals.test.js`. Also: keybindings are
+removed only if they were added (mutter warned five times per disable otherwise).
+
 ## Verified and not
 
-Verified: `node --test` unit tests; `tsc` and `biome check`; in a hermetic headless GNOME Shell (staged build, 1440x900):
-reveal frames at 60 Hz (smooth spring, settles in about 0.35 s, no visible overshoot), state sequence hidden, revealing,
-visible, magnifying, hidden; cancelled dismissal; six rapid in/out cycles ending hidden; Gaussian scales with
-displacement and no hidden-state scales left; animation switch off makes the dock jump; `disable()` stops cleanly.
+Runtime harness: `tests/shell/dock-session.sh <built dock dir> <steps> <outdir>` starts a hermetic headless GNOME Shell 51 (own
+HOME, XDG dirs, XDG_RUNTIME_DIR, D-Bus session, key-file settings, wayland socket; only the dock enabled) and sources a steps
+script: `dock-lifecycle-steps.sh`, `dock-motion-steps.sh` (probes in `dock-helper.js`), `dock-multimon-steps.sh`, `dock-hz-steps.sh`;
+`dock-analyze.mjs` checks the dumped icon geometry against the engine. Virtual input is the compositor's own virtual pointer
+(`create_virtual_device(POINTER_DEVICE)` plus `notify_absolute_motion` with monotonic timestamps). Stage motion events DO arrive
+from it (the stage's motion-event count rose one for one with the moves); the one quirk is that the first move of a fresh device
+lands at y=0 (hot corner opens the Overview), so the pointer is primed and `Main.overview.hide()` called. All pointer-driven
+results below are therefore REAL input events unless marked SYNTHETIC. Only the dock itself is not exercised through
+input for: urgency (`Meta.Window.set_demands_attention()` called from the shell; the dock reacts to the same display signal, but
+no client sent a hint) and fullscreen (`make_fullscreen()` on a real app window).
 
-Not verified: real pointer motion events (the headless virtual pointer delivered no stage events here, so the pointer state
-was fed to the same handler directly); multi-monitor; urgent attention and the running-mark fade; the launch state with a
-real app; touchpad and scroll.
+Measured (1920x1080, icon size 60, scale 1.4): edge zone enters at 25 px (hidden at 26, shown at 25), 50 crossings of the boundary
+gave no show/hide event once shown and d=35 stayed shown (leave is 37); auto-hide dismisses 121 ms after the pointer leaves and is
+hidden 505 ms after; reveal settles in 267 ms, overshoot 0.04 px; a dismissal cancelled at slide 0.80 turned around with its
+velocity (-8.2/s) and ended visible; scales match `gaussianScale` exactly at six pointer positions and no two icons overlap (gap
+6 px at rest spacing, 6 px minimum per painted frame during a sweep); sweeps of 4 laps of 600 ms across the dock at about 125 events
+per second: 60 Hz frame mean 16.67 ms (max 20.0), 120 Hz mean 8.33 ms (max 10.6), no dismiss, opacity never below 255 while over the
+dock; a real click on the Calculator icon gave launching, bounce to -28 px, and back to magnifying when the window arrived; an
+unfocused window demanding attention bounces its icon to -28 px, a focused one does not; with a full-screen window the dock is
+hidden, the bottom edge brings it back (scanout held while it is up) and it leaves again; with `enable-animations` off reveal and
+settle land in the same frame and the bounce is skipped; disable/enable five times with apps open left the shell log without
+errors or warnings; two virtual monitors (1920x1080 and 1280x720): the edge activator and zone belong to the primary monitor, the
+pointer at the bottom edge of the second monitor never brings the dock.
+
+Not verified: touchpad and scroll; a client-sent urgency hint; direct scanout (headless has none, only the inhibit flag);
+multi-monitor with the dock on a non-primary monitor (the dock only lives on the primary); real GPU frame pacing (virtual monitor).
