@@ -17,7 +17,7 @@ import {RIM_FUNCTIONS, RIM_UNIFORMS, rimCode, rimUniforms} from './glow.js';
 import {effectPoint, shaderEffect} from './shader.js';
 import {GENTLE, Spring, SpringDriver} from './spring.js';
 import * as Theme from './theme.js';
-import {dur, motionOn} from './motion.js';
+import {dur, motionMode, motionOn} from './motion.js';
 import {morphPlan} from './surfaceMotion.js';
 import {fence, setEnabled, slideBy} from './widgets.js';
 
@@ -212,6 +212,8 @@ export const Island = GObject.registerClass({
         this._view = null;
         this._pointerAtMorph = null;
         this._axisLag = 0;
+        /** How the last morph was planned (axis order, delays, spring): read by the runtime checks. */
+        this._lastPlan = null;
         this._views = [];
         this._tint = null;
         this._tintStyle = 'wash';
@@ -460,8 +462,9 @@ export const Island = GObject.registerClass({
             y + height <= top + Math.max(0, this._height.target);
     }
 
-    /** Animates to `size` ({width, height, radius, shoulder}) and shows `view`, already sized to fit. */
-    morph(size, view) {
+    /** Animates to `size` ({width, height, radius, shoulder}) and shows `view`, already sized to fit. `spring` overrides the size
+     * spring for this move (an alert's, see surfaceMotion.ts `alertMotion`); the next morph names its own. */
+    morph(size, view, {spring = null} = {}) {
         // Content travels with the shape: out with it as it grows, in from it as it shrinks.
         const growing = size.height + size.width > this._height.target + this._width.target;
         this._pointerAtMorph = global.get_pointer();
@@ -472,11 +475,15 @@ export const Island = GObject.registerClass({
         // retargeting springs that keep their velocity (see surfaceMotion.ts). The lagging axis' retarget is a timer
         // that the next morph or destroy cancels, so an interruption never leaves a stale target behind.
         this._cancelAxisLag();
-        const plan = morphPlan({width: this._width.value, height: this._height.value}, size, {off: !motionOn()});
-        this._width.setTarget(size.width);
-        this._height.setTarget(size.height);
-        this._radius.setTarget(size.radius);
-        this._shoulder.setTarget(size.shoulder);
+        const mode = motionMode();
+        const plan = morphPlan({width: this._width.value, height: this._height.value}, size, {off: mode === 'off', reduced: mode === 'reduced'});
+        // Each move names its springs, so an alert's snappy or calm one never lingers into the next move.
+        const sizeSpring = spring && !plan.instant ? spring : plan.size;
+        this._lastPlan = {order: plan.order, widthDelay: plan.widthDelay, heightDelay: plan.heightDelay, size: sizeSpring, instant: plan.instant};
+        this._width.setTarget(size.width, sizeSpring);
+        this._height.setTarget(size.height, sizeSpring);
+        this._radius.setTarget(size.radius, plan.radius);
+        this._shoulder.setTarget(size.shoulder, plan.radius);
         if (!firstShow && !plan.instant && (plan.widthDelay || plan.heightDelay)) {
             const heightLags = plan.heightDelay > 0;
             const lagging = heightLags ? this._height : this._width;

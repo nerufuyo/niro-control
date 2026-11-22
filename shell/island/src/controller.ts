@@ -61,7 +61,7 @@ import {BarHider} from './barHider.js';
 import {SessionRestore} from './sessionRestore.js';
 import {TextWriter} from './writer.js';
 import * as Motion from './motion.js';
-import {Coalescer} from './surfaceMotion.js';
+import {Coalescer, SurfacePresenter, alertMotion} from './surfaceMotion.js';
 
 /** Volume key repeat is shown at most this often (ms): about two frames. */
 const OSD_BURST_MS = 33;
@@ -209,7 +209,12 @@ export class Controller {
         this._askedAt = new Map();
         /** The AIs whose hook island-daemon is changing now, and whether to ask again after (see `_hookAgent`). */
         this._hooking = new Map();
-        this._presentation = 'compact';
+        /** The surface machine: what is presented ('compact', 'peek', 'expanded', 'voice') is derived from its state (see
+         * `_presentation`); every change of state runs through `_onSurface`. `_surfaceLog` keeps the last transitions for the
+         * runtime checks (tests/shell/island-motion.sh). */
+        this._surface = new SurfacePresenter();
+        this._surfaceLog = [];
+        this._surface.onChange((to, from, event) => this._onSurface(to, from, event));
         /** Whether auto-hide has faded the closed island away (see `_syncAutoHide`). */
         this._autoHidden = false;
         /** Over a full-screen app (alerts waiting): the top edge has brought the island back for a moment (see `_revealOverFullscreen`),
@@ -375,6 +380,7 @@ export class Controller {
         });
         // Drawn into the edge by auto-hide: GNOME may send a window covering the display straight to the screen again.
         this._island.connect('auto-hide-settled', () => {
+            this._surface.settled();
             if (this._fsLeaving)
                 this._finishReveal();
             this._syncScanout();
@@ -573,6 +579,8 @@ export class Controller {
             if (this._presentation === 'compact')
                 this._render();
         });
+        // A second activity joins or leaves the closed island: it splits or is whole again (see `_render`).
+        this._compact.connect('activities-changed', () => this._render());
 
         this._settingsChanged = ['notch-depth', 'island-in-top-bar'].map(key =>
             this._settings.connect(`changed::${key}`, () => this._render()));
@@ -1210,6 +1218,8 @@ export class Controller {
         if (hidden === this._autoHidden)
             return;
         this._autoHidden = hidden;
+        // The surface leaves (dismissing) or comes back from wherever it is.
+        this._surface.autoHide(hidden);
         this._trackIsland();
         this._syncScanout();
     }
@@ -1555,13 +1565,28 @@ export class Controller {
         return windows.filter(named).sort((a, b) => b.get_user_time() - a.get_user_time())[0] ?? null;
     }
 
+    /** What the views call the surface now ('compact', 'peek', 'expanded', 'voice'): derived from the machine, never set apart. */
+    get _presentation() {
+        return this._surface.presentation;
+    }
+
+    /** The surface changed state: the transition is kept for the runtime checks. The views follow from `_render`, which calls
+     * this machine first and then sizes, morphs and activates what the new state shows. */
+    _onSurface(to, from, event) {
+        this._surfaceLog.push({to, from, event, at: Math.round(GLib.get_monotonic_time() / 1000)});
+        if (this._surfaceLog.length > 64)
+            this._surfaceLog.shift();
+
+    }
+
     /** Sizes and shapes the island for what it shows now: the assistant, the pages, an alert, or nothing. */
     _render() {
         if (this._destroying)
             return;
-        const presentation = this._voiceOpen ? 'voice'
-            : this._expandWanted ? 'expanded' : this._alert ? 'peek' : 'compact';
-        this._presentation = presentation;
+        // The inputs go to the machine; the presentation is what it says.
+        this._surface.resolve({voice: this._voiceOpen, expanded: this._expandWanted, alert: Boolean(this._alert),
+            activities: this._compact.activityCount});
+        const presentation = this._presentation;
         // Alerts, the open island and the assistant are never auto-hidden; the resting island waits again.
         this._syncAutoHide();
         if (presentation !== 'compact')
@@ -1627,7 +1652,8 @@ export class Controller {
         view.set_size(size.width, size.height);
         if (this._onBar)
             this._topBar.reserveWidth(this._compact.preferredWidth);
-        this._island.morph(size, view);
+        // An alert moves by its priority: a critical one snappy, a routine one calm (see surfaceMotion.ts alertMotion).
+        this._island.morph(size, view, {spring: presentation === 'peek' ? this._alertSpring() : null});
         this._expanded.setActive(presentation === 'expanded');
         this._voice.setActive(presentation === 'voice');
         // A new alert under the pointer: its × shows (or not) at once.
@@ -1648,6 +1674,11 @@ export class Controller {
         if (presentation === 'expanded' && this._expanded.page === this._shelf)
             this._shelfHelper.prepare();
         this._shelfHelper.sync();
+    }
+
+    /** The alert on screen's size spring: snappy for a critical one, critically damped for a routine one or the volume. */
+    _alertSpring() {
+        return alertMotion(this._alert, {reduced: Motion.motionMode() === 'reduced'}).spring;
     }
 
     /** The closed island's size on a display with the top bar (`onBar`) or without, `compact` styled for it. */
@@ -1712,7 +1743,7 @@ export class Controller {
         view.set_size(size.width, size.height);
         if (onBar && mirror.shown)
             this._topBar.reserveWidth(mirror.compact.preferredWidth);
-        mirror.island.morph(size, view);
+        mirror.island.morph(size, view, {spring: alert ? this._alertSpring() : null});
         this._tintMirror(mirror);
     }
 
@@ -2443,6 +2474,9 @@ export class Controller {
         }
         this._timeAlert();
         this._render();
+        // A critical alert's pieces come in in order once its view is up; a routine one only moves calmly (see `_alertSpring`).
+        if (!inPlace && alertMotion(alert, {reduced: Motion.motionMode() !== 'full'}).reveal)
+            this._peek.reveal();
         // Parts shown for the first time are only measured right once styled;
         // fit the island again then.
         this._later('alert-fit', ALERT_FIT_DELAY_MS, () => {

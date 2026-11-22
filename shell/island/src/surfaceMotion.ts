@@ -6,7 +6,7 @@
 // island.ts owns the one actor and the four springs (width, height, radius, shoulder); this decides only the targets'
 // timing and the springs' character. Nothing here creates or replaces an actor.
 
-import {Machine, criticallyDamped, springFor, staggerDelay} from './shared/motionEngine.js';
+import {MOTION_TOKENS, Machine, criticallyDamped, springFor, staggerDelay} from './shared/motionEngine.js';
 
 /** The island's own size spring (see spring.ts): ~3.5% overshoot, the "elastic" part of its personality. */
 export const SURFACE_SPRING = {stiffness: 155, damping: 18, mass: 1};
@@ -16,7 +16,7 @@ export const RADIUS_SPRING = {stiffness: 155, damping: 25, mass: 1};
 /** How long the second axis waits for the first, ms. Short enough to read as one gesture, long enough to see the order. */
 export const AXIS_LAG_MS = 70;
 
-/** Surface states. `split` has no runtime trigger yet (see docs/motion/island.md); the machine supports it. */
+/** Surface states. `split` is the closed island holding two live activities at once (see SurfacePresenter). */
 export const SURFACE_STATES = ['idle', 'compact', 'expanded', 'immersive', 'split', 'dismissing'];
 
 // Any live state may be interrupted into any other (that is the point of springs).
@@ -64,6 +64,104 @@ export function surfaceStateFor(presentation, {hidden = false} = {}) {
 }
 
 /**
+ * How much motion the user wants: `off` (preset "off", or GNOME's animations switched off: the whole shell is instant, so
+ * is the island), `reduced` (the "minimal" preset: everything still moves, but never overshoots, no axis order, no
+ * stagger) or `full`. The same gate as shared/tokens.js `motionAllowed` for `off`.
+ */
+export function motionModeFor({preset = '', reduced = false} = {}) {
+    if (preset === 'off' || reduced === true)
+        return 'off';
+    return preset === 'minimal' ? 'reduced' : 'full';
+}
+
+/** The closed island shows two activities side by side (music with a timer, a call or a recording) from this many. */
+export const SPLIT_MIN_ACTIVITIES = 2;
+
+/** Which surface state the inputs ask for. Voice > the open island > an alert (still the compact surface) > split > compact. */
+export function wantedState({voice = false, expanded = false, alert = false, activities = 0} = {}) {
+    if (voice)
+        return 'immersive';
+    if (expanded)
+        return 'expanded';
+    if (alert)
+        return 'compact';
+    return activities >= SPLIT_MIN_ACTIVITIES ? 'split' : 'compact';
+}
+
+/**
+ * The surface machine as the controller's source of truth for what is presented. `resolve` takes what the controller
+ * knows (assistant open, pages wanted, an alert, how many activities) and sends the event the machine needs; the
+ * presentation name the views know ('compact', 'peek', 'expanded', 'voice') is derived from the state, never kept apart.
+ * Auto-hide is the same surface leaving: `autoHide(true)` dismisses it, `settled()` rests it, and `autoHide(false)` (or
+ * a render wanting something else) retargets it from wherever it is.
+ */
+export class SurfacePresenter {
+    constructor(initial = 'idle') {
+        this.machine = createSurface(initial);
+        this.alert = false;
+        this.hidden = false;
+        this.want = 'compact';
+    }
+
+    get state() {
+        return this.machine.state;
+    }
+
+    /** What the views call it. A peek is the compact surface showing an alert; `idle` and `dismissing` still hold their view. */
+    get presentation() {
+        switch (this.state) {
+        case 'immersive': return 'voice';
+        case 'expanded': return 'expanded';
+        default: return this.alert ? 'peek' : 'compact';
+        }
+    }
+
+    /** Whether two activities share the closed island now. */
+    get split() {
+        return this.state === 'split';
+    }
+
+    onChange(listener) {
+        return this.machine.onChange(listener);
+    }
+
+    /** Takes the inputs, moves the machine; returns {from, to, changed}. While auto-hidden the compact states wait (the surface is leaving). */
+    resolve(inputs) {
+        this.alert = Boolean(inputs.alert);
+        this.want = wantedState(inputs);
+        const from = this.state;
+        const waits = this.hidden && (this.want === 'compact' || this.want === 'split');
+        if (!waits)
+            this.machine.send(eventFor(this.want));
+        return {from, to: this.state, changed: from !== this.state};
+    }
+
+    /** Auto-hide drew the island away (`true`) or back. */
+    autoHide(hidden) {
+        if (hidden === this.hidden)
+            return;
+        this.hidden = hidden;
+        if (hidden && (this.state === 'compact' || this.state === 'split'))
+            this.machine.send('dismiss');
+        else if (!hidden)
+            this.machine.send(eventFor(this.want));
+    }
+
+    /** The auto-hide slide ended: the surface rests. */
+    settled() {
+        this.machine.send('settled');
+    }
+}
+
+/**
+ * When the second zone of a split reveals, ms after the shape starts moving: after the shape has made room for it (the
+ * axis lag), not before. Reduced motion and off: at once.
+ */
+export function splitRevealDelay({mode = 'full'} = {}) {
+    return mode === 'full' ? AXIS_LAG_MS + staggerDelay(1) : 0;
+}
+
+/**
  * Which axis leads. Growing in both: width first (the surface widens, then drops), so the content has room before the
  * height reveals it. Shrinking in both: height first, the reverse of the same path, from wherever the springs are now.
  * Mixed or unchanged: together. `from` is the current visual size, `to` the new target ({width, height}).
@@ -108,6 +206,8 @@ export function revealDelays(count, {reduced = false} = {}) {
 
 /** Reveal order for a track starting: the shape first (see morphPlan), then these. */
 export const MUSIC_REVEAL = ['artwork', 'metadata', 'progress', 'controls'];
+/** How far (CSS px) a revealed piece rises into place. */
+export const REVEAL_RISE_PX = MOTION_TOKENS.distance.reveal;
 
 /**
  * How a notification moves, by priority: an `instant` (critical, call) alert is quick and may overshoot; a routine
