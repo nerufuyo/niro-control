@@ -27,8 +27,9 @@ ws.addEventListener('message', e => { const m = JSON.parse(e.data); if (m.id && 
 const call = (method, params = {}) => new Promise((res, rej) => { const i = ++id; pending.set(i, m => m.error ? rej(new Error(JSON.stringify(m.error))) : res(m.result)); ws.send(JSON.stringify({id: i, method, params})); });
 await call('Page.enable'); await call('Runtime.enable');
 await call('Emulation.setDeviceMetricsOverride', {width: W, height: H, deviceScaleFactor: 1, mobile: false});
-await call('Page.navigate', {url: `http://127.0.0.1:${port}/commercial/v4/film.html`});
+await call('Page.navigate', {url: `http://127.0.0.1:${port}/commercial/v5/film.html`});
 for (let i = 0; i < 300; i++) { const r = await call('Runtime.evaluate', {expression: 'window.__ready === true', returnByValue: true}); if (r.result.value) break; await new Promise(r => setTimeout(r, 100)); }
+await call('Runtime.evaluate', {expression: `window.__preload(${Number(from) / FPS}, ${Number(to) / FPS})`, awaitPromise: true});
 const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '15', '-pix_fmt', 'yuv420p', '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', out], {stdio: ['pipe', 'inherit', 'inherit']});
 const t0 = Date.now();
 for (let f = Number(from); f < Number(to); f++) {
