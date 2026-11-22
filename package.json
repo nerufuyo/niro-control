@@ -9,7 +9,7 @@
     "shell/dock"
   ],
   "scripts": {
-    "build": "tsc -p shell/island && tsc -p shell/dock && tsc -p shell/search && tsc -p shell/emulator && tsc -p control && mkdir -p control/build/tile && cp shell/tile/layouts.js shell/tile/config.js shell/tile/windowRules.js control/build/tile/ && mkdir -p shell/search/build/shared control/build/shared && mkdir -p shell/island/build/src/shared && cp shell/shared/tokens.js shell/island/build/src/shared/ && cp shell/shared/*.js shell/search/build/shared/ && cp shell/shared/*.js control/build/shared/",
+    "build": "tsc -p shell/island && tsc -p shell/dock && tsc -p shell/search && tsc -p shell/emulator && tsc -p control && mkdir -p control/build/tile && cp shell/tile/layouts.js shell/tile/config.js shell/tile/windowRules.js control/build/tile/ && mkdir -p shell/search/build/shared control/build/shared && mkdir -p shell/island/build/src/shared && cp shell/shared/tokens.js shell/shared/motionEngine.js shell/island/build/src/shared/ && cp shell/shared/*.js shell/search/build/shared/ && cp shell/shared/*.js control/build/shared/",
     "test:flow-e2e": "NIRO_E2E_STRICT_AUDIT=1 bash tests/shell/run-staged.sh e2e-flow",
     "test": "npm run build && node --test tests/island/*.test.js && tests/gjs/run.sh",
     "lint": "cd shell/dock && biome check src/"

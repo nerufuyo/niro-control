@@ -10,6 +10,7 @@ mkdir -p "$X" "$P/share/glib-2.0/schemas" "$P/share/dbus-1/services" "$P/share/n
 cp -r shell/island/build/. "$X/island@niro.local/"
 mkdir -p "$X/dock@niro.local" "$X/search@niro.local" "$X/emulator@niro.local"
 cp -r shell/dock/dist/. "$X/dock@niro.local/"; cp shell/dock/metadata.json shell/dock/stylesheet.css "$X/dock@niro.local/"; cp -r shell/dock/schemas "$X/dock@niro.local/"
+mkdir -p "$X/dock@niro.local/shared" && cp shell/shared/motionEngine.js "$X/dock@niro.local/shared/"
 cp shell/search/build/*.js shell/search/metadata.json shell/search/stylesheet.css "$X/search@niro.local/"
 mkdir -p "$X/search@niro.local/shared" && cp shell/shared/*.js "$X/search@niro.local/shared/"
 for e in blur corners emoji tile; do cp -r "shell/$e" "$X/$e@niro.local"; done
