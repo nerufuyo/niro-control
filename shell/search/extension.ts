@@ -35,7 +35,7 @@ import {entities, haQuery, validBase} from './homeAssistant.js';
 import {layoutQuery} from './layouts.js';
 import {agendaQuery, parseEvents, upcoming} from './agenda.js';
 import {Switcher} from './switcher.js';
-import {createSearchMachine, isLive, keepScrollValue, planUpdate, resultKey, rowReveal, SearchMotion} from './searchMotion.js';
+import {anchoredScroll, createSearchMachine, isLive, keepScrollValue, planUpdate, resultKey, rowReveal, SearchMotion} from './searchMotion.js';
 import {buildEngine, evaluateNow, QUIET_MS} from './adaptive.js';
 import {connectFlowSources, createFlowEmitter} from './flowEvents.js';
 import {savedLayouts} from './actions.js';
@@ -81,7 +81,7 @@ export default class NiroSearch extends Extension {
         this._rowByKey = new Map();
         this._animRow = [];
         this._lastQuery = null;
-        this._tick = 0;
+        this._frames = null;
         this._motion = new SearchMotion({
             onWake: () => this._wakeFrames(),
             onFrame: () => this._drawMotion(),
@@ -178,8 +178,7 @@ export default class NiroSearch extends Extension {
         this._soup = null;
         this._release();
         this._motion?.cancel();
-        if (this._tick) { GLib.source_remove(this._tick); this._tick = 0; }
-        if (this._restore) { GLib.source_remove(this._restore); this._restore = 0; }
+        this._stopFrames();
         this._motion = this._sm = null;
         this._box?.destroy();
         this._box = this._entry = this._list = this._scroll = this._status = this._hint = null;
@@ -441,13 +440,22 @@ export default class NiroSearch extends Extension {
     }
 
     // ---- Motion: the frame loop exists only while a spring is moving
+    /** One step per real frame: a Clutter timeline on the box runs in the stage's frame clock, so every step lands before a paint (a GLib timeout beats against it). */
     _wakeFrames() {
-        if (this._tick) return;
-        this._tick = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
-            if (this._motion?.tick(GLib.get_monotonic_time() / 1000)) return GLib.SOURCE_CONTINUE;
-            this._tick = 0;
-            return GLib.SOURCE_REMOVE;
+        if (this._frames || !this._box) return;
+        const frames = new Clutter.Timeline({actor: this._box, duration: 3_600_000});
+        frames.connect('new-frame', (_t, ms: number) => {
+            this._motion?.tick(ms);
+            if (!this._motion?.animator.active) this._stopFrames();        // a spring woken during the last step keeps the loop going
         });
+        this._frames = frames;
+        frames.start();
+    }
+
+    _stopFrames() {
+        const frames = this._frames;
+        this._frames = null;
+        frames?.stop();
     }
 
     _drawMotion() {
@@ -949,7 +957,9 @@ export default class NiroSearch extends Extension {
         const queryChanged = query !== this._lastQuery;
         this._lastQuery = query;
         const adj = this._scroll.vadjustment ?? this._scroll.get_vscroll_bar?.().adjustment;
-        const scrollBefore = adj?.value ?? 0;
+        const selRow = this._rows[this._selected];
+        // where the selected row sits in the viewport now (its allocation is current: nothing was rebuilt yet)
+        const anchor = adj && selRow ? selRow.get_allocation_box().y1 - adj.value : null;
         const before = {keys: this._keys, selected: this._selected};
         this._results = results;
         this._list.destroy_all_children();
@@ -987,20 +997,21 @@ export default class NiroSearch extends Extension {
         this._animRow = plan.animate;
         this._keys.forEach((k, i) => this._rowByKey.set(k, this._rows[i]));
         this._select(plan.selected, {instant: true, scroll: queryChanged});
-        if (plan.keepScroll && adj) this._keepScroll(adj, scrollBefore);
+        if (plan.keepScroll && adj) this._keepScroll(adj, plan.selected, anchor);
         if (plan.animate.some(Boolean)) { this._motion?.revealList(); }
         this._drawMotion();
     }
 
-    /** The list was rebuilt, so its extent is not known until the next allocation: put the offset back now and once more after it. */
-    _keepScroll(adj, value: number) {
-        adj.value = keepScrollValue(value, adj.upper, adj.page_size) || value;
-        if (this._restore) GLib.source_remove(this._restore);
-        this._restore = GLib.idle_add(GLib.PRIORITY_HIGH_IDLE, () => {
-            this._restore = 0;
-            if (adj && this._live()) adj.value = keepScrollValue(value, adj.upper, adj.page_size);
-            return GLib.SOURCE_REMOVE;
-        });
+    /**
+     * The list was rebuilt, so adj.upper and every row position are those of the previous layout until the next frame. Allocate now (the same box,
+     * synchronously) so they are current, then put the selected row back where it was in the viewport. Rows that arrived above it push the offset
+     * down by their height, rows that arrived below leave it alone, and the offset can never pass the new end.
+     */
+    _keepScroll(adj, selected: number, anchor: number | null) {
+        this._list.queue_relayout();
+        this._scroll.allocate(this._scroll.get_allocation_box());
+        const row = this._rows[selected];
+        adj.value = row && anchor !== null ? anchoredScroll(row.get_allocation_box().y1, anchor, adj.upper, adj.page_size) : keepScrollValue(adj.value, adj.upper, adj.page_size);
     }
 
     /** A currency question needs the day's rate: fetched once, kept for six hours, and the list is drawn again when it arrives. */

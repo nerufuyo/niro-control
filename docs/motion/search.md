@@ -47,7 +47,7 @@ slide, start offset from `staggerDelay(i)` (28 ms steps, capped at 160 ms), firs
 `planUpdate` decides, after each rebuild:
 - new query text: select row 0, reveal all rows;
 - late answer for the same text: select the same result by identity (`resultKey`), reveal only rows that were not there, restore the scroll
-  offset (`keepScrollValue`, applied now and once after allocation).
+  offset (`anchoredScroll`: the selected row is put back at the same place in the viewport, measured after a synchronous allocation, see below).
 Empty: the existing status line; while a currency rate is in flight it says "Looking up the exchange rate...".
 
 ### Selection highlight
@@ -61,9 +61,11 @@ outside click go through `_close()`; toggling while Dismissing re-opens (the spr
 
 ### Reduced motion and idle cost
 `St.Settings.enable-animations` false -> `springFor(..., {off: true})` returns null and every spring jumps (`reset`), no frame source is created.
-The spring is already critically damped, so reduced motion has no overshoot either way. Frames come from a 16 ms `GLib.timeout` that exists
-only while the Animator is active and removes itself when everything is at rest (`onSettled`).
-`disable()` calls `_release()`, `motion.cancel()`, removes the frame source and the scroll-restore idle, and destroys the box.
+The spring is already critically damped, so reduced motion has no overshoot either way. Frames come from a `Clutter.Timeline` attached to the panel (`_wakeFrames`), i.e. the stage's own frame clock, that exists
+only while the Animator is active and is stopped when everything is at rest (`onSettled`). A 16 ms `GLib.timeout` was used first and measured badly:
+it beats against the 16.67 ms frame clock, so 9 of 164 painted frames (5.5%) had no motion step (a frozen frame) or two (a skipped step); with the
+timeline every one of the 163 painted frames had exactly one step.
+`disable()` calls `_release()`, `motion.cancel()`, stops the timeline, and destroys the box.
 
 ## Interactions with known audit items (not fixed here)
 - `_activate` holds `Once` across `await this._run`; reopening during a slow action works visually but Enter is refused until it ends.
@@ -72,6 +74,31 @@ only while the Animator is active and removes itself when everything is at rest 
   the Once lock behaviour is unchanged.
 - `find` spawned per keystroke: `_refresh` still calls `_findFiles` as before; late file results now keep the selection instead of resetting it.
 
-## Not verified at runtime
-Only node tests (state machine, springs, update planning) ran. The Clutter side (pivot scale, `translation_y`, frame timeout, scroll restore
-after allocation) was compiled but not exercised in a live GNOME Shell session.
+## Scroll after a late answer
+`_refresh` rebuilds the list, and until the next frame `adj.upper` and every row's allocation are those of the old layout (measured: `upper` 952 right
+after the rebuild, 1128 a frame later). The first version clamped the restored offset against that stale `upper`, and kept the same offset, so rows arriving
+*above* the selection pushed it down the list (a real `find` answer put six Files rows first: the selected row went from 298 px to 624 px in a 354 px viewport,
+i.e. out of sight). Now `_keepScroll` records where the selected row sits in the viewport before the rebuild, calls `allocate()` on the scroll view with its
+own box (synchronous, no frame wait) so `upper` and the rows are current, and sets `anchoredScroll(newRowY, anchor, upper, page)`.
+
+## Runtime evidence
+`tests/shell/search-motion.sh` (needs `npm run build`; headless shell in its own D-Bus session, HOME, settings and Wayland socket via `search-session.sh`)
+runs `tests/shell/search-motion.js` inside the shell and asserts: focus on the first frame; keys typed during the opening land in the entry (real virtual
+keyboard); no overshoot, monotone, converges; one step per painted frame; frame source stopped at rest; Escape (real virtual key) dismisses and releases the
+grab within 60 ms; late rows above and below keep the selected result at the same viewport position on every painted frame; 20 rapid toggles keep the
+invariants (no live panel without the grab, no grab without a live panel, never Closed and visible); Escape and Enter still work after them; Enter reaches the
+action 1 ms after the key while the fade takes about 450 ms; reduced motion jumps with no frame source; disable/enable x5 and disable while animating leave no
+GLib sources, shell-object signal handlers, modal grabs, D-Bus names or actors; the shell log holds no errors from the extension.
+One screenshot sequence (spring slowed to about 2 s so it can be caught mid-flight) is in `docs/motion/evidence/search/open-sequence.png`.
+
+## Limits of that evidence
+- Input is synthetic (`create_virtual_device`), never a real keyboard or pointer. In a headless session the virtual keyboard's Return is swallowed by the
+  input-method filter, so Enter is delivered by calling the key handler with an event object; Escape, Down and letters do go through the virtual keyboard.
+  Letters reach the entry asynchronously through the input method.
+- Outside-click dismissal and row clicks were not exercised.
+- The software renderer's frame pacing is 60 Hz; a 120/144 Hz monitor was not tried (the spring uses fixed sub-steps, so the path is the same by construction).
+- Each keystroke rebuilds the list (8 to 12 ms for 15 rows here), so a key typed during the opening can cost one late frame (a 56 ms paint gap was seen with
+  three keys in 45 ms). The motion itself catches up (one step per frame, `MAX_FRAME` caps the catch-up).
+- Known and unrelated: GJS logs a `Gio.DesktopAppInfo has been moved` deprecation warning once (`Gio.DesktopAppInfo.search`), and mutter logs
+  `Overwriting existing binding of keysym 20` on each enable.
+- After the panel closes one highlight spring (target 1, at rest) stays in the map until the next open clears it; harmless.

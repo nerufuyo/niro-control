@@ -65,6 +65,9 @@ export function planUpdate(prev: {keys: string[]; selected: number}, nextKeys: s
 /** Where the scroll offset should be after a late update: unchanged, but never past the end. */
 export const keepScrollValue = (value: number, upper: number, page: number) => Math.min(Math.max(value, 0), Math.max(0, upper - page));
 
+/** Offset that puts a row at `rowY` back where it was in the viewport (`anchor` = its old y minus the old offset), within the fresh extent. */
+export const anchoredScroll = (rowY: number, anchor: number, upper: number, page: number) => keepScrollValue(rowY - anchor, upper, page);
+
 export type MotionHost = {
     onWake?: () => void;
     onFrame?: () => void;
