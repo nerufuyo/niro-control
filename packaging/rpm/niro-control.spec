@@ -7,7 +7,7 @@
 Name:           niro-control
 Version:        @VERSION@
 Release:        @RELEASE@%{?dist}
-Summary:        The look of the GNOME desktop in one place
+Summary:        GNOME Shell extensions for Fedora and Ubuntu: island, dock, search, tiling and one control panel
 License:        GPL-3.0-or-later
 URL:            https://github.com/nerufuyo/niro-control
 ExclusiveArch:  x86_64 aarch64
@@ -28,8 +28,8 @@ Requires:       polkit
 BuildRequires:  systemd-rpm-macros
 
 %description
-Island (a notch on the top bar), a macOS-style dock, an application search, window blur,
-rounded corners, and one control panel (org.niro.control: tone, opacity, blur) that sets them all.
+GNOME Shell extensions for Fedora 45 and Ubuntu 24.04 on Wayland: a top-bar island, macOS-style dock, Spotlight-like app search, tiling window manager, window blur and rounded corners, with one control panel.
+The control panel is org.niro.control (tone, opacity, blur).
 
 %prep
 
