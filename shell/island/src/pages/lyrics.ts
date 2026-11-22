@@ -8,6 +8,7 @@
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
+import {motionOn} from '../motion.js';
 
 import {VERTICAL} from '../compat.js';
 import * as Playback from '../playback.js';
@@ -67,7 +68,7 @@ class PauseDots extends St.BoxLayout {
 
     /** Starts or stops the loop; never runs hidden or with animations off. */
     _sync() {
-        const on = this._breathing && this.mapped && St.Settings.get().enable_animations;
+        const on = this._breathing && this.mapped && motionOn();
         this._dots.forEach((dot, i) => {
             dot.remove_all_transitions();
             dot.set_scale(1, 1);

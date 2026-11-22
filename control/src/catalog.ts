@@ -325,6 +325,236 @@ export const CATALOG: Item[] = [
   "kind": "shortcut"
  },
  {
+  "id": "niro.adaptive-suggestions",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "Suggest a profile from the application in front",
+  "help": "When Search opens, offers one row that switches to a profile that fits the application in front (Gaming for a game launcher, Deep Work for a code…",
+  "detail": "When Search opens, offers one row that switches to a profile that fits the application in front (Gaming for a game launcher, Deep Work for a code editor, Creative for a design or video tool). Nothing is applied by itself, and the same suggestion stays quiet for 30 minutes.",
+  "source": "niro",
+  "key": "adaptive-suggestions",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.adaptive-live",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "Watch for suggestions while you work",
+  "help": "Needs \"Suggest a profile from the application in front\".",
+  "detail": "Needs \"Suggest a profile from the application in front\". Instead of looking only when Search opens, Niro also looks when the focused window or the monitors change, so a suggestion can be waiting when you open Search. It only listens while this is on; nothing is applied by itself.",
+  "source": "niro",
+  "key": "adaptive-live",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch",
+  "depends": {
+   "id": "niro.adaptive-suggestions",
+   "op": "on"
+  }
+ },
+ {
+  "id": "niro.permissions-enforced",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "Ask before other programs use Search actions",
+  "help": "When on, a program that calls Search's actions over D-Bus (the voice assistant, a script) needs your permission for each kind of thing it does…",
+  "detail": "When on, a program that calls Search's actions over D-Bus (the voice assistant, a script) needs your permission for each kind of thing it does (launch, files, clipboard, windows, automation). You can allow once, or always; a program can be revoked at any time. Off keeps the current behaviour: only the actions that already ask you, ask you.",
+  "source": "niro",
+  "key": "permissions-enforced",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.smart-clipboard",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Keep secrets out of the clipboard history",
+  "help": "When on, Search checks the island's clipboard history about once a minute and removes unpinned text that looks like a password, a key, a token or a…",
+  "detail": "When on, Search checks the island's clipboard history about once a minute and removes unpinned text that looks like a password, a key, a token or a card number. Pinned items stay. The island saves a copy first, so a secret can sit in the history for up to a minute; a password manager's own copies are already left out. Nothing is logged and the text never leaves this computer.",
+  "source": "niro",
+  "key": "smart-clipboard",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.smart-clipboard-minutes",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Forget unpinned clipboard items after",
+  "help": "Needs \"Keep secrets out of the clipboard history\".",
+  "detail": "Needs \"Keep secrets out of the clipboard history\". Unpinned items older than this many minutes (0 to 1440) are removed from the history. 0 keeps them.",
+  "source": "niro",
+  "key": "smart-clipboard-minutes",
+  "type": "i",
+  "default": "0",
+  "unit": "",
+  "kind": "stepper",
+  "digits": 0,
+  "step": 1,
+  "min": 0.0,
+  "max": 1440.0,
+  "depends": {
+   "id": "niro.smart-clipboard",
+   "op": "on"
+  }
+ },
+ {
+  "id": "niro.notification-hub",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Apply notification rules",
+  "help": "When on, Search watches notifications as they arrive and keeps which application sent each one and how urgent it was (never the title or the text),…",
+  "detail": "When on, Search watches notifications as they arrive and keeps which application sent each one and how urgent it was (never the title or the text), only in memory and only the last 200. \"notification summary\" in Search shows the counts. Rules, quiet hours and snoozing are set with the notification actions in Search.",
+  "source": "niro",
+  "key": "notification-hub",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.notification-hub-apply",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Hide or silence notifications by rule",
+  "help": "Needs \"Apply notification rules\".",
+  "detail": "Needs \"Apply notification rules\". A rule that says silent keeps the notification in the list without a banner; hide removes it. Urgent (critical) notifications are never hidden. Off: the rules are only counted and nothing is changed.",
+  "source": "niro",
+  "key": "notification-hub-apply",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch",
+  "depends": {
+   "id": "niro.notification-hub",
+   "op": "on"
+  }
+ },
+ {
+  "id": "niro.perf-recording",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Record performance history",
+  "help": "When on, Search takes a reading of processor, memory, swap and load every 30 seconds (every 60 on battery) and keeps the last 360 in memory only.",
+  "detail": "When on, Search takes a reading of processor, memory, swap and load every 30 seconds (every 60 on battery) and keeps the last 360 in memory only. \"performance\" in Search shows them. Off: nothing is read except when you ask.",
+  "source": "niro",
+  "key": "perf-recording",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.privacy-dashboard",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Privacy overview in Search",
+  "help": "When on, \"privacy\" in Search says whether the microphone, the camera or the screen is in use now and by which application, as far as GNOME lets Niro…",
+  "detail": "When on, \"privacy\" in Search says whether the microphone, the camera or the screen is in use now and by which application, as far as GNOME lets Niro see. What cannot be seen is shown as unknown, never as not in use. Nothing is kept.",
+  "source": "niro",
+  "key": "privacy-dashboard",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.privacy-history",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Remember privacy events",
+  "help": "Needs \"Privacy overview in Search\".",
+  "detail": "Needs \"Privacy overview in Search\". Keeps, in memory only, which application used the microphone, the camera or the screen and when, the last 200 events. Switching it off clears them. Looking costs a short check every 20 seconds while it is on.",
+  "source": "niro",
+  "key": "privacy-history",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch",
+  "depends": {
+   "id": "niro.privacy-dashboard",
+   "op": "on"
+  }
+ },
+ {
+  "id": "niro.audio-router",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Audio router actions",
+  "help": "When on, Search can list sound outputs and playing applications (\"audio devices\", \"audio streams\"), set one application's volume and move its sound…",
+  "detail": "When on, Search can list sound outputs and playing applications (\"audio devices\", \"audio streams\"), set one application's volume and move its sound to another output. Nothing runs by itself, and the default output is never changed.",
+  "source": "niro",
+  "key": "audio-router",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.universal-hud",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "On-screen display action",
+  "help": "When on, the hud action shows a short message and level (volume, brightness, battery or your own) in GNOME's own on-screen display, so macros and…",
+  "detail": "When on, the hud action shows a short message and level (volume, brightness, battery or your own) in GNOME's own on-screen display, so macros and plans can give feedback. GNOME places that display itself; its position and size cannot be changed.",
+  "source": "niro",
+  "key": "universal-hud",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.shelf-collections",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Shelf collections",
+  "help": "When on, Search can keep named collections of references (file paths, web addresses, short text) in a private file under your Niro Control settings.",
+  "detail": "When on, Search can keep named collections of references (file paths, web addresses, short text) in a private file under your Niro Control settings. Removing an item or a collection never touches the original file. Text that looks like a secret is refused.",
+  "source": "niro",
+  "key": "shelf-collections",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.widgets-in-search",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Widgets in Search",
+  "help": "When on, Search can list the built-in widgets (processor, memory, load, battery) and show their current values from one reading shared with the…",
+  "detail": "When on, Search can list the built-in widgets (processor, memory, load, battery) and show their current values from one reading shared with the performance report. They appear only when you ask: there are no desktop widgets yet, and nothing polls in the background.",
+  "source": "niro",
+  "key": "widgets-in-search",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
+  "id": "niro.flow-events",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Tell Niro Flow about desktop events",
+  "help": "When on, Search tells the Niro Flow service (in the island daemon) when the workspace changes, a monitor is plugged or unplugged, a profile is…",
+  "detail": "When on, Search tells the Niro Flow service (in the island daemon) when the workspace changes, a monitor is plugged or unplugged, a profile is applied, or an application starts or comes to the front, so a workflow can start from them. Only the event kind and a number or an application or profile id are sent, never window titles or text. Nothing listens while this is off.",
+  "source": "niro",
+  "key": "flow-events",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch"
+ },
+ {
   "id": "niro.tools-above-apps",
   "menu": "Search",
   "group": "Search Behaviour",
@@ -1870,6 +2100,46 @@ export const CATALOG: Item[] = [
   "default": "cloud",
   "unit": "",
   "kind": "text"
+ },
+ {
+  "id": "island.motion-preset",
+  "menu": "Island",
+  "group": "Appearance and Behavior",
+  "title": "How fast the island's fades and slides run",
+  "help": "\"default\" keeps the island's own timings.",
+  "detail": "\"default\" keeps the island's own timings. \"off\" removes the fades and slides, \"minimal\", \"smooth\", \"dynamic\" and \"cinematic\" scale them (smooth is the usual speed). GNOME's \"reduce animations\" switch turns them off whenever a preset is chosen. The island's springs are not changed.",
+  "source": "island",
+  "key": "motion-preset",
+  "type": "s",
+  "default": "default",
+  "unit": "",
+  "kind": "select",
+  "options": [
+   {
+    "value": "default",
+    "label": "Default"
+   },
+   {
+    "value": "off",
+    "label": "Off"
+   },
+   {
+    "value": "minimal",
+    "label": "Minimal"
+   },
+   {
+    "value": "smooth",
+    "label": "Smooth"
+   },
+   {
+    "value": "dynamic",
+    "label": "Dynamic"
+   },
+   {
+    "value": "cinematic",
+    "label": "Cinematic"
+   }
+  ]
  },
  {
   "id": "island.bot-glow",
@@ -3446,6 +3716,60 @@ export const CATALOG: Item[] = [
   "step": 0.05,
   "min": 0.2,
   "max": 1.0,
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.monitor-recovery",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Move windows back and forth when a monitor leaves and returns",
+  "help": "When a monitor is unplugged its windows go to the primary monitor, and go back to it when it returns.",
+  "detail": "When a monitor is unplugged its windows go to the primary monitor, and go back to it when it returns. Off by default. Only windows are moved; no display setting is changed.",
+  "source": "tile",
+  "key": "monitor-recovery",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.rules-engine",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Use the advanced window rules",
+  "help": "Reads the rules in \"advanced-rules\" (conditions, priority, stop) on top of the simple ones.",
+  "detail": "Reads the rules in \"advanced-rules\" (conditions, priority, stop) on top of the simple ones. Off by default; windows already open are not touched.",
+  "source": "tile",
+  "key": "rules-engine",
+  "type": "b",
+  "default": "false",
+  "unit": "",
+  "kind": "switch",
+  "depends": {
+   "id": "tile.enabled",
+   "op": "on"
+  }
+ },
+ {
+  "id": "tile.advanced-rules",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Advanced window rules",
+  "help": "JSON list: {\"id\": \"calc\", \"conditions\": {\"appId\": \"org.gnome.Calculator\"}, \"actions\": {\"tile\": \"float\", \"above\": true}, \"priority\": 1, \"stop\": false}.",
+  "detail": "JSON list: {\"id\": \"calc\", \"conditions\": {\"appId\": \"org.gnome.Calculator\"}, \"actions\": {\"tile\": \"float\", \"above\": true}, \"priority\": 1, \"stop\": false}. Conditions: appId, title, workspace, monitor, type, time, profile. Actions: workspace, monitor, tile, above.",
+  "source": "tile",
+  "key": "advanced-rules",
+  "type": "s",
+  "default": "[]",
+  "unit": "",
+  "kind": "text",
   "depends": {
    "id": "tile.enabled",
    "op": "on"

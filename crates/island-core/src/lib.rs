@@ -11,6 +11,7 @@ pub mod clipboard;
 pub mod lrc;
 pub mod pomodoro;
 pub mod reminders;
+pub mod secrets;
 pub mod shelf;
 pub mod speech;
 pub mod todo;

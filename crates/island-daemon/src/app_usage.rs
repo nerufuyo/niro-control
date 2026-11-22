@@ -84,8 +84,8 @@ impl AppUsageService {
         }
         // Everything or nothing: a bad stretch in the batch does not leave half of it recorded.
         let mut next = self.usage.clone();
-        for stretch in stretches {
-            if !record_span(&mut next, &stretch) {
+        for stretch in &stretches {
+            if !record_span(&mut next, stretch) {
                 return Err(fdo::Error::InvalidArgs(
                     "an app id, a start after 1970 and 1 ms to 24 hours are needed".into(),
                 ));
@@ -93,6 +93,9 @@ impl AppUsageService {
         }
         self.usage = next;
         self.store.save(&self.usage);
+        // Niro Flow's "app focused" trigger; a no-op unless Flow is on.
+        let reported: Vec<(String, i64, i64)> = stretches.iter().map(|s| (s.id.clone(), s.start_ms, s.ms)).collect();
+        crate::flow::observe_apps(&reported);
         Ok(())
     }
 

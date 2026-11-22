@@ -20,6 +20,7 @@ import * as Format from './format.js';
 import * as Palette from './palette.js';
 import * as Playback from './playback.js';
 import * as Theme from './theme.js';
+import {dur, motionOn} from './motion.js';
 import {watchClock} from './wallClock.js';
 import {Art, Bars, PrivacyDots, RecordingDot, Ring, icon, restsAt} from './widgets.js';
 
@@ -490,7 +491,7 @@ export const CompactView = GObject.registerClass({
             [this._ring, pomodoro?.running], [this._secondRing, pomodoro?.running]]) {
             const opacity = on ? 255 : PAUSED_OPACITY;
             if (!restsAt(actor, 'opacity', opacity))
-                actor.ease({opacity, duration: 200});
+                actor.ease({opacity, duration: dur(200)});
         }
         this._syncBars();
 
@@ -524,12 +525,12 @@ export const CompactView = GObject.registerClass({
     /** Puts `sign` in `side`, fading in once on screen: one sign giving way to another reads as a change. */
     _swap(side, sign) {
         side.child = sign;
-        if (!sign || !this.mapped || !St.Settings.get().enable_animations)
+        if (!sign || !this.mapped || !motionOn())
             return;
         // To full: a paused song's bars or timer's time are dimmed after (see `_refresh`).
         sign.remove_transition('opacity');
         sign.opacity = 0;
-        sign.ease({opacity: 255, duration: 200, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        sign.ease({opacity: 255, duration: dur(200), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
     }
 
     /** Fades `actor` in and the other centre actors out. */
@@ -541,9 +542,9 @@ export const CompactView = GObject.registerClass({
                     other.show();
                 }
                 if (!restsAt(other, 'opacity', 255))
-                    other.ease({opacity: 255, duration: 200});
+                    other.ease({opacity: 255, duration: dur(200)});
             } else if (other.visible) {
-                other.ease({opacity: 0, duration: 150, onComplete: () => other.hide()});
+                other.ease({opacity: 0, duration: dur(150), onComplete: () => other.hide()});
             }
         }
     }

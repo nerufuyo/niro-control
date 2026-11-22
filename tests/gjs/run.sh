@@ -16,4 +16,13 @@ GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m t
 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/tileBackend.test.js
 # no shell on the bus: the real session's extension (if it runs) must not answer
 DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/tilingPage.test.js
+DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/appearanceStudio.test.js
+# Flow: the backend against a stand-in daemon on a private bus the test starts itself; the page against a fake backend (no real session bus)
+DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus gjs -m tests/gjs/flowBackend.test.js
+DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/flowPage.test.js
+DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/hubPage.test.js
 DEEPSEEK_API_KEY= GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/aiConnections.test.js
+# Backup & Restore (fake backend and pickers; the real Gio backend on the throw-away schemas) and niro-plugin check
+DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/backupPage.test.js
+# Permissions and Connectivity (stand-in Search on a private bus the test starts itself; the pages against fake backends)
+DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/permissionsPage.test.js

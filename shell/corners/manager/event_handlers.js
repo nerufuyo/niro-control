@@ -144,7 +144,7 @@ function createShadow(actor) {
 function refreshShadow(actor) {
     const win = actor.metaWindow;
     const shadow = actor.rwcCustomData?.shadow;
-    if (!shadow) {
+    if (!shadow || !win) {   // a window that is already gone has no meta window (seen once as a JS error in a headless run)
         return;
     }
     const shadowSettings = win.appears_focused

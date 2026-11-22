@@ -1175,7 +1175,7 @@ dependencies = [
 
 [[package]]
 name = "island-core"
-version = "1.5.9"
+version = "1.6.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -1183,7 +1183,7 @@ dependencies = [
 
 [[package]]
 name = "island-daemon"
-version = "1.5.9"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "chacha20poly1305",
@@ -1200,6 +1200,7 @@ dependencies = [
  "libc",
  "log",
  "md5",
+ "niro-flow",
  "num-bigint",
  "qrcode",
  "serde",
@@ -1215,7 +1216,7 @@ dependencies = [
 
 [[package]]
 name = "island-shelf"
-version = "1.5.9"
+version = "1.6.0"
 dependencies = [
  "env_logger",
  "gdk4-x11",
@@ -1228,7 +1229,7 @@ dependencies = [
 
 [[package]]
 name = "island-whisper"
-version = "1.5.9"
+version = "1.6.0"
 dependencies = [
  "island-core",
  "libc",
@@ -1383,6 +1384,14 @@ checksum = "ac9557c559cd6fc9867e122e20d2cbefc9ca29d80d027a8e39310920ed2f0a97"
 dependencies = [
  "num-traits",
  "pxfm",
+]
+
+[[package]]
+name = "niro-flow"
+version = "1.6.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

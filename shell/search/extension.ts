@@ -14,7 +14,12 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {PACKAGE_VERSION} from 'resource:///org/gnome/shell/misc/config.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import {buildRegistry, clipboardHistory, autostartEntries, confirm, endPresentation, endSpotlight, profiles, windows} from './actions.js';
+import {askPermission, buildRegistry, clipboardHistory, autostartEntries, confirm, endPresentation, endSpotlight, profiles, windows} from './actions.js';
+import {validateArgs} from './registry.js';
+import {CAPABILITY_TEXT, createGate} from './capabilities.js';
+import {registerRuntimeActions} from './runtime.js';
+import {createSystemHub, SETTING_KEYS} from './systemHub.js';
+import {NotificationWatch, ScreenShareWatch, shellServices} from './systemShell.js';
 import {calculate} from './calc.js';
 import {searchItems} from './logic.js';
 import {hint, keyIntent, move, Once} from './nav.js';
@@ -30,6 +35,8 @@ import {entities, haQuery, validBase} from './homeAssistant.js';
 import {layoutQuery} from './layouts.js';
 import {agendaQuery, parseEvents, upcoming} from './agenda.js';
 import {Switcher} from './switcher.js';
+import {buildEngine, evaluateNow, QUIET_MS} from './adaptive.js';
+import {connectFlowSources, createFlowEmitter} from './flowEvents.js';
 import {savedLayouts} from './actions.js';
 import {contentNeedle, defineQuery, definitions, grepArgs, historyMatches, historyNeedle, killName, matchProcesses, qrText, translateQuery, translated} from './lookups.js';
 
@@ -53,6 +60,11 @@ const DBUS_XML = `<node><interface name="org.niro.Search">
   <method name="Availability"><arg type="s" direction="in" name="id"/><arg type="s" direction="out" name="json"/></method>
   <method name="RunAction"><arg type="s" direction="in" name="id"/><arg type="s" direction="in" name="args_json"/><arg type="s" direction="out" name="outcome_json"/></method>
   <method name="History"><arg type="u" direction="in" name="limit"/><arg type="s" direction="out" name="json_lines"/></method>
+  <method name="ListGrants"><arg type="s" direction="out" name="json"/></method>
+  <method name="Grant"><arg type="s" direction="in" name="subject"/><arg type="s" direction="in" name="capability"/><arg type="s" direction="in" name="scope"/><arg type="s" direction="out" name="outcome_json"/></method>
+  <method name="Revoke"><arg type="s" direction="in" name="subject"/><arg type="s" direction="in" name="capability"/><arg type="s" direction="out" name="outcome_json"/></method>
+  <method name="PermissionHistory"><arg type="u" direction="in" name="limit"/><arg type="s" direction="out" name="json"/></method>
+  <method name="ClearPermissionHistory"><arg type="s" direction="out" name="outcome_json"/></method>
 </interface></node>`;
 
 export default class NiroSearch extends Extension {
@@ -68,6 +80,35 @@ export default class NiroSearch extends Extension {
         this._vars = {};
         this._net = new Map();       // answers from the web for this moment's query (translations, definitions): not kept once the palette closes
         this._procs = new Map();
+        this._adaptive = null;             // the suggestion Search shows now (profile, reason, rule)
+        this._pending = null;              // adaptive-live: a suggestion found while Search was closed
+        this._lastSuggestion = null;       // the one dismiss answers
+        this._liveIds = null;
+        this._liveTimer = 0;
+        this._flow = null;                 // flow-events (opt-in): the emitter and its listeners
+        this._gate = createGate({
+            read: () => this._readConfig('permissions.json'),
+            write: text => this._writeConfig('permissions.json', text),
+            ask: (subject, cap) => askPermission(subject, CAPABILITY_TEXT[cap] ?? cap),
+        });
+        this._ad = buildEngine(this._readConfig('adaptive-rules.json'));
+        registerRuntimeActions(this._registry, {
+            runStep: (id, args, ctx) => this._dispatch(id, args, ctx?.source ?? 'ui', ctx?.caller ?? 'search', 'plan'),
+            readMacros: () => this._readConfig('macros.json'),
+            writeMacros: text => this._writeConfig('macros.json', text),
+            sleep: ms => new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => { resolve(); return GLib.SOURCE_REMOVE; })),
+            adaptive: {dismiss: () => this._adaptiveDismiss(), history: () => this._adaptiveHistory(), lock: on => this._adaptiveLock(on)},
+        });
+        // System Experience: opt-in clipboard clean-up, notification rules, performance history, audio, HUD, privacy, shelf collections
+        const watchers = {notifications: new NotificationWatch(n => this._hub?.onNotification(n)), screen: new ScreenShareWatch()};
+        this._watchers = watchers;
+        const services = shellServices(this, watchers);
+        services.version = String(this.metadata?.version ?? 'unknown');
+        services.shellVersion = PACKAGE_VERSION;
+        this._hub = createSystemHub(services);
+        this._hub.register(this._registry);
+        this._hubIds = SETTING_KEYS.map(k => this._look.connect(`changed::${k}`, () => this._hub?.sync()));
+        this._hub.sync();
         this._contents = new Map();
         this._soup = new Soup.Session({timeout: 6});
 
@@ -92,6 +133,10 @@ export default class NiroSearch extends Extension {
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._switcher.isOpen ? this._switcher.close() : this._switcher.open());
         Main.wm.addKeybinding('snip-shortcut', this._look, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._snip());
+        this._lookIds = ['changed::adaptive-suggestions', 'changed::adaptive-live'].map(k => this._look.connect(k, () => this._syncLive()));
+        this._lookIds.push(this._look.connect('changed::flow-events', () => this._syncFlow()));
+        this._syncLive();
+        this._syncFlow();
         this._export();
     }
 
@@ -102,6 +147,16 @@ export default class NiroSearch extends Extension {
         this._switcher?.destroy();
         this._switcher = null;
         this._unexport();
+        this._stopLive();
+        this._stopFlow();
+        for (const id of this._lookIds ?? []) this._look?.disconnect(id);
+        this._lookIds = null;
+        for (const id of this._hubIds ?? []) this._look?.disconnect(id);
+        this._hubIds = null;
+        this._hub?.stop();
+        this._watchers?.notifications.stop();
+        this._watchers?.screen.stop();
+        this._hub = this._watchers = null;
         endPresentation();
         endSpotlight();
         this._soup?.abort();
@@ -109,7 +164,8 @@ export default class NiroSearch extends Extension {
         this._close();
         this._box?.destroy();
         this._box = this._entry = this._list = this._scroll = this._status = this._hint = null;
-        this._registry = this._look = null;
+        this._registry = this._look = this._gate = this._ad = null;
+        this._pending = this._adaptive = this._lastSuggestion = null;
         this._files = null;
     }
 
@@ -123,6 +179,18 @@ export default class NiroSearch extends Extension {
                 return JSON.stringify({id, available: Boolean(a) && reason === null, reason});
             },
             History: limit => this._history(Math.min(Math.max(limit, 1), 200)),
+            ListGrants: () => JSON.stringify({enforced: this._pref('permissions-enforced', false), grants: this._gate.list()}),
+            GrantAsync: (params, invocation) => {
+                const [subject, capability, scope] = params;
+                const reply = outcome => invocation.return_value(new GLib.Variant('(s)', [JSON.stringify(outcome)]));
+                this._grant(subject, capability, scope).then(reply);
+            },
+            Revoke: (subject, capability) => {
+                try { this._gate.revoke(subject, capability || null); this._audit({at: new Date().toISOString(), source: 'external', id: 'permission.revoke', subject, capability: capability || null, ok: true}); return JSON.stringify({ok: true}); }
+                catch (e) { return JSON.stringify({ok: false, error: e.message}); }
+            },
+            PermissionHistory: limit => JSON.stringify(this._gate.history(Math.min(Math.max(limit, 1), 200))),
+            ClearPermissionHistory: () => { this._gate.clearHistory(); return JSON.stringify({ok: true}); },
             RunActionAsync: (params, invocation) => {
                 const [id, argsJson] = params;
                 const reply = outcome => invocation.return_value(new GLib.Variant('(s)', [JSON.stringify(outcome)]));
@@ -187,7 +255,6 @@ export default class NiroSearch extends Extension {
 
     // ---- Running: the one gate. Search, a shortcut over D-Bus and the assistant all come through here.
     async _run(id, args, source, caller = 'search') {
-        const started = GLib.get_monotonic_time();
         const key = `${id}\u001f${canon(args)}`;
         // The same request while it is still running or just finished is not run twice (a loop, a double press, a retry)
         this._inflight ??= new Map();
@@ -199,18 +266,67 @@ export default class NiroSearch extends Extension {
             return outcome;
         }
         if (source === 'external') this._inflight.set(key, 0);
-        const outcome = await this._registry.run(id, args, {}, source, (action, a) => confirm(action.title, action.ask ? action.ask(a) : action.confirm, action.title));
+        const outcome = await this._dispatch(id, args, source, caller);
         if (source === 'external') this._inflight.set(key, GLib.get_monotonic_time());
-        this._audit({at: new Date().toISOString(), source, caller, id, args: this._shorten(args), ok: outcome.ok, code: outcome.code ?? null,
-            ms: Math.round((GLib.get_monotonic_time() - started) / 1000)});
         if (!outcome.ok && outcome.code !== 'declined') Main.notify('Niro Search', outcome.error);
         else if (outcome.ok && source === 'external') Main.notify('Niro Search', outcome.message);
         return outcome;
     }
 
+    /** One action through the whole gate: the permission service (outside callers, when it is on), the registry's own checks and confirmation, the audit. */
+    async _dispatch(id, args, source, caller, via = null) {
+        if (!this._registry) return {ok: false, code: 'unavailable', error: 'Search is off'};
+        const started = GLib.get_monotonic_time();
+        let outcome = await this._permit(id, args, source, caller);
+        outcome ??= await this._registry.run(id, args, {source, caller}, source, (action, a) => confirm(action.title, action.ask ? action.ask(a) : action.confirm, action.title));
+        // A profile chosen by hand silences the suggestions for an hour; one accepted from the suggestion does not
+        if (outcome.ok && id === 'profile.apply' && !this._viaAdaptive && typeof args.id === 'string') this._ad?.engine.setOverride(args.id);
+        this._audit({at: new Date().toISOString(), source, caller, id, args: this._shorten(args), ok: outcome.ok, code: outcome.code ?? null, ...(via ? {via} : {}),
+            ms: Math.round((GLib.get_monotonic_time() - started) / 1000)});
+        return outcome;
+    }
+
+    /** null: go on. Otherwise the refusal. Only outside callers are checked, and only when "Ask before other programs use Search actions" is on. */
+    async _permit(id, args, source, caller) {
+        if (source !== 'external' || !this._pref('permissions-enforced', false)) return null;
+        const action = this._registry.get(id);
+        if (!action || validateArgs(action.params, args)) return null;           // the registry says what is wrong with it
+        const verdict = await this._gate.check(caller, id);
+        return verdict.allowed ? null : {ok: false, code: 'denied', error: verdict.reason};
+    }
+
+    /** D-Bus Grant: only a program-side `deny` is taken as it comes; letting a program do more needs you to say yes on screen. */
+    async _grant(subject, capability, scope) {
+        try {
+            this._gate.validate(subject, capability, scope);
+            if (scope !== 'deny') {
+                const yes = await confirm('Let a program do more?', `Allow "${subject}" to ${CAPABILITY_TEXT[capability] ?? capability} (${scope})? No answer in a minute counts as no.`, 'Allow', 60);
+                if (!yes) return {ok: false, code: 'declined', error: 'cancelled'};
+            }
+            this._gate.grant(subject, capability, scope);
+            this._audit({at: new Date().toISOString(), source: 'external', id: 'permission.grant', subject, capability, scope, ok: true});
+            return {ok: true};
+        } catch (e) { return {ok: false, code: 'invalid', error: e.message}; }
+    }
+
+    _configPath(name) { return `${GLib.get_user_config_dir()}/niro-control/${name}`; }
+
+    _readConfig(name) {
+        try { return new TextDecoder().decode(GLib.file_get_contents(this._configPath(name))[1]); } catch (_e) { return null; }
+    }
+
+    _writeConfig(name, text) {
+        const path = this._configPath(name);
+        GLib.mkdir_with_parents(GLib.path_get_dirname(path), 0o700);
+        Gio.File.new_for_path(path).replace_contents(new TextEncoder().encode(text), null, false, Gio.FileCreateFlags.REPLACE_DESTINATION | Gio.FileCreateFlags.PRIVATE, null);
+    }
+
     _shorten(args) {
         const out = {};
-        for (const [k, v] of Object.entries(args)) out[k] = typeof v === 'string' && v.length > 120 ? `${v.slice(0, 120)}…` : v;
+        // The audit says what was asked, not what was typed: text, secrets and clipboard content are recorded by length only.
+        const private_ = /text|content|clip|secret|token|pass|key|value|body|message|input/i;
+        for (const [k, v] of Object.entries(args))
+            out[k] = typeof v === 'string' && private_.test(k) ? `(hidden, ${v.length} chars)` : typeof v === 'string' && v.length > 120 ? `${v.slice(0, 120)}…` : v;
         return out;
     }
 
@@ -218,7 +334,9 @@ export default class NiroSearch extends Extension {
         if (!result || !this._once.begin()) return;
         this._close();
         let outcome;
-        try { outcome = await this._run(result.action, result.args, 'ui'); } finally { this._once.end(); }
+        this._viaAdaptive = Boolean(result.adaptiveRule);
+        try { outcome = await this._run(result.action, result.args, 'ui'); } finally { this._once.end(); this._viaAdaptive = false; }
+        if (outcome.ok && result.adaptiveRule) { try { this._ad?.engine.recordOutcome(result.adaptiveRule, 'accepted'); this._lastSuggestion = null; } catch (_e) { /* history only */ } }
         if (outcome.ok) {
             if (result.calc && this._vars) {                       // a sum was used: its result is `ans`, and a named one is kept for later sums
                 this._vars.ans = result.calc.value;
@@ -256,6 +374,7 @@ export default class NiroSearch extends Extension {
     _toggle() { this._box.visible ? this._close() : this._open(); }
 
     _open() {
+        this._adaptive = this._adaptiveSuggestion();       // before the palette takes the focus: it is about the window that had it
         this._grab = Main.pushModal(this._box, {actionMode: Shell.ActionMode.POPUP});
         if (!this._grab) return;
         this._applyLook();
@@ -281,7 +400,8 @@ export default class NiroSearch extends Extension {
         if (this._grab) { Main.popModal(this._grab); this._grab = null; }
         this._box?.hide();
         this._files?.clear();
-        this._net?.clear(); this._procs?.clear(); this._contents?.clear();                                   // file names are not kept once the palette is closed
+        this._net?.clear(); this._procs?.clear(); this._contents?.clear();
+        this._adaptive = null;                                   // file names are not kept once the palette is closed
     }
 
     _applyLook() {
@@ -601,8 +721,148 @@ export default class NiroSearch extends Extension {
         });
     }
 
+    /** What the engine may look at: the window in front, the time, the monitors, the workspace and the power. Read only when asked (Search opens, or a live event). */
+    _signals() {
+        const win = global.display.focus_window;
+        const app = win ? Shell.WindowTracker.get_default().get_window_app(win) : null;
+        const id = `${app?.get_id() ?? ''} ${win?.get_wm_class() ?? ''}`.trim().toLowerCase();
+        const now = GLib.DateTime.new_now_local();
+        const power = this._power();
+        return {app: id || null, minute: now.get_hour() * 60 + now.get_minute(), monitors: Main.layoutManager.monitors.length,
+            workspace: global.workspace_manager.get_active_workspace_index(), battery: power.battery, onAc: power.onAc};
+    }
+
+    /** Battery level and mains from /sys/class/power_supply; nulls on a desktop. */
+    _power() {
+        const out = {battery: null, onAc: null};
+        try {
+            const base = '/sys/class/power_supply';
+            const it = Gio.File.new_for_path(base).enumerate_children('standard::name', 0, null);
+            for (let i = it.next_file(null); i; i = it.next_file(null)) {
+                const read = f => { try { return new TextDecoder().decode(GLib.file_get_contents(`${base}/${i.get_name()}/${f}`)[1]).trim(); } catch (_e) { return null; } };
+                const type = read('type');
+                if (type === 'Battery' && out.battery === null) { const c = Number(read('capacity')); if (Number.isFinite(c)) out.battery = c; }
+                else if (type === 'Mains') out.onAc = read('online') === '1';
+            }
+        } catch (_e) { /* no power supplies listed */ }
+        return out;
+    }
+
+    /** One profile suggestion for the application in front, or null (off by default; each rule is then quiet for 30 minutes). With "watch while you work" the
+     * suggestion found earlier may be waiting. */
+    _adaptiveSuggestion() {
+        if (!this._pref('adaptive-suggestions', false) || !this._ad) return null;
+        try {
+            const list = profiles();
+            const active = list.find(p => p.active)?.id ?? null;
+            const known = id => list.some(p => p.id === id);
+            let found = this._pending && this._pending.profile !== active && known(this._pending.profile) ? this._pending : null;
+            this._pending = null;
+            found ??= evaluateNow(this._ad.engine, this._signals(), active, known);
+            if (!found) return null;
+            this._lastSuggestion = found;
+            return {profile: list.find(p => p.id === found.profile), reason: found.reason, rule: found.ruleId};
+        } catch (_e) { return null; }
+    }
+
+    _adaptiveDismiss() {
+        const s = this._lastSuggestion;
+        if (!s) return 'There is no suggestion to dismiss';
+        this._ad.engine.recordOutcome(s.ruleId, 'dismissed');
+        this._lastSuggestion = this._pending = null;
+        return 'Dismissed; it stays quiet for a while';
+    }
+
+    _adaptiveHistory() {
+        const h = this._ad.engine.history().slice(-20).reverse();
+        const lines = h.map(e => `${new Date(e.at).toLocaleString()}  ${e.outcome}  ${e.ruleId ?? 'by hand'}  ${e.profile}`);
+        const problems = this._ad.problems.length ? `\nIgnored rules: ${this._ad.problems.join(' | ')}` : '';
+        return (lines.length ? lines.join('\n') : 'No suggestions yet') + problems + (this._ad.engine.isLocked() ? '\nSuggestions are locked' : '');
+    }
+
+    _adaptiveLock(on) {
+        on ? this._ad.engine.lock() : this._ad.engine.unlock();
+        return on ? 'Suggestions locked: none until you unlock' : 'Suggestions unlocked';
+    }
+
+    // ---- adaptive-live (opt-in): look when the focused window or the monitors change, not only when Search opens. Nothing listens while it is off.
+    _syncLive() {
+        const want = this._pref('adaptive-suggestions', false) && this._pref('adaptive-live', false);
+        if (want && !this._liveIds) {
+            this._liveIds = [
+                [global.display, global.display.connect('notify::focus-window', () => this._liveEvent())],
+                [Main.layoutManager, Main.layoutManager.connect('monitors-changed', () => this._liveEvent())],
+            ];
+        } else if (!want) this._stopLive();
+    }
+
+    _stopLive() {
+        for (const [obj, id] of this._liveIds ?? []) obj.disconnect(id);
+        this._liveIds = null;
+        if (this._liveTimer) GLib.source_remove(this._liveTimer);
+        this._liveTimer = 0;
+        this._pending = null;
+    }
+
+    /** A burst of focus changes (Alt+Tab through windows) is one look, after the focus has rested for a moment. */
+    _liveEvent() {
+        if (this._liveTimer) GLib.source_remove(this._liveTimer);
+        this._liveTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
+            this._liveTimer = 0;
+            try {
+                if (this._box?.visible || !this._ad) return GLib.SOURCE_REMOVE;
+                const list = profiles();
+                const active = list.find(p => p.active)?.id ?? null;
+                const found = evaluateNow(this._ad.engine, this._signals(), active, id => list.some(p => p.id === id));
+                if (found) this._pending = found;
+            } catch (_e) { /* a look that fails is just no suggestion */ }
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    // ---- Niro Flow events (opt-in, `flow-events`): nothing is connected while it is off. Real Shell signals only; see flowEvents.ts for what leaves and how often.
+    _syncFlow() {
+        const want = this._pref('flow-events', false);
+        if (want && !this._flow) {
+            const emitter = createFlowEmitter({
+                send: (kind, payload) => new Promise((resolve, reject) => {
+                    // NO_AUTO_START: a daemon that is not running is not started for an event; the answer comes later and is only looked at for failures
+                    Gio.DBus.session.call('org.niro.island.Daemon', '/org/niro/island/Daemon', 'org.niro.Flow1', 'Notify', new GLib.Variant('(ss)', [kind, payload]),
+                        new GLib.VariantType('(b)'), Gio.DBusCallFlags.NO_AUTO_START, 1000, null, (conn, res) => {
+                            try { resolve(conn.call_finish(res).deepUnpack()[0]); } catch (e) { reject(e); }
+                        });
+                }),
+                after: (ms, fn) => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => { fn(); return GLib.SOURCE_REMOVE; }),
+                cancel: handle => { try { GLib.source_remove(handle); } catch (_e) { /* already ran */ } },
+                now: () => GLib.get_monotonic_time() / 1000,
+            });
+            const activeProfile = () => {
+                try { return JSON.parse(new TextDecoder().decode(Gio.File.new_for_path(`${GLib.get_user_config_dir()}/niro-control/state.json`).load_contents(null)[1])).active ?? null; } catch (_e) { return null; }
+            };
+            const sources = connectFlowSources({
+                workspaceManager: global.workspace_manager, layoutManager: Main.layoutManager, appSystem: Shell.AppSystem.get_default(), tracker: Shell.WindowTracker.get_default(),
+                runningState: Shell.AppState.RUNNING, stoppedState: Shell.AppState.STOPPED, readProfile: activeProfile,
+                watchProfile: cb => {
+                    const monitor = Gio.File.new_for_path(`${GLib.get_user_config_dir()}/niro-control/state.json`).monitor_file(Gio.FileMonitorFlags.NONE, null);
+                    const id = monitor.connect('changed', () => cb(activeProfile()));
+                    return () => { monitor.disconnect(id); monitor.cancel(); };
+                },
+            }, emitter);
+            this._flow = {emitter, sources};
+        } else if (!want) this._stopFlow();
+    }
+
+    _stopFlow() {
+        this._flow?.sources.stop();
+        this._flow?.emitter.stop();
+        this._flow = null;
+    }
+
     _suggestions() {
         const out = [];
+        if (this._adaptive) out.push({section: 'Suggested', title: `Switch to ${this._adaptive.profile.name}?`, subtitle: `${this._adaptive.reason}  ·  Enter applies it  ·  not asked again for 30 minutes`,
+            iconName: ICON.Profiles, action: 'profile.apply', args: {id: this._adaptive.profile.id}, toast: true, recent: false, adaptiveRule: this._adaptive.rule});
+        if (this._adaptive) out.push({section: 'Suggested', title: 'Not now', subtitle: 'Dismiss this suggestion  ·  "suggestion history" shows what you answered', iconName: ICON.Profiles, action: 'adaptive.dismiss', args: {}, recent: false});
         for (const r of this._recent()) out.push({section: 'Recent', title: r.title, subtitle: r.subtitle, iconName: r.icon, action: r.action, args: r.args, recent: false});
         const seen = new Set(out.map(o => o.action + JSON.stringify(o.args)));
         const push = (section, r) => { if (!seen.has(r.action + JSON.stringify(r.args))) out.push({section, ...r}); };

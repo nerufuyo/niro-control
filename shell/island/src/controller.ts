@@ -60,6 +60,7 @@ import {autoHide, revealBand} from './visibilityRules.js';
 import {BarHider} from './barHider.js';
 import {SessionRestore} from './sessionRestore.js';
 import {TextWriter} from './writer.js';
+import * as Motion from './motion.js';
 
 /** While the pointer rests before the island opens (Settings: hover-delay), it moves at most this far (CSS px). */
 const REST_DISTANCE_PX = 10;
@@ -192,6 +193,7 @@ export class Controller {
         this._settings = extension.getSettings();
         // Before any view shows a time: 24 or 12 hours, or as GNOME's clock (Settings → Appearance → Clock).
         Format.setClockFormat(this._settings.get_string('clock-format'));
+        Motion.configure(this._settings);
         this._daemon = new Daemon();
         // Heard once everything listening is built (see `_connectAll`).
         this._daemon.hold();
@@ -3456,6 +3458,7 @@ export class Controller {
         this._daemon.destroy();
         this._settings = null;
         Format.release();
+        Motion.release();
     }
 
     /** Lets GNOME send windows straight to the screen again, as it was before Island (see `_syncScanout`). */
@@ -3523,5 +3526,6 @@ export class Controller {
             service?.destroy();
         this._settings = null;
         Format.release();
+        Motion.release();
     }
 }

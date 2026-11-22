@@ -40,6 +40,30 @@ pub struct ClipboardService {
     clips: ClipFiles,
     /// Images still without this version's thumbnail, and whether an older one stands in.
     stale: HashMap<String, bool>,
+    /// Copies that looked like secrets and were not kept (opt-in; since the daemon started, never saved).
+    secrets_skipped: u64,
+}
+
+/// Opt-in, default off: secret-looking text is not put in the history. `NIRO_CLIPBOARD_SKIP_SECRETS` (1/0, true/false,
+/// on/off) wins, then the one-word file `~/.config/niro/clipboard.skip-secrets`, the way Flow's switch works.
+fn skip_secrets_enabled() -> bool {
+    let file = dirs::config_dir().map(|d| d.join("niro").join("clipboard.skip-secrets"));
+    skip_secrets_from(std::env::var("NIRO_CLIPBOARD_SKIP_SECRETS").ok().as_deref(), file.as_deref())
+}
+
+fn skip_secrets_from(env: Option<&str>, file: Option<&Path>) -> bool {
+    let parse = |text: Option<&str>| match text?.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Some(true),
+        "0" | "false" | "no" | "off" => Some(false),
+        _ => None,
+    };
+    parse(env).or_else(|| parse(file.and_then(|f| fs::read_to_string(f).ok()).as_deref())).unwrap_or(false)
+}
+
+/// Whether a new copy is left out of the history: only when the opt-in is on and the text looks like a secret. Applies
+/// to new copies only; items already in the history are never touched.
+fn refuse_secret(opted_in: bool, text: &str) -> bool {
+    opted_in && island_core::secrets::sensitive_kind(text).is_some()
 }
 
 impl ClipboardService {
@@ -81,6 +105,7 @@ impl ClipboardService {
             store,
             clips,
             stale,
+            secrets_skipped: 0,
         }
     }
 
@@ -228,8 +253,19 @@ impl ClipboardService {
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
     ) -> fdo::Result<u64> {
         let clip = Clip::from_text(text).map_err(invalid)?;
+        if refuse_secret(skip_secrets_enabled(), text) {
+            // Decided when the copy arrives, so it never waits in the history for a later sweep. Not kept, not saved, not signalled: only the count remains. 0 is no item.
+            self.secrets_skipped += 1;
+            return Ok(0);
+        }
         let added = self.history.add(clip, app_id, now_ms());
         self.added(added, &emitter).await
+    }
+
+    /// How many copies were left out of the history as secrets since the daemon started (0 unless opted in).
+    #[zbus(property)]
+    fn secrets_skipped(&self) -> u64 {
+        self.secrets_skipped
     }
 
     /// Records a copied PNG image and returns its id. Decoding and scaling
@@ -762,5 +798,40 @@ mod tests {
         assert!(bytes.len() == 4096 && bytes.iter().all(|&b| b == bytes[0]));
         assert_eq!(fs::read_dir(&clips.dir).unwrap().count(), 1);
         fs::remove_dir_all(&clips.dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod secret_switch_tests {
+    use super::*;
+
+    #[test]
+    fn a_secret_is_refused_on_arrival_only_when_opted_in() {
+        let key = "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----";
+        assert!(refuse_secret(true, key));
+        assert!(!refuse_secret(false, key), "default off keeps today's behaviour");
+        assert!(!refuse_secret(true, "just a sentence"));
+        // An item already in the history is not rewritten when the switch turns on.
+        let mut history = ClipboardHistory::default();
+        let old = Clip::from_text(key).unwrap();
+        history.add(old, "app", 1);
+        let _ = refuse_secret(true, key);
+        assert_eq!(history.items().len(), 1);
+    }
+
+    #[test]
+    fn skipping_secrets_is_off_unless_asked_for() {
+        let dir = std::env::temp_dir().join(format!("niro-clip-switch-{}", std::process::id()));
+        let _ = fs::create_dir_all(&dir);
+        let file = dir.join("clipboard.skip-secrets");
+        assert!(!skip_secrets_from(None, None));
+        assert!(!skip_secrets_from(None, Some(&file)), "no file");
+        fs::write(&file, "true\n").unwrap();
+        assert!(skip_secrets_from(None, Some(&file)));
+        assert!(!skip_secrets_from(Some("0"), Some(&file)), "env wins");
+        assert!(skip_secrets_from(Some("on"), None));
+        fs::write(&file, "garbage").unwrap();
+        assert!(!skip_secrets_from(None, Some(&file)));
+        let _ = fs::remove_dir_all(&dir);
     }
 }

@@ -117,7 +117,7 @@ async fn proxy(timeout: Duration) -> zbus::Result<zbus::Proxy<'static>> {
 }
 
 /// The registry's list: id, title, description, category, parameters, permission, and whether it can run now.
-async fn manifest() -> Result<Vec<Value>, String> {
+pub(crate) async fn manifest() -> Result<Vec<Value>, String> {
     let proxy = proxy(LIST_WITHIN).await.map_err(|e| format!("the action registry is not reachable: {e}"))?;
     let json: String = proxy
         .call_with_flags("ListActions", MethodFlags::NoAutoStart.into(), &())
@@ -125,6 +125,19 @@ async fn manifest() -> Result<Vec<Value>, String> {
         .map_err(|e| format!("the action registry did not answer: {e}"))?
         .ok_or("the action registry did not answer")?;
     serde_json::from_str::<Vec<Value>>(&json).map_err(|_| "the action registry's list is not readable".to_owned())
+}
+
+/// Runs one registry action for Niro Flow: the registry's own outcome (`{ok, message}` or `{ok: false, code, error}`).
+/// Availability and confirmation are the caller's to settle first: nothing here asks the user, and the registry
+/// would put a confirmation on screen for a sensitive action.
+pub(crate) async fn run_action(id: &str, args_json: &str) -> Result<Value, String> {
+    let proxy = proxy(RUN_WITHIN).await.map_err(|e| format!("the action registry is not reachable: {e}"))?;
+    let reply: Option<String> = proxy
+        .call_with_flags("RunAction", MethodFlags::NoAutoStart.into(), &(id, args_json))
+        .await
+        .map_err(|e| format!("the action registry did not answer: {e}"))?;
+    let text = reply.ok_or("the action registry did not answer")?;
+    serde_json::from_str(&text).map_err(|_| "the action registry's answer is not readable".to_owned())
 }
 
 /// Runs one `{"type": "niro", "action": id, "args": {…}}` the AI asked for, and returns what to tell it: a JSON outcome.

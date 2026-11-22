@@ -478,6 +478,19 @@
       <summary>The assistant's colour</summary>
       <description>One of Island's colours (cloud, ink, peach, coral, amber, mint, teal, sky, lavender, rose, graphite) or a colour as #rrggbb.</description>
     </key>
+    <key name="motion-preset" type="s">
+      <choices>
+        <choice value="default"/>
+        <choice value="off"/>
+        <choice value="minimal"/>
+        <choice value="smooth"/>
+        <choice value="dynamic"/>
+        <choice value="cinematic"/>
+      </choices>
+      <default>'default'</default>
+      <summary>How fast the island's fades and slides run</summary>
+      <description>"default" keeps the island's own timings. "off" removes the fades and slides, "minimal", "smooth", "dynamic" and "cinematic" scale them (smooth is the usual speed). GNOME's "reduce animations" switch turns them off whenever a preset is chosen. The island's springs are not changed.</description>
+    </key>
     <key name="bot-glow" type="s">
       <default>'match'</default>
       <summary>The colours the island glows with while the assistant is open</summary>
