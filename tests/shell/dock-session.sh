@@ -23,7 +23,7 @@ gsettings set org.gnome.shell enabled-extensions "['"'"'dock@niro.local'"'"']"
 gsettings set org.gnome.shell favorite-apps "['"'"'org.gnome.Calculator.desktop'"'"', '"'"'org.gnome.Nautilus.desktop'"'"', '"'"'org.gnome.TextEditor.desktop'"'"', '"'"'org.gnome.Settings.desktop'"'"', '"'"'org.gnome.Terminal.desktop'"'"']"
 gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display=niro-dock-$$ $VM > "$WORK/shell.log" 2>&1 & SP=$!
 sleep 14
-ev() { gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "$1" 2>&1 | sed -E "s/^\((true|false), ?\x27?//; s/\x27?\)\$//"; }
+ev() { gdbus call --session --dest org.gnome.Shell --object-path /org/gnome/Shell --method org.gnome.Shell.Eval "$1" 2>&1 | sed -E "s/^\((true|false), ?\x27?//; s/\x27?\)\$//; s/^\"//; s/\"\$//; s/\\\\\\\\\"/\"/g"; }
 shot() { gdbus call --session --dest org.gnome.Shell.Screenshot --object-path /org/gnome/Shell/Screenshot --method org.gnome.Shell.Screenshot.Screenshot false false "$OUT/$1.png" > /dev/null 2>&1; }
 wait_ms() { sleep $(awk "BEGIN{print $1/1000}"); }
 M() { ev "global.__move($1, $2); 1" > /dev/null; }
