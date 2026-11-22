@@ -89,5 +89,5 @@ fixed on one side without any messaging: the island collapses while another moda
 
 ## Open items
 
-- Choose the overlap fix above (island-side observer preferred), and re-run `island-steps-search-over.sh`.
+- ~~Overlap fix~~ done: Search dodges the island itself (`shell/search/placement.ts`, no service; it finds the island actor by its name `islandIsland` and watches its `notify::` signals). Evidence: `evidence/search/collision-before.png` and `collision-after-island-expanded.png`. The actor name is now a contract between the two extensions.
 - Whether `Main.modalCount` is available and stable from GNOME 46 to 51; if not, use the key-focus signal.
