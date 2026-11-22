@@ -210,6 +210,58 @@ export const MUSIC_REVEAL = ['artwork', 'metadata', 'progress', 'controls'];
 export const REVEAL_RISE_PX = MOTION_TOKENS.distance.reveal;
 
 /**
+ * Content that follows the surface (the geometry of the island's edge, as opposed to its interpolation): a view is laid out at the width
+ * it will have at rest and centred on the display, so while the surface is still narrower (or wider) than that, its edge content would
+ * sit at its final place at once: past the surface's clip when widening, or teleported inward when narrowing. These functions
+ * give where the content should be instead. Pure (CSS px or stage px alike, as long as both edges are in one unit).
+ *
+ * `surface` is the animated body's {left, right}, `rest` the same where it will settle. The shift of each edge is how far the content
+ * pinned to it is from its resting place. `signed` follows the edge both ways (the same view in a new size: a sign beside the
+ * island's end moves in with it); unsigned only moves content in from past the edge's inner side (a view coming in on a surface that
+ * is narrower than it will be): a surface wider than the view leaves it where it rests, as the view just fades in there.
+ */
+export function edgeShifts(surface, rest, signed) {
+    const left = surface.left - rest.left;
+    const right = surface.right - rest.right;
+    return signed ? {left, right} : {left: Math.max(0, left), right: Math.min(0, right)};
+}
+
+const clamp01 = value => Math.max(0, Math.min(1, value));
+const smooth = value => {
+    const t = clamp01(value);
+    return t * t * (3 - 2 * t);
+};
+
+/** How much of a travel from `from` to `to` has been made, 0 to 1 (1 when there is no travel). */
+export function travelProgress(size, from, to) {
+    const span = to - from;
+    return Math.abs(span) < 1 ? 1 : clamp01((size - from) / span);
+}
+
+/**
+ * How revealed a piece of content that arrives with the surface growing from `from` to `to` should be at `size`: nothing until the
+ * surface has covered `start` of the way, all of it from `end`; in between a smooth ramp. It reads the size, not the time, so an
+ * interruption (a retarget, a collapse) turns it round with the surface. Content that arrives on a surface not growing shows at once.
+ */
+export function arrivalGate(size, from, to, {start = 0.5, end = 0.95} = {}) {
+    if (to - from < 1)
+        return 1;
+    return smooth((travelProgress(size, from, to) - start) / (end - start));
+}
+
+/**
+ * How revealed the content of a view that is `full` wide (tall) at rest should be on a surface `size` wide (tall): none while the
+ * surface is `ramp` or more short of holding the content (the view less `edge` of padding on each side), all once it holds it. For the
+ * content of a view that is wider than the surface while it grows, or while it narrows: it is shown only inside the edge's clip.
+ */
+export function roomGate(size, full, {edge = 0, ramp = 0} = {}) {
+    const need = full - 2 * edge;
+    if (ramp <= 0)
+        return size >= need ? 1 : 0;
+    return smooth((size - (need - ramp)) / ramp);
+}
+
+/**
  * How a notification moves, by priority: an `instant` (critical, call) alert is quick and may overshoot; a routine
  * one is calm (critically damped, no stagger). Transient ones (volume) never bounce the surface.
  */
