@@ -35,6 +35,7 @@ import {entities, haQuery, validBase} from './homeAssistant.js';
 import {layoutQuery} from './layouts.js';
 import {agendaQuery, parseEvents, upcoming} from './agenda.js';
 import {Switcher} from './switcher.js';
+import {obstacle, placeSearch, SAFE_GAP} from './placement.js';
 import {anchoredScroll, createSearchMachine, isLive, keepScrollValue, planUpdate, resultKey, rowReveal, SearchMotion} from './searchMotion.js';
 import {buildEngine, evaluateNow, QUIET_MS} from './adaptive.js';
 import {connectFlowSources, createFlowEmitter} from './flowEvents.js';
@@ -42,6 +43,7 @@ import {savedLayouts} from './actions.js';
 import {contentNeedle, defineQuery, definitions, grepArgs, historyMatches, historyNeedle, killName, matchProcesses, qrText, translateQuery, translated} from './lookups.js';
 
 const WIDTH = 680;
+const ISLAND_ACTOR = 'islandIsland';       // the Niro Island's actor name; see _findIsland
 /** JSON with the keys in order, so the same arguments written in another order are the same request. */
 const canon = (v) => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x));
 const LIMITS = {Applications: 5, Windows: 4, Settings: 5, Profiles: 4, Actions: 4, Clipboard: 6, Files: 8};
@@ -402,15 +404,21 @@ export default class NiroSearch extends Extension {
         if (!this._grab) return;
         this._applyLook();
         const monitor = Main.layoutManager.currentMonitor;
-        this._box.set_position(Math.round(monitor.x + (monitor.width - WIDTH) / 2), Math.round(monitor.y + monitor.height * 0.16));
-        this._scroll.style = `max-height: ${Math.round(monitor.height * 0.5)}px;`;
+        this._monitor = monitor;
+        this._defaultY = Math.round(monitor.y + monitor.height * 0.16);
+        this._box.set_position(Math.round(monitor.x + (monitor.width - WIDTH) / 2), this._defaultY);
+        this._scrollMax = Math.round(monitor.height * 0.5);
+        this._scroll.style = `max-height: ${this._scrollMax}px;`;
         this._windows = windows();
         this._sm.send('open');
         this._entry.set_text('');
         this._lastQuery = null;
         this._motion.dropHighlights();
+        const wasHidden = !this._box.visible;
         this._box.show();
         this._refresh();
+        this._watchIsland();
+        this._placeNow(wasHidden);                         // clear of the island from the first frame; a panel still fading out moves smoothly instead
         this._entry.grab_key_focus();                      // keys work from the first frame: the animation never gates typing
         this._motion.open();
         this._drawMotion();
@@ -425,6 +433,8 @@ export default class NiroSearch extends Extension {
 
     /** Hands the keyboard back and forgets the moment's data at once; what is left of the panel is only a fade. */
     _release() {
+        this._unwatchIsland();
+        this._fit = null;
         if (this._outside) { global.stage.disconnect(this._outside); this._outside = 0; }
         if (this._grab) { Main.popModal(this._grab); this._grab = null; }
         this._files?.clear();
@@ -437,6 +447,100 @@ export default class NiroSearch extends Extension {
         if (!this._sm || this._sm.state === 'Closed') return;
         this._sm.send('close');
         this._motion.close();                                    // fades out; onClosed hides the actor
+    }
+
+    // ---- Keeping clear of the Niro Island
+    // The island is another extension. Search does not import it or ask it anything: it finds the island's actor in the shell's chrome by its
+    // NAME, 'islandIsland' (set in shell/island/src/island.ts and not to be renamed), and reads what GNOME itself reports about that actor
+    // (its stage rectangle, visibility), the same way any shell code can see any actor. FALLBACK: if no actor has that name (island not
+    // enabled, renamed, or destroyed) or it is hidden/unmapped/on another monitor, nothing is an obstacle and Search sits at its normal anchor.
+    // The actor is looked up once per open and the signals are connected only while Search is open (no polling, no per-frame queries).
+    _findIsland() {
+        const walk = (actor, depth) => {
+            if (actor.get_name?.() === ISLAND_ACTOR) return actor;
+            if (depth > 3) return null;
+            for (const child of actor.get_children?.() ?? []) { const hit = walk(child, depth + 1); if (hit) return hit; }
+            return null;
+        };
+        return walk(Main.layoutManager.uiGroup, 0);
+    }
+
+    _watchIsland() {
+        this._unwatchIsland();
+        const island = this._findIsland();
+        if (!island) {
+            // Not there yet (enabled while Search is open): look again when the shell's chrome gains a child; until then no obstacle.
+            this._groupId = Main.layoutManager.uiGroup.connect('child-added', (_g, actor) => {
+                if (actor.get_name?.() !== ISLAND_ACTOR) return;
+                this._watchIsland();
+                this._queuePlace();
+            });
+            return;
+        }
+        this._island = island;
+        this._islandIds = ['x', 'y', 'width', 'height', 'visible', 'mapped', 'opacity', 'translation-x', 'translation-y', 'scale-x', 'scale-y']
+            .map(prop => island.connect(`notify::${prop}`, () => { this._follow(); this._queuePlace(); }));
+        this._islandIds.push(island.connect('destroy', () => { this._island = null; this._islandIds = null; this._queuePlace(); }));
+    }
+
+    _unwatchIsland() {
+        if (this._groupId) { try { Main.layoutManager.uiGroup.disconnect(this._groupId); } catch (_e) { /* gone */ } this._groupId = 0; }
+        if (this._island && this._islandIds) for (const id of this._islandIds) { try { this._island.disconnect(id); } catch (_e) { /* destroyed */ } }
+        this._island = null; this._islandIds = null;
+        if (this._placeLater) { global.compositor.get_laters().remove(this._placeLater); this._placeLater = 0; }
+    }
+
+    /**
+     * The island moves in its own frame step, which can land after this frame's `BEFORE_REDRAW` evaluation: acting only there leaves Search one frame
+     * behind a growing island (measured: up to 7 px of overlap on 4 of 75 frames). So a notification also does the cheap part at once: if the island's
+     * edge now reaches the panel, push it down (cached measurements, one rectangle read, no layout queries). The full evaluation stays one per frame.
+     */
+    _follow() {
+        if (!this._box || !this._motion || !this._fit || !this._live()) return;
+        const rect = this._islandRect();
+        if (!rect) return;
+        const plan = placeSearch({...this._fit, island: rect, panelX: this._box.x, defaultY: this._defaultY, gap: SAFE_GAP});
+        if (plan.offset <= this._motion.dodge.value) return;
+        this._motion.place(plan.offset, false);
+        this._box.translation_y = this._motion.pose().dy + this._motion.dodge.value;
+    }
+
+    /** One evaluation per frame however many island notifications arrive (a morph changes x, y, width and height every frame). */
+    _queuePlace() {
+        if (this._placeLater || !this._box || !this._live()) return;
+        this._placeLater = global.compositor.get_laters().add(Meta.LaterType.BEFORE_REDRAW, () => {
+            this._placeLater = 0;
+            this._placeNow(false);
+            return false;
+        });
+    }
+
+    /** The island's visible rectangle in stage pixels, if it is an obstacle on Search's monitor. */
+    _islandRect() {
+        const a = this._island;
+        if (!a) return null;
+        const visible = a.visible && a.mapped && a.get_paint_opacity() > 0;
+        if (!visible) return null;
+        const rect = a.get_transformed_extents();
+        return obstacle({x: rect.get_x(), y: rect.get_y(), width: rect.get_width(), height: rect.get_height()}, visible, this._monitor);
+    }
+
+    /** Moves the panel clear of the island (or back), and keeps its results list inside the work area. `instant`: no spring. */
+    _placeNow(instant) {
+        if (!this._box || !this._motion || !this._monitor) return;
+        const m = this._monitor;
+        // Heights are outer boxes: the scroll view's own padding is inside `max-height`'s outside, so it is taken off when the cap is written.
+        const pad = this._scroll.get_theme_node().get_vertical_padding();
+        const total = this._box.get_preferred_height(WIDTH)[1];
+        const fixed = total - this._scroll.get_preferred_height(WIDTH)[1];
+        const normalCap = Math.round(m.height * 0.5);
+        const wanted = Math.min(this._list.get_preferred_height(WIDTH)[1], normalCap) + pad;
+        this._fit = {work: Main.layoutManager.getWorkAreaForMonitor(m.index), panelWidth: WIDTH, fixedHeight: fixed, wantedResults: wanted};
+        const plan = placeSearch({...this._fit, panelX: this._box.x, defaultY: this._defaultY, island: this._islandRect(), gap: SAFE_GAP});
+        const cap = plan.maxResults < wanted ? Math.max(0, plan.maxResults - pad) : normalCap;
+        if (cap !== this._scrollMax) { this._scrollMax = cap; this._scroll.style = `max-height: ${cap}px;`; }
+        this._motion.place(plan.offset, instant);
+        this._drawMotion();
     }
 
     // ---- Motion: the frame loop exists only while a spring is moving
@@ -463,7 +567,7 @@ export default class NiroSearch extends Extension {
         const pose = this._motion.pose();
         this._box.opacity = pose.opacity;
         this._box.set_scale(pose.scale, pose.scale);
-        this._box.translation_y = pose.dy;
+        this._box.translation_y = pose.dy + this._motion.dodge.value;
         const reveal = this._motion.reveal.value;
         this._rows.forEach((row, i) => {
             const r = this._animRow[i] ? rowReveal(reveal, i) : {opacity: 255, dy: 0};
@@ -1000,6 +1104,7 @@ export default class NiroSearch extends Extension {
         if (plan.keepScroll && adj) this._keepScroll(adj, plan.selected, anchor);
         if (plan.animate.some(Boolean)) { this._motion?.revealList(); }
         this._drawMotion();
+        this._queuePlace();                                // the list's height changed: it may now reach the island, or fit again
     }
 
     /**
