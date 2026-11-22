@@ -8,6 +8,6 @@ Depends: gnome-shell (>= 46), dconf-cli, libgtk-4-1, libvulkan1, fontconfig, gjs
 Recommends: tesseract-ocr, tesseract-ocr-ind
 Replaces: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults
 Conflicts: neru-isle, neru-macos-dock, neru-digup-shell, neru-desktop-defaults
-Description: Niro Control: the look of the desktop in one place
- Island (the island on the top bar), the macOS-style dock, an application search, and one control panel
- (org.niro.control: tone, opacity, blur) that sets them all. Local build.
+Description: GNOME Shell extensions for Fedora 45 and Ubuntu 24.04 on Wayland
+ A top-bar island, macOS-style dock, Spotlight-like app search, tiling window manager, window blur
+ and rounded corners, with one control panel (org.niro.control: tone, opacity, blur).

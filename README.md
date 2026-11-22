@@ -1,12 +1,14 @@
-# Niro Control
+# Niro Control: GNOME Shell extensions for Fedora and Ubuntu
 
-<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control 1.6.0: one look for the whole GNOME desktop"></p>
+<p align="center"><img src="docs/images/niro-banner.png" alt="Niro Control on a GNOME desktop: the top-bar island and the macOS-style dock over a blurred, rounded-window desktop"></p>
 
-**One look for the whole GNOME desktop.** A top-bar island, a macOS-style dock, an application search, window blur and
-rounded corners, a tiling layout manager, an emoji picker, and a control panel that sets them all from one place. One repository, one package.
+**Niro Control is a suite of GNOME Shell extensions that gives the whole desktop one look.** A top-bar island, a macOS-style dock, a Spotlight-like application search (`Super+Space`), window blur and
+rounded corners, a tiling window manager (layout manager), an emoji picker, and a control panel that sets them all from one place. One repository, one package.
 
 Runs on **Fedora 45 (GNOME Shell 51)** and **Ubuntu 24.04 (GNOME Shell 46)**, on Wayland. The extensions declare GNOME Shell 46 to 51.
 Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.6.0** ([releases](https://github.com/nerufuyo/niro-control/releases)).
+
+Jump to: [Install](#install) · [Screenshots](#screenshots) · [What you get](#what-you-get) · [Updating](#updating)
 
 ## What you get
 
@@ -42,17 +44,17 @@ It costs nothing when it is not in view: no frames and no timers while the islan
 
 The island alone at the top (GNOME's top bar is taken away; windows use the whole screen), with the dock below:
 
-![The island and the dock](docs/images/island-active.png)
+![The Niro island on the top bar and the dock below it on a GNOME desktop](docs/images/island-active.png)
 
 Taken from a headless GNOME Shell with the installed package (`scripts/screenshots.sh` regenerates them).
 
 | Home and Settings Health | Profiles |
 |---|---|
-| ![Home](docs/images/panel-home.png) | ![Profiles](docs/images/panel-profiles.png) |
+| ![Control panel Home dashboard](docs/images/panel-home.png) | ![Control panel Profiles page](docs/images/panel-profiles.png) |
 | **Look** | **Search: settings** |
-| ![Look](docs/images/panel-look.png) | ![Search for a setting](docs/images/search-settings.png) |
+| ![Control panel Look page with live preview](docs/images/panel-look.png) | ![Super+Space search finding a Niro setting](docs/images/search-settings.png) |
 | **Search: calculator** | **Search: profiles** |
-| ![Calculator](docs/images/search-calculator.png) | ![Profiles in Search](docs/images/search-profiles.png) |
+| ![Super+Space search showing a calculator result](docs/images/search-calculator.png) | ![Super+Space search listing profiles](docs/images/search-profiles.png) |
 
 ## Universal Appearance
 
@@ -60,7 +62,7 @@ One shared look with glass for backgrounds and solid text: presets, safe mode, a
 
 | Compatibility | GTK apps with the integration (Files, Settings) |
 |---|---|
-| ![Compatibility](reports/ui/compatibility.png) | ![Settings](reports/ui/gtk/settings-dark-on.png) |
+| ![Universal Appearance compatibility report](reports/ui/compatibility.png) | ![GNOME Settings app with the Niro GTK theme integration in dark mode](reports/ui/gtk/settings-dark-on.png) |
 
 ## Install
 

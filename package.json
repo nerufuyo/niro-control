@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "version": "1.0.0",
-  "description": "Niro Control: the look of the desktop in one place (island, dock, search, control panel). TypeScript for the shell and the panel, Rust for the island's programs.",
+  "description": "GNOME Shell extensions for Fedora 45 and Ubuntu 24.04 on Wayland: a top-bar island, macOS-style dock, Spotlight-like app search, tiling window manager, window blur and rounded corners, with one control panel.",
+  "keywords": ["gnome-shell","gnome-shell-extension","dock","app-launcher","tiling-window-manager","fedora","ubuntu","wayland"],
   "workspaces": [
     "shell/dock"
   ],

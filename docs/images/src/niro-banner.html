@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Niro Control banner</title>
+<style>
+@font-face{font-family:"Inter";src:url("../../../data/fonts/InterVariable.ttf");font-weight:100 900}
+:root{--ember:#E8472B;--coral:#FF7A59;--ink:#F4F4F7;--mute:#9A9AA6}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1600px;height:800px;overflow:hidden;background:#0a0a0e;font-family:"Inter",system-ui,sans-serif;color:var(--ink)}
+.stage{position:relative;width:1600px;height:800px;overflow:hidden;
+  background:
+   radial-gradient(900px 520px at 4% 108%,rgba(232,71,43,.26),transparent 62%),
+   radial-gradient(760px 520px at 96% -8%,rgba(46,110,210,.30),transparent 60%),
+   linear-gradient(180deg,#101015,#09090c)}
+.stage:before{content:"";position:absolute;inset:0;
+  background:repeating-linear-gradient(0deg,rgba(255,255,255,.028) 0 1px,transparent 1px 40px),repeating-linear-gradient(90deg,rgba(255,255,255,.028) 0 1px,transparent 1px 40px)}
+.url{position:absolute;right:56px;top:44px;font-size:15px;font-weight:600;letter-spacing:.2em;color:#76768a}
+.appicon{position:absolute;left:92px;top:92px;width:112px;height:112px;filter:drop-shadow(0 14px 26px rgba(0,0,0,.55))}
+.eyebrow{position:absolute;left:236px;top:104px;font-size:15px;font-weight:700;letter-spacing:.26em;color:var(--ember)}
+.title{position:absolute;left:230px;top:124px;font-size:84px;font-weight:780;letter-spacing:-.035em;line-height:1}
+.title .a{color:#fff} .title .b{background:linear-gradient(180deg,#b9b9c6,#7c7c8a);-webkit-background-clip:text;color:transparent}
+.hl{position:absolute;left:92px;top:294px;font-size:58px;font-weight:730;letter-spacing:-.022em;line-height:1.1}
+.hl em{font-style:normal;color:var(--coral)}
+.sub{position:absolute;left:94px;top:452px;width:720px;font-size:21px;line-height:1.55;color:var(--mute)}
+.pills{position:absolute;left:92px;top:584px;display:flex;gap:10px;flex-wrap:wrap;width:760px}
+.pill{font-size:18px;font-weight:650;padding:9px 19px;border-radius:999px;color:#E8E8EE;background:rgba(255,255,255,.065);border:1px solid rgba(255,255,255,.15)}
+.pill.hot{background:rgba(232,71,43,.16);border-color:rgba(232,71,43,.55);color:#FFD9CF}
+.foot{position:absolute;left:94px;top:728px;font-size:17px;color:#7d7d8c;letter-spacing:.01em}
+.foot b{color:#b9b9c6;font-weight:650}
+.cardA{position:absolute;left:912px;top:140px;width:624px;height:390px;border-radius:18px;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,255,255,.10),0 44px 90px rgba(0,0,0,.62),0 0 120px rgba(46,110,210,.18);
+  transform:perspective(1700px) rotateY(-5deg) rotateX(1.5deg);transform-origin:left center}
+.cardA img{width:100%;height:100%;object-fit:cover;display:block}
+.cardB{position:absolute;left:868px;top:446px;width:478px;height:125px;border-radius:20px;overflow:hidden;
+  box-shadow:0 0 0 1px rgba(255,255,255,.14),0 30px 70px rgba(0,0,0,.65),0 0 60px rgba(232,71,43,.18)}
+.cardB img{position:absolute;width:1012px;left:-267px;top:-102px;display:block}
+.slime{position:absolute;left:1356px;top:540px;width:214px;height:214px;filter:drop-shadow(0 18px 24px rgba(10,30,90,.45))}
+.bub{position:absolute;border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.75),rgba(150,190,255,.18) 55%,rgba(255,255,255,.05));border:1px solid rgba(190,215,255,.4)}
+</style></head><body><div class="stage">
+<div class="url">GITHUB.COM/NERUFUYO/NIRO-CONTROL</div>
+<svg class="appicon" xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="ibg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3A3A40"/>
+      <stop offset="1" stop-color="#1C1C1E"/>
+    </linearGradient>
+    <linearGradient id="ish" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="28" fill="url(#ibg)"/>
+  <rect x="4" y="4" width="120" height="60" rx="28" fill="url(#ish)"/>
+  <rect x="4.5" y="4.5" width="119" height="119" rx="27.5" fill="none" stroke="#FFFFFF" stroke-opacity="0.14"/>
+  <!-- the island: a black pill at the top edge -->
+  <rect x="42" y="12" width="44" height="12" rx="6" fill="#000000"/>
+  <circle cx="78" cy="18" r="2.4" fill="#E8472B"/>
+  <!-- N -->
+  <path fill="#FFFFFF" d="M28 94V44h12l26 34V44h12v50H66L40 60v34z"/>
+  <!-- the full stop of NIRO. -->
+  <circle cx="93" cy="88" r="7" fill="#E8472B"/>
+</svg>
+
+<div class="eyebrow">FOR GNOME ON FEDORA AND UBUNTU</div>
+<div class="title"><span class="a">Niro</span> <span class="b">Control</span></div>
+<div class="hl">One look for the whole<br><em>GNOME desktop.</em></div>
+<div class="sub">A top-bar island, a macOS-style dock, Spotlight-style search, window blur, rounded corners and tiling, set from one control panel.</div>
+<div class="pills"><span class="pill">Island</span><span class="pill">Dock</span><span class="pill">Search</span><span class="pill">Blur</span><span class="pill">Tile</span><span class="pill hot">Flow</span><span class="pill">Profiles</span></div>
+<div class="foot"><b>Fedora 45</b> · <b>Ubuntu 24.04</b> · GNOME Shell 46–51 · Wayland · GPL-3.0</div>
+<div class="cardA"><img src="../panel-home.png" alt=""></div>
+<div class="cardB"><img src="../search-calculator.png" alt=""></div>
+<div class="bub" style="left:1330px;top:600px;width:24px;height:24px"></div>
+<svg class="slime" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+ <defs>
+  <linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9CDDFF"/><stop offset=".5" stop-color="#5BAEFF"/><stop offset="1" stop-color="#2F80EA"/></linearGradient>
+  <radialGradient id="bl"><stop offset="0" stop-color="#FF7FAE" stop-opacity=".85"/><stop offset="1" stop-color="#FF7FAE" stop-opacity="0"/></radialGradient>
+  <linearGradient id="eye" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a1030"/><stop offset="1" stop-color="#1a2a6c"/></linearGradient>
+  <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3C86EE"/><stop offset="1" stop-color="#1B5FD4"/></linearGradient>
+ </defs>
+ <ellipse cx="100" cy="193" rx="82" ry="7" fill="#0a1a40" opacity=".9"/>
+ <path d="M176 22 l3 9 9 3 -9 3 -3 9 -3 -9 -9 -3 9 -3z" fill="#CFE6FF" opacity=".9"/><path d="M22 50 l2 6 6 2 -6 2 -2 6 -2 -6 -6 -2 6 -2z" fill="#CFE6FF" opacity=".7"/>
+ <path id="d" d="M100,26 C152,26 192,72 192,136 C192,174 154,192 100,192 C46,192 8,174 8,136 C8,72 48,26 100,26 Z" fill="url(#rim)"/>
+ <path d="M100,26 C152,26 192,72 192,136 C192,174 154,192 100,192 C46,192 8,174 8,136 C8,72 48,26 100,26 Z" fill="url(#sg)" transform="translate(100 122) scale(.93) translate(-100 -122)"/>
+ <ellipse cx="54" cy="88" rx="24" ry="11" fill="#fff" opacity=".66" transform="rotate(-16 54 88)"/>
+ <circle cx="34" cy="106" r="4.4" fill="#fff" opacity=".7"/>
+ <circle cx="158" cy="92" r="3.2" fill="#fff" opacity=".35"/>
+ <!-- cheeks -->
+ <ellipse cx="42" cy="150" rx="15" ry="9" fill="url(#bl)"/><ellipse cx="158" cy="150" rx="15" ry="9" fill="url(#bl)"/>
+ <!-- big, wet eyes -->
+ <ellipse cx="69" cy="126" rx="15" ry="20" fill="url(#eye)"/><ellipse cx="131" cy="126" rx="15" ry="20" fill="url(#eye)"/>
+ <ellipse cx="69" cy="132" rx="9" ry="9" fill="#2f5fd0" opacity=".45"/><ellipse cx="131" cy="132" rx="9" ry="9" fill="#2f5fd0" opacity=".45"/>
+ <circle cx="63" cy="117" r="6" fill="#fff"/><circle cx="125" cy="117" r="6" fill="#fff"/>
+ <circle cx="75" cy="136" r="2.8" fill="#fff" opacity=".9"/><circle cx="137" cy="136" r="2.8" fill="#fff" opacity=".9"/>
+ <!-- a small cat mouth -->
+ <path d="M91 152 Q95.5 160 100 152 Q104.5 160 109 152" fill="none" stroke="#1B3F8F" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+</div></body></html>
