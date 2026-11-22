@@ -58,6 +58,7 @@ export class DockManager {
   private _blurEffect: Shell.BlurEffect | null = null;
   private _bg: InstanceType<typeof St.Widget> | null = null;
   private _bgExtra: [number, number] = [0, 0];
+  private _bgSyncId: number | null = null;
   private _launching: { app: Shell.App; time: number } | null = null;
   private _launchBounceId: number | null = null;
   private _previewPopup: WindowPreviewPopup | null = null;
@@ -126,7 +127,7 @@ export class DockManager {
       "translation-x",
       "translation-y",
     ])
-      this._signals.connect(this._container, `notify::${prop}`, () => this._syncBg());
+      this._signals.connect(this._container, `notify::${prop}`, () => this._queueSyncBg());
 
     // Icon manager: populates the container with app buttons.
     const iconManager = new IconManager(
@@ -237,6 +238,7 @@ export class DockManager {
       this._bgExtra = bottom ? [w, 0] : [0, 0];
       this._syncBg();
     });
+    magnification.setOnActivity((active) => this._visibility?.setMagnifying(active));
     magnification.start();
     iconManager.setOnDragStateChanged((dragging) => {
       previewPopup.cancelScheduledHide();
@@ -261,6 +263,11 @@ export class DockManager {
     this._registerKeybindings();
     this._updatePosition();
     this._signals.connect(global.display, "workareas-changed", () => this._updatePosition());
+    // A window asking for attention makes its app's icon jump once (not for the focused app, which already has the user's eyes).
+    for (const sig of ["window-demands-attention", "window-marked-urgent"])
+      this._signals.connect(global.display, sig, (_d: unknown, win: unknown) =>
+        this._attention(win as Meta.Window),
+      );
     this._signals.connect(global.backend.get_monitor_manager(), "monitors-changed", () => {
       iconManager.refreshResourceScale();
       this._updatePosition();
@@ -593,6 +600,10 @@ export class DockManager {
       GLib.source_remove(this._launchBounceId);
       this._launchBounceId = null;
     }
+    if (this._bgSyncId !== null) {
+      GLib.source_remove(this._bgSyncId);
+      this._bgSyncId = null;
+    }
 
     if (this._bg) {
       Main.layoutManager.removeChrome(this._bg);
@@ -791,6 +802,7 @@ export class DockManager {
     const step = (): boolean => {
       if (!this._iconManager || app.get_windows().length > 0 || Date.now() - started > 10000) {
         this._launchBounceId = null;
+        this._visibility?.setLaunching(false);
         GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
           this._recentlyLaunched.delete(id);
           return GLib.SOURCE_REMOVE;
@@ -800,6 +812,7 @@ export class DockManager {
       this._iconManager.bounceForApp(app);
       return GLib.SOURCE_CONTINUE;
     };
+    this._visibility?.setLaunching(true);
     this._iconManager?.bounceForApp(app);
     if (this._launchBounceId) GLib.source_remove(this._launchBounceId);
     this._launchBounceId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 700, step);
@@ -969,6 +982,25 @@ export class DockManager {
   private _showDefaultDash(): void {
     const dash = Main.overview.dash;
     dash.visible = this._originalDashVisible ?? true;
+  }
+
+  /**
+   * The container notifies about eight properties, three of them on every frame of a slide. Syncing the shelf once per
+   * main-loop turn, before the redraw, gives one update per frame instead of one per property.
+   */
+  private _queueSyncBg(): void {
+    if (this._bgSyncId !== null) return;
+    this._bgSyncId = GLib.idle_add(GLib.PRIORITY_HIGH, () => {
+      this._bgSyncId = null;
+      this._syncBg();
+      return GLib.SOURCE_REMOVE;
+    });
+  }
+
+  private _attention(win: Meta.Window | null): void {
+    if (!win || !this._iconManager || win.has_focus()) return;
+    const app = Shell.WindowTracker.get_default().get_window_app(win);
+    if (app) this._iconManager.bounceForApp(app);
   }
 
   private _syncBg(): void {
