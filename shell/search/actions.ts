@@ -11,6 +11,8 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {ModalDialog} from 'resource:///org/gnome/shell/ui/modalDialog.js';
 
 import {Registry} from './registry.js';
+import {registerSharedActions} from './sharedActions.js';
+import {PACKAGE_VERSION} from 'resource:///org/gnome/shell/misc/config.js';
 import {qrMatrix, qrPng} from './qrmatrix.js';
 import Soup from 'gi://Soup?version=3.0';
 import {habitLog, markDone, noteLine, todoLine} from './notes.js';
@@ -86,15 +88,41 @@ export function windows(): {id: number; title: string; app: string; icon: any}[]
         });
 }
 
+/** Closes `dialog` and answers `fallback` once `seconds` pass with no answer (a caller that has gone must not leave a dialog on the screen). 0 waits for ever. */
+function answerByDefault<T>(dialog: any, seconds: number, fallback: T, resolve: (v: T) => void): () => void {
+    if (seconds <= 0) return () => {};
+    const id = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, seconds, () => { try { dialog.close(); } catch (_e) { /* already closed */ } resolve(fallback); return GLib.SOURCE_REMOVE; });
+    return () => GLib.source_remove(id);
+}
+
 // ---- Asking before something that ends the session
-export function confirm(title: string, question: string, verb: string): Promise<boolean> {
+/** `timeoutSeconds` > 0: no answer in that time counts as Cancel and the dialog closes. The default (0) waits, which an action that ends the session wants. */
+export function confirm(title: string, question: string, verb: string, timeoutSeconds = 0): Promise<boolean> {
     return new Promise(resolve => {
         const dialog = new ModalDialog({styleClass: 'niro-confirm', destroyOnClose: true});
         dialog.contentLayout.add_child(new St.Label({text: title, style_class: 'niro-confirm-title'}));
         dialog.contentLayout.add_child(new St.Label({text: question, style_class: 'niro-confirm-body'}));
+        const stop = answerByDefault(dialog, timeoutSeconds, false, resolve);
         dialog.setButtons([
-            {label: 'Cancel', action: () => { dialog.close(); resolve(false); }, key: 0xff1b},
-            {label: verb, action: () => { dialog.close(); resolve(true); }, default: true},
+            {label: 'Cancel', action: () => { stop(); dialog.close(); resolve(false); }, key: 0xff1b},
+            {label: verb, action: () => { stop(); dialog.close(); resolve(true); }, default: true},
+        ]);
+        dialog.open();
+    });
+}
+
+/** Asks whether a program that called Search over D-Bus may use a kind of thing: 'deny', 'once' or 'always' (Esc denies). */
+export function askPermission(subject: string, doing: string, timeoutSeconds = 60): Promise<'deny' | 'once' | 'always'> {
+    return new Promise(resolve => {
+        const dialog = new ModalDialog({styleClass: 'niro-confirm', destroyOnClose: true});
+        dialog.contentLayout.add_child(new St.Label({text: 'A program asks for permission', style_class: 'niro-confirm-title'}));
+        dialog.contentLayout.add_child(new St.Label({text: `"${subject}" wants to ${doing}. You can change this later (org.niro.Search Revoke).`, style_class: 'niro-confirm-body'}));
+        const stop = answerByDefault<'deny' | 'once' | 'always'>(dialog, timeoutSeconds, 'deny', resolve);
+        const answer = (a: 'deny' | 'once' | 'always') => () => { stop(); dialog.close(); resolve(a); };
+        dialog.setButtons([
+            {label: 'Deny', action: answer('deny'), key: 0xff1b},
+            {label: 'Always allow', action: answer('always')},
+            {label: 'Allow once', action: answer('once'), default: true},
         ]);
         dialog.open();
     });
@@ -458,5 +486,15 @@ export function buildRegistry() {
         confirm: 'Restart the computer? Unsaved work in open applications is lost.', run: async () => { await run(['systemctl', 'reboot']); }});
     r.register({id: 'system.shutdown', title: 'Shut down', description: 'Turns the computer off', category: 'System', keywords: ['power off', 'turn off'], permission: 'confirm',
         confirm: 'Shut down the computer? Unsaved work in open applications is lost.', run: async () => { await run(['systemctl', 'poweroff']); }});
+    registerSharedActions(r, {
+        shellMajor: () => parseInt(PACKAGE_VERSION, 10),
+        extensions: () => {
+            const m = Main.extensionManager;
+            return m.getUuids().map(uuid => {
+                const e = m.lookup(uuid);
+                return {uuid, enabled: e?.state === 1, shellVersions: e?.metadata?.['shell-version'] ?? []};
+            });
+        },
+    });
     return r;
 }

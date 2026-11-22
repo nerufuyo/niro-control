@@ -13,6 +13,7 @@ import St from 'gi://St';
 import {onUiScale} from './compat.js';
 import {Slime} from './slime.js';
 import {drawSlime} from './slimeDraw.js';
+import {motionOn} from './motion.js';
 
 /** The most a stretch of sleep is made up for when it wakes (s); the slime's own steps are shorter still. */
 const MAX_CATCH_UP = 5;
@@ -92,7 +93,7 @@ class SlimeView extends St.DrawingArea {
     }
 
     _animated() {
-        return St.Settings.get().enable_animations && this.mapped && !this._paused;
+        return motionOn() && this.mapped && !this._paused;
     }
 
     _stop() {

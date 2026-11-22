@@ -8,6 +8,9 @@ P=$(tests/shell/stage.sh) || exit 1
 # test shell and write its own snapshot over it.
 STATE=$(mktemp -d); trap 'rm -rf "$P" "$STATE"' EXIT
 export XDG_STATE_HOME="$STATE" NIRO_RESTORE_MARKER="$STATE/restored"
+# Nor may they write the real user data (Search's audit log in ~/.local/share/niro-control, snips, the island's clipboard history), or load the extensions
+# installed in ~/.local/share/gnome-shell instead of the staged ones: XDG_DATA_HOME is a scratch folder (the staged tree is found through XDG_DATA_DIRS).
+mkdir -p "$STATE/data"; export XDG_DATA_HOME="$STATE/data" NIRO_TEST_ISOLATED=1
 export PATH="$P/bin:$PATH"
 export NIRO_BUILTIN_DIR="$P/share/niro-control/profiles"
 export NIRO_EXT_ROOT="$P/share/gnome-shell/extensions" XDG_DATA_DIRS="$P/share:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"

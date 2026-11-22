@@ -13,6 +13,7 @@ mod clipboard;
 mod clock;
 mod device;
 mod eds;
+mod flow;
 mod http;
 mod login_env;
 mod media;
@@ -58,11 +59,12 @@ const CACHED_SONGS: usize = 500;
 
 const HELP: &str = "island-daemon: the Island background service (started by systemd or D-Bus, not by hand)
 
-Usage: island-daemon [--version | --doctor | --report | --niro-action ID [ARGS_JSON] | --unhook-all | --help]
+Usage: island-daemon [--version | --doctor | --report | --niro-action ID [ARGS_JSON] | --flow COMMAND | --unhook-all | --help]
   --version     print the version
   --doctor      check the service, speech recognition, each AI's install and sign-in, and its alerts
   --report      everything a bug report needs: versions, the doctor's check and recent logs
   --niro-action run one of Niro's actions as the assistant would (the same checks, the same confirmations); prints the outcome
+  --flow        Niro Flow, the workflow runtime (off until switched on): status, list, templates, actions, dry-run ID, history, enable, disable
   --unhook-all  take Island's alert hooks out of Claude Code's and Codex's settings
   --help        print this
 
@@ -115,6 +117,8 @@ async fn run() -> anyhow::Result<()> {
             println!("{}", assistant::niro_execute(&call, &mut seen).await);
             return Ok(());
         }
+        // Niro Flow's files, by hand: never runs an action.
+        Some("--flow") => return flow::cli(&args[2..]).await,
         Some("--unhook-all") => {
             agents::unhook_all();
             return Ok(());
@@ -184,6 +188,8 @@ async fn run() -> anyhow::Result<()> {
     server.at(OBJECT_PATH, updates).await?;
     server.at(OBJECT_PATH, AgentsService::default()).await?;
     server.at(OBJECT_PATH, DeviceService::load()).await?;
+    // Opt-in: loads its files and registers the object, but arms nothing until the switch is on.
+    let (flow_object, flow, flow_signals) = flow::serve(server).await?;
 
     let media = server.interface::<_, MediaService>(OBJECT_PATH).await?;
     let pomodoro = server.interface::<_, PomodoroService>(OBJECT_PATH).await?;
@@ -224,6 +230,7 @@ async fn run() -> anyhow::Result<()> {
     tokio::spawn(device::listen(devices));
     tokio::spawn(app_usage::run(app_usage));
     tokio::spawn(assistant::run(assistant, own_data, assistant_commands));
+    tokio::spawn(flow::run(flow_object, flow, flow_signals));
 
     match zbus::Connection::system().await {
         Ok(bus) => system::spawn_watchers(bus, system),

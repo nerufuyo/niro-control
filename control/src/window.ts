@@ -13,20 +13,40 @@ import {searchItems} from './logic.js';
 import {aboutPage, dockPage, islandPage, lookPage, Model, resultsPage, searchPage, windowsPage} from './pages.js';
 import {detectPreset, effective, PRESET_KEYS, PRESETS} from './appearance.js';
 import {stylesheet} from './appearanceTokens.js';
+import {appearanceStudioPage} from './appearanceStudio.js';
+import {backupPage} from './backupPage.js';
 import {compatPage} from './compatPage.js';
+import {connectivityPage} from './connectivityPage.js';
+import {permissionsPage} from './permissionsPage.js';
+import {flowPage} from './flowPage.js';
 import {homePage} from './homePage.js';
+import {hubPage} from './hubPage.js';
 import {profilesPage} from './profilesPage.js';
 import {tilingPage} from './tilingPage.js';
 
+// Pages by group, in the order the sidebar shows them. Every page is in exactly one group; a group with no page is not shown.
+// (Connectivity has a small page: Wi-Fi, Bluetooth and VPN switches through Search; it does not configure radios or devices.
+// Intelligence holds Search, which has the assistant's connections.)
+export const GROUPS = ['Home', 'Appearance', 'Desktop', 'Automation', 'Intelligence', 'System', 'Connectivity', 'Advanced'];
 const MODULES = [
-    ['home', 'Home', 'go-home-symbolic', (model, shared) => shared.home.widget],
-    ['look', 'Look', 'preferences-desktop-appearance-symbolic', lookPage], ['island', 'Island', 'view-pin-symbolic', islandPage],
-    ['dock', 'Dock', 'view-app-grid-symbolic', dockPage], ['windows', 'Windows', 'window-new-symbolic', windowsPage],
-    ['search', 'Search', 'system-search-symbolic', searchPage],
-    ['tiling', 'Tiling', 'view-grid-symbolic', (model) => tilingPage(model, model.ctx)],
-    ['compat', 'Compatibility', 'preferences-system-symbolic', (model, shared) => shared.compat.widget],
-    ['profiles', 'Profiles', 'user-bookmarks-symbolic', (model, shared) => shared.profiles.widget], ['about', 'About', 'help-about-symbolic', aboutPage],
-];
+    ['home', 'Home', 'go-home-symbolic', (model, shared) => shared.home.widget, 'Home'],
+    ['look', 'Look', 'preferences-desktop-appearance-symbolic', lookPage, 'Appearance'],
+    ['studio', 'Appearance Studio', 'applications-graphics-symbolic', (model, shared) => shared.studio.widget, 'Appearance'],
+    ['island', 'Island', 'view-pin-symbolic', islandPage, 'Desktop'],
+    ['dock', 'Dock', 'view-app-grid-symbolic', dockPage, 'Desktop'],
+    ['windows', 'Windows', 'window-new-symbolic', windowsPage, 'Desktop'],
+    ['tiling', 'Tiling', 'view-grid-symbolic', (model) => tilingPage(model, model.ctx), 'Desktop'],
+    ['flow', 'Niro Flow', 'media-playlist-consecutive-symbolic', (model, shared) => shared.flow.widget, 'Automation'],
+    ['profiles', 'Profiles', 'user-bookmarks-symbolic', (model, shared) => shared.profiles.widget, 'Automation'],
+    ['search', 'Search', 'system-search-symbolic', searchPage, 'Intelligence'],
+    ['notifications', 'Notifications', 'preferences-system-notifications-symbolic', (model, shared) => shared.hub.widget, 'System'],
+    ['backup', 'Backup & Restore', 'document-save-symbolic', (model, shared) => shared.backup.widget, 'System'],
+    ['permissions', 'Permissions', 'security-medium-symbolic', (model, shared) => shared.permissions.widget, 'System'],
+    ['connectivity', 'Connectivity', 'network-wireless-symbolic', (model, shared) => shared.connectivity.widget, 'Connectivity'],
+    ['about', 'About', 'help-about-symbolic', aboutPage, 'System'],
+    ['compat', 'Compatibility', 'preferences-system-symbolic', (model, shared) => shared.compat.widget, 'Advanced'],
+].sort((a, b) => GROUPS.indexOf(a[4]) - GROUPS.indexOf(b[4]));
+
 
 
 export /** The parts of the shell that were updated on disk after the shell started: they run their old code until the next login. */
@@ -113,6 +133,13 @@ export function buildWindow(app) {
     shared.profiles = profilesPage(model.engine, ctx);
     shared.home = homePage(model, ctx, shared.profiles, stale);
     shared.compat = compatPage(model, ctx);
+    shared.studio = appearanceStudioPage(model, ctx);
+    shared.flow = flowPage(model, ctx);
+    shared.hub = hubPage(model, ctx);
+    shared.backup = backupPage(model, ctx);
+    shared.permissions = permissionsPage(model, ctx);
+    shared.connectivity = connectivityPage(model, ctx);
+    window.connect('close-request', () => { shared.studio.dispose(); shared.flow.dispose(); shared.hub.dispose(); shared.backup.dispose(); shared.permissions.dispose(); shared.connectivity.dispose(); return false; });
 
     const content = new Gtk.Stack({hexpand: true, vexpand: true, transition_type: Gtk.StackTransitionType.CROSSFADE, transition_duration: 120});
     // reduced motion: GNOME's animations switch also stops the panel's crossfade
@@ -128,12 +155,22 @@ export function buildWindow(app) {
     // sidebar: the search, then the modules
     const list = new Gtk.ListBox({css_classes: ['navigation-sidebar'], selection_mode: Gtk.SelectionMode.SINGLE, vexpand: true});
     list.update_property([Gtk.AccessibleProperty.LABEL], ['Settings modules']);
-    for (const [id, title, icon] of MODULES) {
+    for (const [i, [id, title, icon]] of MODULES.entries()) {
         const box = new Gtk.Box({spacing: 10, margin_top: 8, margin_bottom: 8, margin_start: 8, margin_end: 8});
         box.append(new Gtk.Image({icon_name: icon})); box.append(new Gtk.Label({label: title, xalign: 0}));
-        const row = new Gtk.ListBoxRow({child: box}); row.set_name(id);
+        const row = new Gtk.ListBoxRow({child: box, tooltip_text: i < 9 ? `${title} (Ctrl+${i + 1})` : title}); row.set_name(id);
         list.append(row);
     }
+    // a group's name above its first page (the list is already in group order)
+    const groupOf = new Map(MODULES.map(m => [m[0], m[4]]));
+    list.set_header_func((row, before) => {
+        const group = groupOf.get(row.get_name());
+        if (before && groupOf.get(before.get_name()) === group) { row.set_header(null); return; }
+        if (group === 'Home') { row.set_header(null); return; }
+        const label = new Gtk.Label({label: group, xalign: 0, css_classes: ['caption-heading', 'dim-label'], margin_top: before ? 10 : 4, margin_bottom: 2, margin_start: 10});
+        label.set_accessible_role?.(Gtk.AccessibleRole.PRESENTATION);
+        row.set_header(label);
+    });
     let current = 'home';
     const contentTitle = new Adw.WindowTitle({title: 'Home'});
     const select = (id) => { current = id; list.select_row(list.get_row_at_index(MODULES.findIndex(m => m[0] === id))); };
@@ -202,10 +239,10 @@ export function buildWindow(app) {
     });
     window.add_breakpoint(bp);
 
-    // keyboard: Ctrl+F searches, Ctrl+1…6 switch modules, Esc leaves the search
+    // keyboard: Ctrl+F searches, Ctrl+1…9 switch to the first nine modules in sidebar order (the tooltip of a row says its number), Esc leaves the search
     const keys = new Gtk.ShortcutController({scope: Gtk.ShortcutScope.GLOBAL});
     keys.add_shortcut(new Gtk.Shortcut({trigger: Gtk.ShortcutTrigger.parse_string('<Control>f'), action: Gtk.CallbackAction.new(() => { search.grab_focus(); return true; })}));
-    MODULES.forEach(([id], i) => keys.add_shortcut(new Gtk.Shortcut({trigger: Gtk.ShortcutTrigger.parse_string(`<Control>${i + 1}`),
+    MODULES.slice(0, 9).forEach(([id], i) => keys.add_shortcut(new Gtk.Shortcut({trigger: Gtk.ShortcutTrigger.parse_string(`<Control>${i + 1}`),
         action: Gtk.CallbackAction.new(() => { select(id); return true; })})));
     window.add_controller(keys);
 
@@ -215,6 +252,6 @@ export function buildWindow(app) {
     select(MODULES.some(m => m[0] === first) ? first : 'home');
     const query = GLib.getenv('NIRO_SEARCH');
     if (query) search.set_text(query);
-    return {window, model, search, select, ensureAll: () => shared.compat.ensure()};
+    return {window, model, search, select, shared, ensureAll: () => shared.compat.ensure()};
 }
 

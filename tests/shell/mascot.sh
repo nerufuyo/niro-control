@@ -5,6 +5,8 @@
 set -u
 export GSETTINGS_BACKEND=${GSETTINGS_BACKEND:-memory}   # never the real dconf: the settings the test needs it sets itself
 cd "$(dirname "$0")/../.."
+# The test must not write the real ~/.local/share (Search's audit log, snips): run-staged.sh already isolates it, a direct run does here.
+[ -n "${NIRO_TEST_ISOLATED:-}" ] || { export XDG_DATA_HOME; XDG_DATA_HOME=$(mktemp -d); }
 LOG=$(mktemp); trap 'rm -f "$LOG"' EXIT
 SHOTS="${NIRO_SHOTS:-}"
 FAILS=0

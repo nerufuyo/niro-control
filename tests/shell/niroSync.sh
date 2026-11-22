@@ -6,7 +6,7 @@ set -u
 cd "$(dirname "$0")/../.."
 WORK=$(mktemp -d); trap 'rm -rf "$WORK"' EXIT
 EXTS="$WORK/share/gnome-shell/extensions"; mkdir -p "$EXTS" "$WORK/config"
-for e in "$HOME"/.local/share/*; do [ "$(basename "$e")" = gnome-shell ] || ln -s "$e" "$WORK/share/$(basename "$e")"; done
+for e in "$HOME"/.local/share/*; do case "$(basename "$e")" in gnome-shell|niro-control|niro-snip|island) ;; *) ln -s "$e" "$WORK/share/$(basename "$e")";; esac; done
 for u in island blur; do cp -r ${NIRO_EXT_ROOT:-/usr/share/gnome-shell/extensions}/$u@niro.local "$EXTS/"; chmod -R u+w "$EXTS/$u@niro.local"; done
 cp shell/island/build/src/{niroSync,appearance,appearanceTokens,gtkAdapter,shellTheme}.js "$EXTS/island@niro.local/src/"
 cp shell/blur/components/applications/index.js "$EXTS/blur@niro.local/components/applications/index.js"

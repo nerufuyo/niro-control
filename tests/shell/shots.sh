@@ -3,6 +3,8 @@
 # NIRO_JS is run in the shell (Looking Glass) before the shot, one statement per line.
 set -u
 cd "$(dirname "$0")/../.."
+# The test must not write the real ~/.local/share (Search's audit log, snips): run-staged.sh already isolates it, a direct run does here.
+[ -n "${NIRO_TEST_ISOLATED:-}" ] || { export XDG_DATA_HOME; XDG_DATA_HOME=$(mktemp -d); }
 export DIR="${NIRO_SHOTS:?set NIRO_SHOTS}"; mkdir -p "$DIR"
 LOG=$(mktemp); trap 'rm -f "$LOG"' EXIT
 timeout 200 dbus-run-session -- bash -c '

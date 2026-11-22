@@ -57,6 +57,21 @@
       <summary>Rules for applications</summary>
       <description>JSON list: {"match": "org.gnome.Calculator", "action": "float"} keeps an app out of the tiling, "tile" tiles it anyway, {"match": "firefox", "workspace": 2} sends its windows to workspace 2 when they open.</description>
     </key>
+    <key name="monitor-recovery" type="b">
+      <default>false</default>
+      <summary>Move windows back and forth when a monitor leaves and returns</summary>
+      <description>When a monitor is unplugged its windows go to the primary monitor, and go back to it when it returns. Off by default. Only windows are moved; no display setting is changed.</description>
+    </key>
+    <key name="rules-engine" type="b">
+      <default>false</default>
+      <summary>Use the advanced window rules</summary>
+      <description>Reads the rules in "advanced-rules" (conditions, priority, stop) on top of the simple ones. Off by default; windows already open are not touched.</description>
+    </key>
+    <key name="advanced-rules" type="s">
+      <default>'[]'</default>
+      <summary>Advanced window rules</summary>
+      <description>JSON list: {"id": "calc", "conditions": {"appId": "org.gnome.Calculator"}, "actions": {"tile": "float", "above": true}, "priority": 1, "stop": false}. Conditions: appId, title, workspace, monitor, type, time, profile. Actions: workspace, monitor, tile, above.</description>
+    </key>
     <key name="animate" type="b">
       <default>true</default>
       <summary>Slide windows into their tiles</summary>

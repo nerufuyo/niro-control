@@ -15,6 +15,7 @@ import {VERTICAL, onUiScale, px, uiScale} from './compat.js';
 import * as Format from './format.js';
 import * as Playback from './playback.js';
 import {watchClock} from './wallClock.js';
+import {dur, motionOn} from './motion.js';
 import {Bars, PrivacyDots, RecordingDot, Ring, easeTo, fence, icon, iconButton, label, slideBy} from './widgets.js';
 
 /** Sizes and distances in CSS pixels (see `px`). */
@@ -215,7 +216,7 @@ export const ExpandedView = GObject.registerClass({
             () => this.emit('settings-requested'), {size: 15, accessibleName: 'Settings'});
         // Its icon is an image, which takes no CSS colour: dimmed as the sparkle beside it, lit under the pointer.
         settings.child.opacity = SETTINGS_OPACITY;
-        settings.connect('notify::hover', () => settings.child.ease({opacity: settings.hover ? 255 : SETTINGS_OPACITY, duration: 120}));
+        settings.connect('notify::hover', () => settings.child.ease({opacity: settings.hover ? 255 : SETTINGS_OPACITY, duration: dur(120)}));
         status.add_child(settings);
         header.add_child(status);
         return header;
@@ -287,7 +288,7 @@ export const ExpandedView = GObject.registerClass({
 
     /** Lights the open page's tab and shows which pages have news. */
     _syncTabs() {
-        const animate = this.mapped && St.Settings.get().enable_animations;
+        const animate = this.mapped && motionOn();
         this._tabs.forEach((entry, index) => {
             const {tab, icon: tabIcon, gicons, name, nameClip, badge} = entry;
             const open = index === this._index;
@@ -515,14 +516,14 @@ export const ExpandedView = GObject.registerClass({
         next.remove_all_transitions();
         next.show();
 
-        if (animate && St.Settings.get().enable_animations) {
+        if (animate && motionOn()) {
             this._sliding = true;
             const distance = px(SLIDE_DISTANCE);
             // Whole pixels (see `slideBy`), the fades eased as before.
-            slideBy(previous, 'x', previous.translation_x, -direction * distance, {duration: SLIDE_DURATION});
+            slideBy(previous, 'x', previous.translation_x, -direction * distance, {duration: dur(SLIDE_DURATION)});
             previous.ease({
                 opacity: 0,
-                duration: SLIDE_DURATION,
+                duration: dur(SLIDE_DURATION),
                 mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
                 onStopped: () => {
                     if (previous !== this.page)
@@ -532,10 +533,10 @@ export const ExpandedView = GObject.registerClass({
                 },
             });
             next.opacity = 0;
-            slideBy(next, 'x', direction * distance, 0, {duration: SLIDE_DURATION});
+            slideBy(next, 'x', direction * distance, 0, {duration: dur(SLIDE_DURATION)});
             next.ease({
                 opacity: 255,
-                duration: SLIDE_DURATION,
+                duration: dur(SLIDE_DURATION),
                 mode: Clutter.AnimationMode.EASE_OUT_CUBIC,
                 onStopped: () => {
                     this._sliding = false;

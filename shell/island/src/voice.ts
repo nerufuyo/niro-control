@@ -13,6 +13,7 @@ import Meta from 'gi://Meta';
 import Pango from 'gi://Pango';
 import Shell from 'gi://Shell';
 import St from 'gi://St';
+import {dur, motionOn} from './motion.js';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
@@ -116,7 +117,7 @@ const KEY_LEVEL = 0.32;
 function fadeIn(actor) {
     actor.remove_transition('opacity');
     actor.opacity = 0;
-    actor.ease({opacity: 255, duration: FADE_IN_MS, delay: FADE_IN_DELAY_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+    actor.ease({opacity: 255, duration: dur(FADE_IN_MS), delay: dur(FADE_IN_DELAY_MS), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
 }
 
 /** The character (see bot.js), on screen: it looks at the pointer, or reads along as you type. */
@@ -470,7 +471,7 @@ export const VoiceView = GObject.registerClass({
         // The answer takes the place of its steps, and each step of the last: the words fade in, not cut.
         const group = working ? 'working' : state.phase;
         if ((group !== this._lastGroup || (working && step && newStep)) && this._shownParts.has(this._text) &&
-            this._text.visible && this.mapped && St.Settings.get().enable_animations)
+            this._text.visible && this.mapped && motionOn())
             fadeIn(this._text);
         this._lastGroup = group;
     }
@@ -586,9 +587,9 @@ export const VoiceView = GObject.registerClass({
         this._syncCardText();
         if (!WORKING.includes(this._phase) && !this.typing)
             this.emit('type-requested');
-        if (St.Settings.get().enable_animations) {
+        if (motionOn()) {
             this._chat.opacity = 0;
-            this._chat.ease({opacity: 255, duration: 260, delay: 80, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            this._chat.ease({opacity: 255, duration: dur(260), delay: dur(80), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
         }
         this.emit('size-changed');
     }
@@ -652,11 +653,11 @@ export const VoiceView = GObject.registerClass({
         this._sendIcon.gicon = icon(shows === 'send' ? 'island-send-symbolic' : 'island-mic-symbolic');
         this._sendButton.style_class = shows === 'send' ? 'island-voice-send' : 'island-voice-send island-voice-send-mic';
         this._sendButton.accessible_name = shows === 'send' ? 'Send' : 'Speak instead';
-        if (!St.Settings.get().enable_animations || !this._sendButton.mapped)
+        if (!motionOn() || !this._sendButton.mapped)
             return;
         this._sendButton.remove_all_transitions();
         this._sendButton.set({scale_x: 0.6, scale_y: 0.6});
-        this._sendButton.ease({scale_x: 1, scale_y: 1, duration: 200, mode: Clutter.AnimationMode.EASE_OUT_BACK});
+        this._sendButton.ease({scale_x: 1, scale_y: 1, duration: dur(200), mode: Clutter.AnimationMode.EASE_OUT_BACK});
     }
 
     /** The steps done, a tick each; one just done fades in. */
@@ -675,7 +676,7 @@ export const VoiceView = GObject.registerClass({
         }
         this._stepsBox.visible = done.length > 0;
         // A step just done joins the list fading in (a list that just appeared fades in whole, see `fit`).
-        if (before > 0 && done.length > before && this.mapped && St.Settings.get().enable_animations)
+        if (before > 0 && done.length > before && this.mapped && motionOn())
             fadeIn(this._stepsBox.get_last_child());
     }
 
@@ -774,11 +775,11 @@ export const VoiceView = GObject.registerClass({
         this._shownAction = button;
         for (const other of [this._typeButton, this._stop])
             other.visible = other === button;
-        if (!button || !St.Settings.get().enable_animations)
+        if (!button || !motionOn())
             return;
         button.remove_all_transitions();
         button.set({opacity: 0, scale_x: 0.6, scale_y: 0.6});
-        button.ease({opacity: 255, scale_x: 1, scale_y: 1, duration: 220, mode: Clutter.AnimationMode.EASE_OUT_BACK});
+        button.ease({opacity: 255, scale_x: 1, scale_y: 1, duration: dur(220), mode: Clutter.AnimationMode.EASE_OUT_BACK});
     }
 
     /** Keeps the steps of the request being worked on; a new request starts the list over. */
@@ -886,7 +887,7 @@ export const VoiceView = GObject.registerClass({
     // What comes into view fades in as the shape grows to it, rather than show cut off by its edge.
     _fadeInNew(parts) {
         const shown = new Set(parts.filter(part => part.visible));
-        if (this.mapped && St.Settings.get().enable_animations) {
+        if (this.mapped && motionOn()) {
             for (const part of shown) {
                 if (!this._shownParts.has(part))
                     fadeIn(part);
@@ -901,7 +902,7 @@ export const VoiceView = GObject.registerClass({
             this._start = Date.now();
             this._lastTick = 0;
             this._face.restart();
-            if (St.Settings.get().enable_animations) {
+            if (motionOn()) {
                 this._timeline.start();
             } else {
                 this._face.queue_repaint();

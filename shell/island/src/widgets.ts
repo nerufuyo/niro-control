@@ -15,6 +15,7 @@ import St from 'gi://St';
 
 import {onUiScale, px, uiScale} from './compat.js';
 import * as Theme from './theme.js';
+import {motionOn} from './motion.js';
 
 let iconDir = null;
 /** Icons by name, made once: a GIcon never changes, and looking for the file is a disk access. */
@@ -604,9 +605,8 @@ class Bars extends St.BoxLayout {
     _bounce(index) {
         const bounce = this._bounces[index];
         const bar = this._bars[index];
-        const settings = St.Settings.get();
         // With animations off the bars rest where they are.
-        bounce.on = this._playing && bar.mapped && settings.enable_animations;
+        bounce.on = this._playing && bar.mapped && motionOn();
         if (bounce.on) {
             bounce.from = bar.scale_y;
             bounce.to = 0.25 + Math.random() * 0.75;
@@ -983,7 +983,7 @@ export function slideBy(actor, axis, from, to, {delay = 0, duration = 0, onDone 
     actor[key]?.stop();
     actor[key] = null;
     actor[property] = from;
-    if (!duration || from === to || !actor.mapped || !St.Settings.get().enable_animations) {
+    if (!duration || from === to || !actor.mapped || !motionOn()) {
         actor[property] = to;
         onDone?.();
         return;
@@ -1020,7 +1020,7 @@ export function playMotion(actor, motion, {delay = 0} = {}) {
     const pending = pendingMotions.get(actor);
     if (pending)
         pending.run = null;
-    if (!steps || !St.Settings.get().enable_animations)
+    if (!steps || !motionOn())
         return;
     actor.set_pivot_point(0.5, 0.5);
     if (motion === 'rise') {
@@ -1429,7 +1429,7 @@ class RecordingDot extends St.Widget {
             GLib.source_remove(this._timer);
         this._timer = 0;
         this.opacity = 255;
-        if (!this.mapped || !St.Settings.get().enable_animations)
+        if (!this.mapped || !motionOn())
             return;
         const start = GLib.get_monotonic_time();
         this._timer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, Math.round(DOT_STEP_MS), () => {

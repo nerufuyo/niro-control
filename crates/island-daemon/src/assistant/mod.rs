@@ -22,7 +22,7 @@ mod grok;
 mod mic;
 mod models;
 mod music;
-mod niro;
+pub(crate) mod niro;
 
 /// The assistant's registry gateway, for the command line (see `niro.rs`).
 pub fn niro_seen() -> niro::Seen {

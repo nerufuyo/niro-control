@@ -14,6 +14,7 @@ import St from 'gi://St';
 import {Bot} from './bot.js';
 import {onUiScale, px} from './compat.js';
 import * as Theme from './theme.js';
+import {motionOn} from './motion.js';
 
 /** How long (ms) a gesture plays; the icon is still again after it. */
 const GESTURE_MS = 750;
@@ -72,7 +73,7 @@ class BotIcon extends St.DrawingArea {
             return;
         if (this._alive)
             GLib.source_remove(this._alive);
-        this._alive = alive && St.Settings.get().enable_animations
+        this._alive = alive && motionOn()
             ? GLib.timeout_add(GLib.PRIORITY_DEFAULT, ALIVE_MS, () => {
                 if (this.mapped) {
                     this._glance = {x: Math.random() * 1.2 - 0.6, y: Math.random() * 0.6 - 0.2};
@@ -85,7 +86,7 @@ class BotIcon extends St.DrawingArea {
 
     /** Plays a hop, nod or shake once (or just a blink and a glance), then holds still again. */
     play(gesture, duration = GESTURE_MS) {
-        if (!St.Settings.get().enable_animations)
+        if (!motionOn())
             return;
         this._timeline?.stop();
         const from = this._bot.time;
