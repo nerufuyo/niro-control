@@ -31,7 +31,7 @@ Light and dark appearance both work, and the panel adapts to narrow windows.
 
 ## Niro, the mascot
 
-<p align="center"><img src="docs/images/niro-mascot-poster.png" alt="Niro, the mascot: a little blue slime, and how it feels in twelve moods"></p>
+<p align="center"><img src="docs/images/niro-mascot-poster.png" alt="Niro, the Niro Control mascot: a little blue slime with big eyes, shown in twelve moods from idle to sleepy"></p>
 
 Niro is a small slime (a nod to Rimuru's slime form) that lives in two places and means the same thing in both:
 
