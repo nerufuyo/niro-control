@@ -6,6 +6,7 @@
 // cross-fades views. On a bar that is not black it hangs from the screen's top edge, like a notch.
 
 import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
 import St from 'gi://St';
@@ -17,6 +18,7 @@ import {effectPoint, shaderEffect} from './shader.js';
 import {GENTLE, Spring, SpringDriver} from './spring.js';
 import * as Theme from './theme.js';
 import {dur, motionOn} from './motion.js';
+import {morphPlan} from './surfaceMotion.js';
 import {fence, setEnabled, slideBy} from './widgets.js';
 
 
@@ -209,6 +211,7 @@ export const Island = GObject.registerClass({
         this._monitor = null;
         this._view = null;
         this._pointerAtMorph = null;
+        this._axisLag = 0;
         this._views = [];
         this._tint = null;
         this._tintStyle = 'wash';
@@ -462,14 +465,31 @@ export const Island = GObject.registerClass({
         // Content travels with the shape: out with it as it grows, in from it as it shrinks.
         const growing = size.height + size.width > this._height.target + this._width.target;
         this._pointerAtMorph = global.get_pointer();
+        // The first shape appears without animating: an island of zero size
+        // is on no monitor, so it would get no frames to animate with.
+        const firstShow = this._view === null;
+        // One surface, two axes: growing in both it widens first and drops after, shrinking it lifts first, all by
+        // retargeting springs that keep their velocity (see surfaceMotion.ts). The lagging axis' retarget is a timer
+        // that the next morph or destroy cancels, so an interruption never leaves a stale target behind.
+        this._cancelAxisLag();
+        const plan = morphPlan({width: this._width.value, height: this._height.value}, size, {off: !motionOn()});
         this._width.setTarget(size.width);
         this._height.setTarget(size.height);
         this._radius.setTarget(size.radius);
         this._shoulder.setTarget(size.shoulder);
+        if (!firstShow && !plan.instant && (plan.widthDelay || plan.heightDelay)) {
+            const heightLags = plan.heightDelay > 0;
+            const lagging = heightLags ? this._height : this._width;
+            const wanted = lagging.target;
+            lagging.setTarget(lagging.value);
+            this._axisLag = GLib.timeout_add(GLib.PRIORITY_DEFAULT, plan.heightDelay || plan.widthDelay, () => {
+                this._axisLag = 0;
+                lagging.setTarget(wanted);
+                this._driver?.start();
+                return GLib.SOURCE_REMOVE;
+            });
+        }
 
-        // The first shape appears without animating: an island of zero size
-        // is on no monitor, so it would get no frames to animate with.
-        const firstShow = this._view === null;
         if (firstShow || !motionOn()) {
             for (const spring of this._springs)
                 spring.reset(spring.target);
@@ -479,6 +499,13 @@ export const Island = GObject.registerClass({
             this._driver.start();
         }
         this._showView(view, growing);
+    }
+
+    /** Drops a pending second-axis retarget (a new morph, or destroy, takes over). */
+    _cancelAxisLag() {
+        if (this._axisLag)
+            GLib.source_remove(this._axisLag);
+        this._axisLag = 0;
     }
 
     /** Away in the top edge at once, without the motion of `setAutoHidden(true)`: for coming in from there next (the reveal over a
@@ -1003,6 +1030,7 @@ export const Island = GObject.registerClass({
 
     /** Stops the springs and a pending glow redraw. */
     _onDestroy() {
+        this._cancelAxisLag();
         this._pulse?.stop();
         this._pulse = null;
         this._liftTimeline?.stop();
