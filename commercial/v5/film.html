@@ -1,0 +1,109 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Niro Control, 60 seconds (real captures)</title>
+<style>
+@font-face{font-family:"Inter";src:url("/data/fonts/InterVariable.ttf");font-weight:100 900}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#07070a;font-family:"Inter",system-ui,sans-serif;color:#F4F4F7}
+#cam{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;will-change:transform}
+#cam img{position:absolute;left:0;top:0;width:1920px;height:1080px;display:block}
+.ring{position:absolute;border:3px solid #FF7A59;border-radius:14px;opacity:0;box-shadow:0 0 28px rgba(255,122,89,.85),inset 0 0 18px rgba(255,122,89,.25);pointer-events:none}
+.cap{position:absolute;left:56px;bottom:56px;max-width:640px;padding:26px 34px 28px;border-radius:26px;background:rgba(8,9,14,.84);border:1px solid rgba(255,255,255,.14);box-shadow:0 20px 60px rgba(0,0,0,.5);opacity:0}
+.cap h2{font-size:76px;font-weight:800;letter-spacing:-.04em;line-height:1}
+.cap p{font-size:30px;line-height:1.38;color:#CFCFDA;font-weight:500;margin-top:12px}
+.lbl{position:absolute;right:56px;top:56px;padding:14px 26px;border-radius:999px;background:rgba(8,9,14,.84);border:1px solid rgba(255,255,255,.14);font-size:34px;font-weight:700;opacity:0}
+#hook{position:absolute;left:0;right:0;top:300px;text-align:center;font-size:104px;font-weight:800;letter-spacing:-.04em;line-height:1.08;text-shadow:0 6px 50px rgba(0,0,0,.75);opacity:0}
+#hook em{font-style:normal;color:#FF7A59}
+#end{position:absolute;inset:0;background:radial-gradient(1000px 700px at 100% 0%,rgba(46,110,210,.30),transparent 62%),radial-gradient(900px 640px at 0% 100%,rgba(232,71,43,.20),transparent 62%),linear-gradient(180deg,#101015,#09090c);opacity:0}
+#end .w{position:absolute;left:0;right:0;top:700px;text-align:center}
+#sl{position:absolute;left:760px;top:250px;width:400px}
+#dim{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none}
+#fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none}
+</style>
+<div id="stage" style="position:absolute;inset:0;overflow:hidden">
+ <div id="cam"></div>
+ <div id="dim"></div>
+ <div id="rings"></div>
+ <div id="hook">One look for the<br>whole <em>GNOME desktop.</em></div>
+ <div id="caps"></div>
+ <div class="lbl" id="lbl"></div>
+ <div id="end"><div id="sl"></div><div class="w"><div style="font-size:120px;font-weight:800;letter-spacing:-.045em;line-height:1">Niro <span style="color:#9A9AA6">Control</span></div><div style="font-size:36px;color:#C9C9D6;margin-top:22px;font-weight:500">GNOME Shell extensions for Fedora and Ubuntu</div><div style="font-size:30px;color:#8a8a98;margin-top:18px;letter-spacing:.04em">github.com/nerufuyo/niro-control &nbsp;·&nbsp; GPL-3.0</div></div></div>
+ <div id="fade"></div>
+</div>
+<script>
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)), sm=x=>x*x*(3-2*x), ease=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const win=(t,a,b)=>sm(clamp((t-a)/(b-a))), pulse=(t,a,b,f=.35)=>win(t,a,a+f)*(1-win(t,b-f,b));
+// ======================= the film, as data. Coordinates are in the desktop's own points: 1920 x 1080 =======================
+// Real captures only (commercial/capture/steps-film-*.sh). a = fade-in start, e = hidden from here (a later frame is on top by then), f = fade-in length
+const FR=[
+ ['desk',0,6.6,.01],
+ ['isl-closed',6,9.4], ['isl-open-1',8.3,9.4,.12], ['isl-open-2',8.45,9.4,.12], ['isl-open-3',8.6,14.4,.12], ['isl-open',8.75,14.4,.12],
+ ['s-open',14,16.9], ['s-calc',16.5,19.0], ['s-unit',18.6,21.0], ['s-zone',20.6,24.4], ['s-a',22.4,24.4,.2], ['s-ac',22.8,24.4,.2], ['s-acc',23.2,24.4,.2], ['s-accent',23.6,24.4,.2],
+ ['dock-790',24,26.4], ['dock-880',26,27.4], ['dock-960',27,28.4], ['dock-1040',28,29.6], ['dock-1130',28.8,29.9], ['windows2',29.6,32.4],
+ ['tile-off',32,33.9], ['tile-dwindle',33.4,34.7], ['tile-m-1',34.3,34.9,.12], ['tile-m-2',34.45,35.0,.12], ['tile-m-3',34.6,35.1,.12], ['tile-m-4',34.75,35.2,.12], ['tile-master',34.9,36.7],
+ ['tile-g-1',36.2,36.9,.12], ['tile-g-2',36.35,37.0,.12], ['tile-g-3',36.5,37.1,.12], ['tile-g-4',36.65,37.2,.12], ['tile-grid',36.8,38.4],
+ ['panel-profiles',38,42.6], ['panel-profiles-applied',42.0,46.4],
+ ['flow-before',46,54.4]];
+// the camera: (t, focal point x, y, zoom). Each scene pulls back to the whole desktop at its boundaries and pushes in on what it is about.
+const CAMK=[
+ {t:0,x:960,y:540,z:1},{t:6,x:960,y:540,z:1.06},
+ {t:6.01,x:960,y:540,z:1},{t:7.0,x:960,y:34,z:4.2},{t:8.2,x:960,y:34,z:4.2},{t:8.9,x:960,y:100,z:2.5},{t:13.2,x:960,y:100,z:2.5},{t:13.9,x:960,y:540,z:1},
+ {t:14,x:960,y:540,z:1},{t:15.0,x:960,y:370,z:2.1},{t:23.3,x:960,y:370,z:2.1},{t:23.95,x:960,y:540,z:1},
+ {t:24,x:960,y:540,z:1},{t:25.0,x:960,y:1000,z:3.0},{t:28.6,x:960,y:1000,z:3.0},{t:29.3,x:960,y:540,z:1},
+ {t:29.6,x:960,y:540,z:1},{t:30.3,x:450,y:540,z:1.9},{t:31.5,x:450,y:540,z:1.9},{t:32,x:960,y:540,z:1},
+ {t:32.01,x:960,y:540,z:1},{t:38,x:960,y:540,z:1.03},
+ {t:38.01,x:960,y:540,z:1},{t:39,x:960,y:520,z:1.35},{t:40.3,x:960,y:520,z:1.35},{t:40.9,x:1290,y:400,z:2.4},{t:42.0,x:1290,y:400,z:2.4},{t:42.7,x:1100,y:320,z:1.8},{t:45.2,x:1100,y:320,z:1.8},{t:45.9,x:960,y:540,z:1},
+ {t:46,x:960,y:540,z:1},{t:46.9,x:1085,y:340,z:1.8},{t:48.6,x:1085,y:340,z:1.8},{t:49.0,x:1085,y:453,z:1.8},{t:50.8,x:1085,y:453,z:1.8},{t:51.2,x:1085,y:666,z:1.5},{t:53.3,x:1085,y:666,z:1.5},{t:53.95,x:960,y:540,z:1},{t:60,x:960,y:540,z:1}];
+// rings around what is being talked about: [from, to, [x, y, w, h]]
+const RINGS=[
+ [7.0,8.3,[860,0,200,34]], [9.0,13.2,[600,0,720,206]],
+ [15.0,16.6,[620,172,680,432]], [16.8,22.3,[620,172,680,184]], [22.6,23.8,[620,172,680,262]],
+ [25.0,28.8,[690,925,540,150]], [30.4,31.9,[331,296,519,266]],
+ [39.4,40.9,[1094,325,391,161]], [41.0,42.0,[1109,438,322,34]], [42.9,44.3,[678,188,330,56]], [44.4,45.4,[1094,381,392,161]],
+ [47.0,48.8,[681,311,807,56]], [49.0,51.0,[681,426,807,54]], [51.2,53.2,[681,556,807,221]]];
+const CAPS=[
+ [6.6,13.6,'Island','Music, timers and alerts, right on the top bar.'],
+ [14.5,23.6,'Search','Super+Space: apps, maths, units, time zones and every Niro setting.'],
+ [24.5,29.2,'Dock','Icons magnify under the pointer.','tl'],
+ [29.8,31.9,'Blur and corners','Frosted glass behind every window, with rounded corners.','tl'],
+ [32.6,37.7,'Tile','Ten layouts. Off until you switch it on.'],
+ [38.5,45.6,'Profiles','Save the whole desktop and switch with one action.','tl'],
+ [46.5,53.6,'Flow','Workflows that run through Search. Off until you turn them on.','tl']];
+const LBL=[[33.4,34.4,'Dwindle'],[34.4,36.2,'Master left'],[36.2,38,'Grid']];
+// ===================================================================================================================================
+const cam=document.getElementById('cam'), IM={};
+let LOADED=new Set();
+FR.forEach(([n])=>{const i=document.createElement('img');i.id='f-'+n;i.style.opacity=0;i.style.display='none';cam.appendChild(i);IM[n]=i;});
+window.__preload=async(t0,t1)=>{const jobs=[];for(const [n,a,e] of FR){const need=a-1<=t1&&e+1>=t0; if(need&&!LOADED.has(n)){LOADED.add(n);IM[n].src='/commercial/v5/shots/'+n+'.jpg';jobs.push(IM[n].decode().catch(()=>{}));}}
+  await Promise.all(jobs); await document.fonts.ready; window.__ready=true;};
+const RE=RINGS.map(()=>{const d=document.createElement('div');d.className='ring';document.getElementById('rings').appendChild(d);return d;});
+const CE=CAPS.map(([a,b,h,p,pos])=>{const d=document.createElement('div');d.className='cap';if(pos==='tl'){d.style.top='56px';d.style.bottom='auto';}d.innerHTML=`<h2>${h}</h2><p>${p}</p>`;document.getElementById('caps').appendChild(d);return d;});
+function keys(t,K){ if(t<=K[0].t) return {...K[0]}; for(let i=0;i<K.length-1;i++){const a=K[i],b=K[i+1]; if(t<b.t){const u=ease(clamp((t-a.t)/(b.t-a.t))),o={};for(const k in a) if(k!=='t') o[k]=a[k]+(b[k]-a[k])*u; return o;}} return {...K[K.length-1]}; }
+// the slime of the end card: the banner's, drawn here
+const BODY='M100,26 C152,26 192,72 192,136 C192,174 154,192 100,192 C46,192 8,174 8,136 C8,72 48,26 100,26 Z';
+document.getElementById('sl').innerHTML=`<svg viewBox="-24 -22 248 238" width="400" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9CDDFF"/><stop offset=".5" stop-color="#5BAEFF"/><stop offset="1" stop-color="#2F80EA"/></linearGradient><linearGradient id="r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3C86EE"/><stop offset="1" stop-color="#1B5FD4"/></linearGradient><radialGradient id="b"><stop offset="0" stop-color="#FF7FAE" stop-opacity=".85"/><stop offset="1" stop-color="#FF7FAE" stop-opacity="0"/></radialGradient></defs>
+ <ellipse cx="100" cy="193" rx="82" ry="7" fill="#0a1a40" opacity=".9"/><path d="${BODY}" fill="url(#r)"/><path d="${BODY}" fill="url(#g)" transform="translate(100 122) scale(.93) translate(-100 -122)"/>
+ <ellipse cx="54" cy="88" rx="24" ry="11" fill="#fff" opacity=".66" transform="rotate(-16 54 88)"/><circle cx="34" cy="106" r="4.4" fill="#fff" opacity=".7"/>
+ <ellipse cx="42" cy="150" rx="15" ry="9" fill="url(#b)"/><ellipse cx="158" cy="150" rx="15" ry="9" fill="url(#b)"/>
+ <path d="M55 128 Q69 112 83 128" fill="none" stroke="#0a1030" stroke-width="4.5" stroke-linecap="round"/><path d="M117 128 Q131 112 145 128" fill="none" stroke="#0a1030" stroke-width="4.5" stroke-linecap="round"/>
+ <path d="M89 148 Q100 164 111 148 Z" fill="#1B3F8F"/><path d="M94 156 Q100 160 106 156" fill="none" stroke="#FF7FAE" stroke-width="3" stroke-linecap="round"/>
+ <path transform="translate(176 30) scale(1.1)" d="M0 -9 L2.4 -2.4 9 0 2.4 2.4 0 9 -2.4 2.4 -9 0 -2.4 -2.4Z" fill="#CFE6FF"/><path transform="translate(24 56) scale(.7)" d="M0 -9 L2.4 -2.4 9 0 2.4 2.4 0 9 -2.4 2.4 -9 0 -2.4 -2.4Z" fill="#CFE6FF" opacity=".7"/></svg>`;
+window.__render=function(t){
+ // the pictures: each fades in over the one before it
+ for(const [n,a,e,f=.35] of FR){const el=IM[n]; if(t<a||t>=e){el.style.display='none';continue;} el.style.display='block'; el.style.opacity=win(t,a,a+f);}
+ // the camera
+ const c=keys(t,CAMK), z=c.z, tx=clamp(960-c.x*z,1920-1920*z,0), ty=clamp(540-c.y*z,1080-1080*z,0);
+ cam.style.transform=`translate(${tx}px,${ty}px) scale(${z})`;
+ // the rings, drawn where the camera puts their target
+ RINGS.forEach(([a,b,r],i)=>{const e=RE[i],o=pulse(t,a,b,.3);e.style.opacity=o;if(o>0){const pad=8,breathe=1+.012*Math.sin(t*6);e.style.left=(tx+r[0]*z-pad)+'px';e.style.top=(ty+r[1]*z-pad)+'px';e.style.width=(r[2]*z+2*pad)*breathe+'px';e.style.height=(r[3]*z+2*pad)*breathe+'px';}});
+ CAPS.forEach(([a,b],i)=>{const e=CE[i];e.style.opacity=pulse(t,a,b,.5);e.style.transform=`translateY(${(1-win(t,a,a+.5))*24}px)`;});
+ const L=LBL.find(l=>t>=l[0]&&t<l[1]); const lb=document.getElementById('lbl'); if(L){lb.textContent=L[2];lb.style.opacity=pulse(t,L[0],L[1],.25);}else lb.style.opacity=0;
+ // the hook on the first desktop, a little darker behind it
+ const h=pulse(t,.7,5.7,.5); document.getElementById('hook').style.opacity=h; document.getElementById('dim').style.opacity=.5*h;
+ document.getElementById('hook').style.transform=`translateY(${(1-win(t,.7,1.3))*20}px)`;
+ // the end card
+ document.getElementById('end').style.opacity=win(t,54.0,54.8); const sl=document.getElementById('sl'); sl.style.opacity=win(t,54.6,55.6);
+ document.querySelector('#end .w').style.opacity=win(t,55.4,56.6);
+ document.getElementById('fade').style.opacity=(1-win(t,0,.4))+win(t,59.5,60);
+};
+</script>
