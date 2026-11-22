@@ -11,7 +11,7 @@ set -u
 if [ "${1:-}" = "--inner" ]; then
     # Inside the private D-Bus session.
     gsettings set org.gnome.shell welcome-dialog-last-shown-version "'99.0'"
-    gsettings set org.gnome.shell enabled-extensions "['island@niro.local']"
+    gsettings set org.gnome.shell enabled-extensions "['island@niro.local'${WITH_SEARCH:+, 'search@niro.local'}]"
     gsettings set org.gnome.desktop.interface color-scheme prefer-dark
     [ -n "${PRE_SETTINGS:-}" ] && eval "$PRE_SETTINGS"
     gnome-shell --headless --wayland --no-x11 --unsafe-mode --wayland-display="niro-isl-$PPID" --virtual-monitor "${MONITOR:-1920x1080}" > "$OUT/shell.log" 2>&1 &
@@ -51,6 +51,10 @@ mkdir -p "$EXT"
 cp -r shell/island/build/. "$EXT/"
 mkdir -p "$EXT/src/shared"; cp shell/shared/tokens.js shell/shared/motionEngine.js "$EXT/src/shared/"
 rm -f "$EXT/schemas/gschemas.compiled"; glib-compile-schemas "$EXT/schemas"
+if [ -n "${WITH_SEARCH:-}" ]; then   # the search extension beside it, for scenarios where both are enabled
+    SX="$WORK/data/gnome-shell/extensions/search@niro.local"; mkdir -p "$SX/shared"
+    cp shell/search/build/*.js shell/search/metadata.json shell/search/stylesheet.css "$SX/"; cp shell/shared/*.js "$SX/shared/"
+fi
 cleanup() { for p in $(cat "$WORK/pids" 2>/dev/null); do kill "$p" 2>/dev/null; done; rm -rf "$WORK"; }
 trap cleanup EXIT
 # Hermetic: every location the shell or the daemon may write is under $WORK, set on the environment of the bus itself.

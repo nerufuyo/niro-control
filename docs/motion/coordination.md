@@ -69,7 +69,25 @@ signal; Search does not know the Island exists.
   each remains testable alone and nothing is circular.
 - Revisit only if a real event appears that GNOME does not broadcast. None of the eight in the brief is one.
 
+## Measured: Search opened over an expanded island
+
+Headless GNOME 51 session with both extensions (`WITH_SEARCH=1 tests/shell/island-session.sh tests/shell/island-steps-search-over.sh`),
+island opened with `expand()` (what a hover calls), then Search opened, closed, and the reverse order. 0 shell log errors.
+
+- Search takes the keyboard (`modalCount` 0 to 1, key focus in its entry); the island is not asked to do anything and stays
+  `expanded`. Closing Search returns the focus to the shell and the island is still `expanded`. The reverse order behaves
+  the same: the island expands under an open Search without taking focus. No focus fight, no stuck grab, in either order.
+- **Visible defect:** the Search panel starts at 16% of the monitor height (about y=173 at 1080p) and the expanded island
+  ends at y=206, so the top 30 px of Search overlap the island's bottom edge
+  (`evidence/coordination/search-over-island.png`). Search is translucent, so the island shows through.
+- Not tested: a hover-opened island normally closes when the pointer leaves, which is what would usually happen once the user
+  moves to type; the headless session cannot hover, so how often the overlap is seen in real use is unknown.
+
+Consequence for the design: the keyboard question is answered (no coordination needed). The overlap is cosmetic and is
+fixed on one side without any messaging: the island collapses while another modal holds the keyboard (observe
+`Main.modalCount` or the key focus), or Search anchors itself below the island's expanded height. Neither is implemented.
+
 ## Open items
 
-- The Search-over-Island runtime result (not yet measured).
+- Choose the overlap fix above (island-side observer preferred), and re-run `island-steps-search-over.sh`.
 - Whether `Main.modalCount` is available and stable from GNOME 46 to 51; if not, use the key-focus signal.
