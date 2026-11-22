@@ -60,6 +60,8 @@ export class DockManager {
   private _bgExtra: [number, number] = [0, 0];
   private _bgSyncId: number | null = null;
   private _launching: { app: Shell.App; time: number } | null = null;
+  /** Keybindings are added only with keyboard navigation on: removing ones that were never added makes mutter warn. */
+  private _keybindingsAdded = false;
   private _launchBounceId: number | null = null;
   private _previewPopup: WindowPreviewPopup | null = null;
   private _mediaManager: MediaManager | null = null;
@@ -1172,6 +1174,7 @@ export class DockManager {
     if (!this._settings.get_boolean("enable-keyboard-nav")) return;
 
     const settings = this._settings;
+    this._keybindingsAdded = true;
 
     Main.wm.addKeybinding(
       "toggle-dock",
@@ -1201,6 +1204,8 @@ export class DockManager {
   }
 
   private _removeKeybindings(): void {
+    if (!this._keybindingsAdded) return;
+    this._keybindingsAdded = false;
     Main.wm.removeKeybinding("toggle-dock");
     for (let i = 1; i <= 9; i++) {
       Main.wm.removeKeybinding(`focus-app-${i}`);
