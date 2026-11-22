@@ -612,7 +612,7 @@ class Bars extends St.BoxLayout {
             bounce.to = 0.25 + Math.random() * 0.75;
             bounce.start = -1;
             // Slowed down as ease() is.
-            bounce.duration = (180 + Math.random() * 220) * settings.slow_down_factor;
+            bounce.duration = (180 + Math.random() * 220) * St.Settings.get().slow_down_factor;
             if (!this._timer) {
                 this._now = 0;
                 this._last = GLib.get_monotonic_time();

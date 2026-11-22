@@ -15,7 +15,9 @@ import {VERTICAL, onUiScale, px} from '../compat.js';
 import {EXPANDED_WIDTH, LARGE_WIDTH, PAGE_HEIGHT} from '../expanded.js';
 import * as Format from '../format.js';
 import * as Playback from '../playback.js';
-import {Art, Bars, Slider, fence, icon, iconButton, label, ownIcon, restsAt, setButtonIcon, setEnabled, smallCover, coverKey} from '../widgets.js';
+import {Art, Bars, Slider, fence, icon, iconButton, label, ownIcon, restsAt, setButtonIcon, setEnabled, slideBy, smallCover, coverKey} from '../widgets.js';
+import {dur, motionMode, motionOn} from '../motion.js';
+import {REVEAL_RISE_PX, revealDelays} from '../surfaceMotion.js';
 import {LyricsPane} from './lyrics.js';
 import {Page} from './page.js';
 
@@ -29,6 +31,11 @@ const UNCOVER_FADE = 24;
 const PROGRESS_REFRESH_MS = 250;
 /** The music bars' opacity while the song is paused, as on the closed island. */
 const PAUSED_BARS_OPACITY = 110;
+/** Each piece of the player fades and rises in this long (ms), the first after the island has made room (about the incoming view's own
+ * delay, see island.ts FADE_IN_DELAY); a track going leaves a little quicker. */
+const REVEAL_MS = 260;
+const REVEAL_AFTER_MS = 90;
+const RETREAT_MS = 180;
 
 /** Lays its child out as wide as with the lyrics shown, also while laid out ahead behind the narrower
  * player (see `warmUp`): the lines wrap there once, not again in the first frame they show. */
@@ -77,6 +84,11 @@ class MediaPage extends Page {
         this._scrubbers = [];
         this._playButtons = [];
         this._transports = [];
+        /** Each layout's pieces in reveal order (cover, title and artist, progress, controls); see `_reveal`. */
+        this._pieces = {player: [], lyrics: []};
+        /** Whether a track was shown last (a track coming after none reveals; one going leaves, see `_update`), and the retreat under way. */
+        this._hadTrack = false;
+        this._retreating = false;
 
         this._player = this._buildPlayer();
         this._lyricsLayout = this._buildLyricsLayout();
@@ -237,7 +249,8 @@ class MediaPage extends Page {
     /** The standard view: cover beside title, mode buttons, progress and controls. */
     _buildPlayer() {
         const player = new St.BoxLayout({style_class: 'island-player', x_expand: true, y_expand: true});
-        player.add_child(this._art(ART_SIZE, 16));
+        const artBox = this._art(ART_SIZE, 16);
+        player.add_child(artBox);
         // The cover itself (`_art` gives it with its badge round it), resized with the page (`onPageHeight`).
         this._playerArt = this._arts[this._arts.length - 1];
 
@@ -268,11 +281,13 @@ class MediaPage extends Page {
         onUiScale(modes, scale => (modes.translation_x = 5 * scale));
         head.add_child(modes);
         column.add_child(head);
-        column.add_child(this._progress());
+        const progress = this._progress();
+        column.add_child(progress);
         const transport = this._transport();
         transport.x_align = Clutter.ActorAlign.CENTER;
         column.add_child(transport);
         player.add_child(column);
+        this._pieces.player = [artBox, head, progress, transport];
         return player;
     }
 
@@ -282,7 +297,8 @@ class MediaPage extends Page {
 
         const side = new St.BoxLayout({...VERTICAL, style_class: 'island-lyrics-side', y_align: Clutter.ActorAlign.CENTER});
         const top = new St.BoxLayout({style_class: 'island-player-top'});
-        top.add_child(this._art(64, 12));
+        const artBox = this._art(64, 12);
+        top.add_child(artBox);
         const texts = this._texts('island-side-title', 'island-side-artist');
         this._lyricsBars = new Bars({height: 11});
         this._lyricsBars.x_align = Clutter.ActorAlign.START;
@@ -290,7 +306,8 @@ class MediaPage extends Page {
         texts.add_child(this._lyricsBars);
         top.add_child(texts);
         side.add_child(top);
-        side.add_child(this._progress());
+        const progress = this._progress();
+        side.add_child(progress);
 
         const controls = new St.BoxLayout({style_class: 'island-lyrics-controls'});
         controls.add_child(this._modeButton('lyrics', 'island-lyrics', 'Hide lyrics', true));
@@ -299,6 +316,7 @@ class MediaPage extends Page {
         controls.add_child(transport);
         controls.add_child(this._modeButton('audio', 'island-output', 'Volume and output', false));
         side.add_child(controls);
+        this._pieces.lyrics = [artBox, texts, progress, controls];
 
         this._lyricsPane = new LyricsPane(this);
         layout.add_child(side);
@@ -394,14 +412,97 @@ class MediaPage extends Page {
         return hasTrack;
     }
 
+    /** The shown layout's pieces in reveal order (cover, title and artist, progress, controls); null in the volume view. */
+    _shownPieces() {
+        return this._pieces[this._mode] ?? null;
+    }
+
+    /** Brings the pieces in one after another, each rising into place (see surfaceMotion.ts `revealDelays`); all at once with
+     * reduced motion, none with it off. `fromCurrent`: a retreat under way is turned round from where each piece is. */
+    _reveal({fromCurrent = false} = {}) {
+        const pieces = this._shownPieces();
+        if (!pieces || !this.active)
+            return;
+        const mode = motionMode();
+        const delays = revealDelays(pieces.length, {reduced: mode !== 'full'});
+        const rise = px(REVEAL_RISE_PX);
+        pieces.forEach((piece, i) => {
+            piece.remove_transition('opacity');
+            if (mode === 'off') {
+                piece.opacity = 255;
+                slideBy(piece, 'y', 0, 0);
+                return;
+            }
+            const from = fromCurrent ? piece.translation_y : rise;
+            if (!fromCurrent)
+                piece.opacity = 0;
+            const delay = dur(REVEAL_AFTER_MS + delays[i]);
+            piece.ease({opacity: 255, delay, duration: dur(REVEAL_MS), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            slideBy(piece, 'y', from, 0, {delay, duration: dur(REVEAL_MS + 80)});
+        });
+    }
+
+    /** The track is gone while the page shows it: its pieces leave in the reverse order (controls first, cover last), each from
+     * wherever its own reveal had got to, and only then does the empty page show. False when there is nothing to animate. */
+    _retreat() {
+        const pieces = this._shownPieces();
+        const mode = motionMode();
+        if (!pieces || !this.active || !this.mapped || mode === 'off')
+            return false;
+        if (this._retreating)
+            return true;
+        this._retreating = true;
+        const delays = revealDelays(pieces.length, {reduced: mode !== 'full'});
+        const rise = px(REVEAL_RISE_PX);
+        pieces.forEach((piece, i) => {
+            const delay = dur(delays[pieces.length - 1 - i]);
+            piece.remove_transition('opacity');
+            piece.ease({opacity: 0, delay, duration: dur(RETREAT_MS), mode: Clutter.AnimationMode.EASE_IN_QUAD});
+            slideBy(piece, 'y', piece.translation_y, rise, {delay, duration: dur(RETREAT_MS)});
+        });
+        this.later('retreat', dur(delays[delays.length - 1] + RETREAT_MS) + 30, () => this._finishRetreat());
+        return true;
+    }
+
+    /** The pieces have left: the pieces are put back whole (out of sight) and the empty page shows, fading in. */
+    _finishRetreat() {
+        this.cancel('retreat');
+        this._retreating = false;
+        this._hadTrack = false;
+        this._update();
+        for (const piece of Object.values(this._pieces).flat()) {
+            piece.remove_transition('opacity');
+            piece.opacity = 255;
+            slideBy(piece, 'y', 0, 0);
+        }
+        if (this._empty.visible && motionOn()) {
+            this._empty.opacity = 0;
+            this._empty.ease({opacity: 255, duration: dur(220), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        }
+    }
+
     /** Fills every layout from `nowPlaying`. */
     _update() {
         // Left out in Settings: no covers loaded or tinted for a page that can't be shown.
         if (this.hidden)
             return;
         const {nowPlaying} = this.daemon.state;
-        if (!this._syncMode())
+        if (!Playback.hasTrack(nowPlaying) && this._hadTrack && this._retreat())
             return;
+        // A track back while it was leaving: turned round from where it is, not restarted from nothing.
+        const resumed = this._retreating && Playback.hasTrack(nowPlaying);
+        if (resumed) {
+            this.cancel('retreat');
+            this._retreating = false;
+        }
+        const hadTrack = this._hadTrack;
+        if (!this._syncMode()) {
+            this._hadTrack = false;
+            return;
+        }
+        this._hadTrack = true;
+        if (!hadTrack || resumed)
+            this._reveal({fromCurrent: resumed});
         // A new song changes the layouts not shown too: they are laid out ahead (see `Page.markCold`).
         const track = [nowPlaying.title, nowPlaying.artist, nowPlaying.album, nowPlaying.identity, nowPlaying.art_path].join('\u001f');
         if (track !== this._track) {
@@ -555,11 +656,16 @@ class MediaPage extends Page {
         this._syncBars();
         this._tickProgress();
         this._lyricsPane.follow();
+        if (Playback.hasTrack(this.daemon.state.nowPlaying))
+            this._reveal();
     }
 
     /** Stops the bars and leaves the audio view. */
     onDeactivate() {
         this._lyricsBars.playing = false;
+        // Away mid-retreat: the empty page is what it finds when it is back.
+        if (this._retreating)
+            this._finishRetreat();
         // Reopening the island starts on the player, not a sub-view.
         if (this._mode === 'audio')
             this._toggleMode('audio');
