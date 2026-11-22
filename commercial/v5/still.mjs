@@ -14,8 +14,9 @@ const ws = new WebSocket((tabs.find(t => t.type === 'page') ?? tabs[0]).webSocke
 let id = 0; const pending = new Map(); ws.addEventListener('message', e => { const m = JSON.parse(e.data); if (m.id && pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } });
 const call = (method, params = {}) => new Promise((res, rej) => { const i = ++id; pending.set(i, m => m.error ? rej(new Error(JSON.stringify(m.error))) : res(m.result)); ws.send(JSON.stringify({id: i, method, params})); });
 await call('Page.enable'); await call('Runtime.enable'); await call('Emulation.setDeviceMetricsOverride', {width: 1920, height: 1080, deviceScaleFactor: 1, mobile: false});
-await call('Page.navigate', {url: `http://127.0.0.1:${server.address().port}/commercial/v4/film.html`});
+await call('Page.navigate', {url: `http://127.0.0.1:${server.address().port}/commercial/v5/film.html`});
 for (let i = 0; i < 300; i++) { const r = await call('Runtime.evaluate', {expression: 'window.__ready === true', returnByValue: true}); if (r.result.value) break; await new Promise(r => setTimeout(r, 100)); }
+await call('Runtime.evaluate', {expression: 'window.__preload(0, 60)', awaitPromise: true});
 for (let i = 0; i < args.length; i += 2) {
     await call('Runtime.evaluate', {expression: `window.__render(${args[i]}); 0`});
     await call('Runtime.evaluate', {expression: 'new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)))', awaitPromise: true});
