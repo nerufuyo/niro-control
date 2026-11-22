@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {createSearchMachine, isLive, isShown, keepScrollValue, panelPose, planUpdate, resultKey, rowReveal, SearchMotion} from '../../shell/search/build/searchMotion.js';
+import {anchoredScroll, createSearchMachine, isLive, isShown, keepScrollValue, panelPose, planUpdate, resultKey, rowReveal, SearchMotion} from '../../shell/search/build/searchMotion.js';
 
 const states = m => { const seen = []; m.onChange((n, p, e) => seen.push(`${p}>${n}:${e}`)); return seen; };
 
@@ -184,4 +184,13 @@ test('scroll is restored but never past the end', () => {
     assert.equal(keepScrollValue(120, 500, 200), 120);
     assert.equal(keepScrollValue(400, 500, 200), 300);
     assert.equal(keepScrollValue(-5, 100, 200), 0);
+});
+
+test('the selected row stays where it was in the viewport when rows arrive above it', () => {
+    // row at y 400 under offset 300 sits 100 px into the viewport (anchor 100)
+    assert.equal(anchoredScroll(400, 100, 2000, 350), 300);          // nothing moved
+    assert.equal(anchoredScroll(576, 100, 2000, 350), 476);          // 176 px of rows arrived above: the offset follows
+    assert.equal(anchoredScroll(224, 100, 2000, 350), 124);          // rows above went away
+    assert.equal(anchoredScroll(900, 100, 1000, 350), 650);          // never past the end, measured with the fresh extent
+    assert.equal(anchoredScroll(20, 100, 1000, 350), 0);             // never before the start
 });
