@@ -6,6 +6,8 @@
 # Needs the staged extensions (tests/shell/run-staged.sh) or the installed package.
 set -u
 cd "$(dirname "$0")/../.."
+# The test must not write the real ~/.local/share (Search's audit log, snips): run-staged.sh already isolates it, a direct run does here.
+[ -n "${NIRO_TEST_ISOLATED:-}" ] || { export XDG_DATA_HOME; XDG_DATA_HOME=$(mktemp -d); }
 LOG=$(mktemp); WORK=$(mktemp -d); trap 'rm -f "$LOG"; rm -rf "$WORK"; rm -f /run/user/$UID/gnome-shell-disable-extensions' EXIT
 rm -f /run/user/$UID/gnome-shell-disable-extensions
 mkdir -p "$WORK/cfg/glib-2.0/settings"

@@ -15,7 +15,22 @@ import {PACKAGE_VERSION} from 'resource:///org/gnome/shell/misc/config.js';
 
 import {arrange, dwindleSplits, inner, LAYOUT_IDS, LAYOUTS} from './layouts.js';
 import {LayoutSwitcher} from './switcher.js';
+import {activeProfileId, createGuard, createOpacityControl, fromLegacy, evaluate as evaluateRules, parseRules as parseAdvanced, pending as pendingActions, setsOpacity, usesProfile} from './windowRules.js';
 import {matchRule, neighbor, parseLayoutMap, parseRules, resolveLayout, withLayout, withoutLayout} from './config.js';
+import {createWorkspaceService} from './workspace.js';
+
+// The pure cores of the groups, snapshots and monitor recovery are copied beside this file (./shared) by the package. Imported at run time
+// so a Tile installed without them still tiles: the new D-Bus methods then answer that they are not installed.
+let WORKSPACE_CORE = null;
+try {
+    WORKSPACE_CORE = {
+        groups: await import('./shared/windowGroups.js'),
+        snapshot: await import('./shared/snapshot.js'),
+        monitors: await import('./shared/monitorManager.js'),
+    };
+} catch (e) {
+    console.warn(`Tile: workspace cores not available (${e.message}); groups, snapshots and monitor recovery are off`);
+}
 
 const RETILE_MS = 60;
 const SHELL_MAJOR = parseInt(PACKAGE_VERSION.split('.')[0], 10);
@@ -34,6 +49,12 @@ const DBUS_XML = `<node><interface name="org.niro.Tile">
   <method name="ClearLayout"><arg type="i" direction="in" name="workspace"/><arg type="i" direction="in" name="monitor"/></method>
   <method name="SetEnabled"><arg type="b" direction="in" name="enabled"/></method>
   <method name="Retile"/>
+  <method name="GetWorkspaceApi"><arg type="s" direction="out" name="json"/></method>
+  <method name="GroupsCall"><arg type="s" direction="in" name="op"/><arg type="s" direction="in" name="args"/><arg type="s" direction="out" name="json"/></method>
+  <method name="SnapshotsCall"><arg type="s" direction="in" name="op"/><arg type="s" direction="in" name="args"/><arg type="s" direction="out" name="json"/></method>
+  <method name="MonitorStatus"><arg type="s" direction="out" name="json"/></method>
+  <method name="ApplyRules"><arg type="s" direction="out" name="json"/></method>
+  <method name="ApplyRulesPreview"><arg type="s" direction="out" name="json"/></method>
   <signal name="StateChanged"/>
 </interface></node>`;
 
@@ -57,6 +78,12 @@ export default class Tile extends Extension {
         this._placed = new WeakSet();     // windows the tiling has put in a tile: one of them maximized afterwards stays maximized
         this._map = parseLayoutMap(this._settings.get_string('layout-map'));
         this._rules = parseRules(this._settings.get_string('window-rules'));
+        this._profile = null;             // the active profile id, read from Niro Control's state file (only while a rule asks for it)
+        this._profileMonitor = null;
+        this._opacity = createOpacityControl(w => w.get_compositor_private());
+        this._engine = this._loadEngine();
+        this._guard = createGuard();      // a rule may act on one window only a few times in a short while: nothing can loop
+        this._workspace = WORKSPACE_CORE ? createWorkspaceService({core: WORKSPACE_CORE, host: this._workspaceHost()}) : null;
 
         const wm = global.window_manager;
         const display = global.display;
@@ -66,6 +93,8 @@ export default class Tile extends Extension {
         for (const s of ['window-created', 'in-fullscreen-changed', 'workareas-changed', 'window-entered-monitor', 'window-left-monitor'])
             this._signals.push([display, display.connect(s, again)]);
         this._signals.push([Main.layoutManager, Main.layoutManager.connect('monitors-changed', again)]);
+        // Opt-in (monitor-recovery): windows of a monitor that left go to the primary, and back when it returns. Windows only; no display setting is written.
+        this._signals.push([Main.layoutManager, Main.layoutManager.connect('monitors-changed', () => this._workspace?.monitorsChanged())]);
         // Drag and drop: moving a tiled window over another and letting go swaps their places
         this._signals.push([display, display.connect('grab-op-begin', (_d, win, op) => this._beginDrag(win, op))]);
         this._signals.push([display, display.connect('grab-op-end', (_d, win) => this._endDrag(win))]);
@@ -75,8 +104,14 @@ export default class Tile extends Extension {
         })]);
         this._signals.push([this._settings, this._settings.connect('changed::window-rules', () => {
             this._rules = parseRules(this._settings.get_string('window-rules'));
+            this._engine = this._loadEngine();
             this._schedule();
         })]);
+        for (const key of ['rules-engine', 'advanced-rules'])
+            this._signals.push([this._settings, this._settings.connect(`changed::${key}`, () => {
+                this._engine = this._loadEngine();
+                this._schedule();
+            })]);
         for (const key of ['enabled', 'layout', 'gap-inner', 'gap-outer', 'master-factor', 'column-width', 'floating-apps'])
             this._signals.push([this._settings, this._settings.connect(`changed::${key}`, again)]);
         this._signals.push([this._settings, this._settings.connect('changed::enabled', () => this._osd(this._settings.get_boolean('enabled') ? 'Tiling on' : 'Tiling off'))]);
@@ -98,6 +133,7 @@ export default class Tile extends Extension {
         for (const key of KEYS)
             Main.wm.addKeybinding(`shortcut-${key}`, this._settings, Meta.KeyBindingFlags.NONE, Shell.ActionMode.NORMAL, handlers[key]);
         this._exportDBus();
+        this._workspace?.noteWindows();
         this._schedule();
     }
 
@@ -127,6 +163,13 @@ export default class Tile extends Extension {
         this._placed = null;
         this._map = null;
         this._rules = null;
+        this._opacity?.restoreAll();
+        this._opacity = null;
+        this._stopProfileWatch();
+        this._engine = null;
+        this._guard?.clear();
+        this._guard = null;
+        this._workspace = null;
         this._settings = null;
     }
 
@@ -149,6 +192,11 @@ export default class Tile extends Extension {
         // allows_move()/allows_resize() are false while a window is maximized: a window that can be resized at all is meant
         if (!win.resizeable || (!isMaximized(win) && (!win.allows_move() || !win.allows_resize())))
             return false;
+        const tile = this._engineActions(win).tile;
+        if (tile === 'float')
+            return false;
+        if (tile === 'tile')
+            return true;
         const rule = matchRule(this._rules, this._classes(win));
         if (rule?.action === 'float')
             return false;
@@ -166,6 +214,178 @@ export default class Tile extends Extension {
         }
     }
 
+    /** The advanced rules (they come before the simple ones), or none while the engine is off. Windows are read, never changed, here. */
+    _loadEngine() {
+        const rules = this._settings.get_boolean('rules-engine') ? parseAdvanced(this._settings.get_string('advanced-rules')) : [];
+        this._wantsOpacity = setsOpacity(rules);
+        if (usesProfile(rules))
+            this._watchProfile();
+        else
+            this._stopProfileWatch();
+        return rules;
+    }
+
+    _profilePath() {
+        return `${GLib.get_user_config_dir()}/niro-control/state.json`;
+    }
+
+    _readProfile() {
+        try {
+            const [ok, bytes] = Gio.File.new_for_path(this._profilePath()).load_contents(null);
+            this._profile = ok ? activeProfileId(new TextDecoder().decode(bytes)) : null;
+        } catch (_e) {
+            this._profile = null;   // no state file yet: no profile is active
+        }
+    }
+
+    /** A profile is applied by the panel or Search rewriting state.json: watched only while a rule has a `profile` condition. */
+    _watchProfile() {
+        if (this._profileMonitor)
+            return;
+        this._readProfile();
+        try {
+            this._profileMonitor = Gio.File.new_for_path(this._profilePath()).monitor_file(Gio.FileMonitorFlags.NONE, null);
+            this._profileMonitorId = this._profileMonitor.connect('changed', () => {
+                const before = this._profile;
+                this._readProfile();
+                if (before !== this._profile)
+                    this._schedule();
+            });
+        } catch (_e) { this._profileMonitor = null; }
+    }
+
+    _stopProfileWatch() {
+        if (this._profileMonitor) {
+            try { this._profileMonitor.disconnect(this._profileMonitorId); this._profileMonitor.cancel(); } catch (_e) { /* gone */ }
+        }
+        this._profileMonitor = null;
+        this._profile = null;
+    }
+
+    /** Opacity from the rules, for the windows in play; put back for a window no rule matches any more. Compositor-only: no window setting is changed. */
+    _applyOpacity() {
+        if (!this._opacity)
+            return;
+        if (!this._wantsOpacity && !this._opacity.size())
+            return;
+        for (const w of this._order)
+            this._opacity.apply(w, this._engineActions(w).opacity);
+    }
+
+    _engineActions(win) {
+        return this._engineEval(win).actions;
+    }
+
+    /** `{actions, from}` the advanced rules give a window (empty while the engine is off). Reads the window, never changes it. */
+    _engineEval(win) {
+        if (!this._engine?.length)
+            return {actions: {}, from: {}};
+        const type = {[Meta.WindowType.NORMAL]: 'normal', [Meta.WindowType.DIALOG]: 'dialog', [Meta.WindowType.UTILITY]: 'utility'}[win.window_type] ?? 'other';
+        return evaluateRules(this._engine, {
+            appIds: this._classes(win), title: win.get_title?.() ?? '', workspace: (win.get_workspace()?.index() ?? 0) + 1,
+            monitor: win.get_monitor(), type,
+        }, {profile: this._profile});
+    }
+
+    /** What the rules compare a window with, as it is now. `wantedOpacity`: the rule's value, so a rounding of the actor's 0..255 is not a difference. */
+    _factsOf(w, wantedOpacity) {
+        const actor = w.get_compositor_private();
+        let opacity;
+        if (actor)
+            opacity = typeof wantedOpacity === 'number' && actor.opacity === Math.round(wantedOpacity * 255) ? wantedOpacity : actor.opacity / 255;
+        return {
+            workspace: w.is_on_all_workspaces() ? 0 : (w.get_workspace()?.index() ?? 0) + 1, monitor: w.get_monitor(), floating: this._floating.has(w),
+            above: Boolean(w.is_above?.()), opacity, fullscreen: Boolean(w.fullscreen),
+        };
+    }
+
+    /**
+     * Evaluates the advanced rules for one window and applies what would change (only `keys`, when given); `dry` applies nothing.
+     * Returns `{windowId, appId, title, actions, from, skipped?: [{key, reason}]}`, or null when no rule has anything to change.
+     * What is already as the rules want is left out (pending), and a rule that already acted on the window several times in a short while
+     * is refused (the loop guard), so calling this again changes nothing.
+     */
+    _applyEngineTo(w, {dry, keys = null}) {
+        if (!this._engine?.length || !w.get_compositor_private())
+            return null;
+        const ev = this._engineEval(w);
+        const wanted = keys ? Object.fromEntries(Object.entries(ev.actions).filter(([k]) => keys.includes(k))) : ev.actions;
+        if (!Object.keys(wanted).length)
+            return null;
+        const todo = pendingActions(wanted, this._factsOf(w, wanted.opacity));
+        const skipped = [];
+        const drop = (k, reason) => { delete todo[k]; skipped.push({key: k, reason}); };
+        if ('workspace' in todo && w.is_on_all_workspaces())
+            drop('workspace', 'the window is on all workspaces');
+        else if ('workspace' in todo && todo.workspace > global.workspace_manager.get_n_workspaces())
+            drop('workspace', `there is no workspace ${todo.workspace}`);
+        if ('monitor' in todo && todo.monitor >= global.display.get_n_monitors())
+            drop('monitor', `there is no monitor ${todo.monitor}`);
+        if (!dry) {
+            const asked = new Map();
+            for (const k of Object.keys(todo)) {
+                const rule = ev.from[k];
+                if (!asked.has(rule))
+                    asked.set(rule, this._guard.allow(w.get_id(), rule, Date.now()));
+                if (!asked.get(rule))
+                    drop(k, `rule "${rule}" has just acted on this window several times (loop guard)`);
+            }
+        }
+        const base = {windowId: w.get_id(), appId: w.get_gtk_application_id?.() || w.get_wm_class() || '', title: w.get_title() ?? ''};
+        if (!Object.keys(todo).length)
+            return skipped.length ? {...base, actions: {}, from: {}, skipped} : null;
+        const from = Object.fromEntries(Object.keys(todo).map(k => [k, ev.from[k]]));
+        if (!dry) {
+            for (const [k, v] of Object.entries(todo)) {
+                try {
+                    if (k === 'workspace') w.change_workspace_by_index(v - 1, false);
+                    else if (k === 'monitor') w.move_to_monitor(v);
+                    else if (k === 'tile') { if (v === 'float') this._floating.add(w); else this._floating.delete(w); }
+                    else if (k === 'above') { if (v) w.make_above(); else w.unmake_above(); }
+                    else if (k === 'opacity') this._opacity?.apply(w, v);
+                    else if (k === 'fullscreen') { if (v) w.make_fullscreen(); else w.unmake_fullscreen(); }
+                } catch (e) {
+                    skipped.push({key: k, reason: e.message});
+                    delete todo[k];
+                }
+            }
+        }
+        return skipped.length ? {...base, actions: todo, from, skipped} : {...base, actions: todo, from};
+    }
+
+    /**
+     * One explicit pass of the advanced rules over every open normal window (the first-seen pass never looks at windows already open).
+     * Refused while the engine is off. `dry`: the same answer, nothing changed. No timer, no listener: a second call finds nothing pending.
+     */
+    _applyRules(dry) {
+        const answer = {api: 1, ok: true, dryRun: dry, applied: [], skipped: [], notes: []};
+        if (!this._settings?.get_boolean('rules-engine'))
+            return {...answer, ok: false, error: 'the rules engine is off: switch on "Use the advanced rules" first (nothing was changed)'};
+        if (!this._engine?.length)
+            return {...answer, notes: ['there are no valid, enabled advanced rules']};
+        const windows = global.get_window_actors().map(a => a.meta_window).filter(w => w && w.window_type === Meta.WindowType.NORMAL && !w.skip_taskbar);
+        for (const w of windows) {
+            let r = null;
+            try {
+                r = this._applyEngineTo(w, {dry});
+            } catch (e) {
+                answer.skipped.push({windowId: w.get_id(), appId: w.get_wm_class() ?? '', reason: e.message});
+                continue;
+            }
+            if (!r)
+                continue;
+            const {skipped, ...entry} = r;
+            if (Object.keys(entry.actions).length)
+                answer.applied.push(entry);
+            for (const s of skipped ?? [])
+                answer.skipped.push({windowId: entry.windowId, appId: entry.appId, ...s});
+        }
+        if (!dry && answer.applied.length)
+            this._schedule();
+        answer.notes.push(`${windows.length} window(s) looked at, ${answer.applied.length} ${dry ? 'would change' : 'changed'}`);
+        return answer;
+    }
+
     /** The names a window is known by: the X11 instance, the class (the Wayland app id) and the desktop id. */
     _classes(win) {
         return [win.get_wm_class_instance(), win.get_wm_class(), win.get_gtk_application_id?.()];
@@ -177,6 +397,7 @@ export default class Tile extends Extension {
         this._order = this._order.filter(w => alive.has(w));
         for (const w of [...this._winSignals.keys()]) {
             if (!alive.has(w)) {
+                this._opacity?.forget(w);
                 try { this._winSignals.get(w).forEach(id => w.disconnect(id)); } catch (_e) { /* gone */ }
                 this._winSignals.delete(w);
                 this._floating.delete(w);
@@ -190,7 +411,15 @@ export default class Tile extends Extension {
             const rule = matchRule(this._rules, this._classes(w));
             if (rule?.workspace && rule.workspace <= global.workspace_manager.get_n_workspaces())
                 w.change_workspace_by_index(rule.workspace - 1, false);
+            // Advanced rules run once, when the window is first seen (so nothing can re-apply in a loop); opacity is kept up to date in _applyOpacity.
+            // Windows already open are only touched by the explicit ApplyRules call.
+            try {
+                this._applyEngineTo(w, {dry: false, keys: ['workspace', 'monitor', 'above', 'fullscreen']});
+            } catch (e) {
+                console.warn(`Tile: rules on a new window: ${e.message}`);
+            }
             const ids = [w.connect('workspace-changed', () => this._schedule())];
+            ids.push(w.connect('notify::title', () => { if (this._wantsOpacity) this._schedule(); }));   // a rule may match on the title
             // maximizing or full screen takes a window out of the tiling and back: looked at when its size changes
             ids.push(w.connect('size-changed', () => {
                 const now = `${isMaximized(w)}|${w.fullscreen}`;
@@ -215,6 +444,7 @@ export default class Tile extends Extension {
             try {
                 this._retile();
                 this._stateChanged();
+                this._workspace?.noteWindows();
             } catch (e) {
                 console.warn(`Tile: ${e.message}`);
             }
@@ -226,6 +456,7 @@ export default class Tile extends Extension {
         if (!this._settings)
             return;
         this._sync();
+        this._applyOpacity();
         if (!this._settings.get_boolean('enabled'))
             return;
         const workspace = global.workspace_manager.get_active_workspace();
@@ -612,6 +843,102 @@ export default class Tile extends Extension {
 
     Retile() {
         this._schedule();
+    }
+
+    GetWorkspaceApi() {
+        // `rules`: the methods that apply the advanced rules to the windows already open (they do not depend on the workspace cores)
+        const rules = ['ApplyRules', 'ApplyRulesPreview'];
+        return JSON.stringify(this._workspace ? {...this._workspace.api(), rules} : this._noWorkspace());
+    }
+
+    GroupsCall(op, args) {
+        return JSON.stringify(this._workspace ? this._workspace.groups(op, args) : this._noWorkspace());
+    }
+
+    SnapshotsCall(op, args) {
+        return JSON.stringify(this._workspace ? this._workspace.snapshots(op, args) : this._noWorkspace());
+    }
+
+    MonitorStatus() {
+        return JSON.stringify(this._workspace ? this._workspace.monitorStatus() : this._noWorkspace());
+    }
+
+    ApplyRules() {
+        return JSON.stringify(this._applyRules(false));
+    }
+
+    ApplyRulesPreview() {
+        return JSON.stringify(this._applyRules(true));
+    }
+
+    _noWorkspace() {
+        return {api: 1, ok: false, error: 'the workspace features are not installed (shell/shared is missing next to Tile)'};
+    }
+
+    /** What the workspace service needs from the shell (see workspace.js). */
+    _workspaceHost() {
+        const windows = () => global.get_window_actors().map(a => a.meta_window).filter(w => w && w.window_type === Meta.WindowType.NORMAL && !w.skip_taskbar);
+        const byId = id => windows().find(w => w.get_id() === id) ?? null;
+        const dir = GLib.build_filenamev([GLib.get_user_config_dir(), 'niro']);
+        return {
+            liveWindows: () => windows().map(w => {
+                const r = w.get_frame_rect();
+                return {
+                    id: w.get_id(), appId: w.get_gtk_application_id?.() || w.get_wm_class() || '', title: w.get_title() ?? '',
+                    workspace: w.is_on_all_workspaces() ? 0 : w.get_workspace().index() + 1, monitor: w.get_monitor(),
+                    rect: {x: r.x, y: r.y, width: r.width, height: r.height},
+                };
+            }),
+            monitors: () => {
+                let logical = [];
+                try { logical = global.backend.get_monitor_manager().get_logical_monitors(); } catch (_e) { /* identity falls back to the index */ }
+                return Main.layoutManager.monitors.map((m, index) => {
+                    let mon = null;
+                    try { mon = logical.find(l => l.get_number() === index)?.get_monitors()[0] ?? null; } catch (_e) { /* no detail */ }
+                    return {
+                        index, connector: mon?.get_connector() ?? `monitor${index}`, vendor: mon?.get_vendor() ?? '', product: mon?.get_product() ?? '', serial: mon?.get_serial() ?? '',
+                        width: m.width, height: m.height, scale: global.display.get_monitor_scale(index), x: m.x, y: m.y, primary: index === global.display.get_primary_monitor(),
+                    };
+                });
+            },
+            nWorkspaces: () => global.workspace_manager.get_n_workspaces(),
+            activeWorkspace: () => global.workspace_manager.get_active_workspace_index() + 1,
+            focusedId: () => global.display.focus_window?.get_id() ?? 0,
+            moveWindow: (id, {workspace, monitor, rect}) => {
+                const w = byId(id);
+                if (!w) return false;
+                if (workspace !== null && !w.is_on_all_workspaces()) w.change_workspace_by_index(workspace - 1, false);
+                if (monitor !== null && w.get_monitor() !== monitor) w.move_to_monitor(monitor);
+                if (rect && !isMaximized(w) && !w.fullscreen) w.move_resize_frame(true, rect.x, rect.y, rect.width, rect.height);
+                return true;
+            },
+            focusWindows: ids => {
+                for (const id of ids) byId(id)?.activate(global.get_current_time());
+            },
+            switchWorkspace: n => global.workspace_manager.get_workspace_by_index(n - 1)?.activate(global.get_current_time()),
+            launch: appId => {
+                const app = Gio.AppInfo.get_all().find(a => a.should_show() && a.get_id()?.toLowerCase() === `${appId}.desktop`.toLowerCase());
+                if (!app) return {ok: false, reason: `no desktop entry for ${appId}`};
+                try {
+                    return {ok: app.launch([], null)};
+                } catch (e) {
+                    return {ok: false, reason: e.message};
+                }
+            },
+            load: name => {
+                try {
+                    return JSON.parse(new TextDecoder().decode(Gio.File.new_for_path(GLib.build_filenamev([dir, name])).load_contents(null)[1]));
+                } catch (_e) {
+                    return null;
+                }
+            },
+            save: (name, value) => {
+                GLib.mkdir_with_parents(dir, 0o755);
+                Gio.File.new_for_path(GLib.build_filenamev([dir, name])).replace_contents(new TextEncoder().encode(JSON.stringify(value, null, 1)), null, false, Gio.FileCreateFlags.REPLACE_DESTINATION, null);
+            },
+            now: () => Date.now(),
+            recoveryEnabled: () => Boolean(this._settings?.get_boolean('monitor-recovery')),
+        };
     }
 
     /** Everything a program needs to know: the settings that matter, the workspaces, the monitors and the windows. Workspaces and windows count from 1. */

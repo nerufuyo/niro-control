@@ -11,6 +11,7 @@
 // is also taken out of the struts, and put back as it was.
 
 import Clutter from 'gi://Clutter';
+import {dur} from './motion.js';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
@@ -78,7 +79,7 @@ export class BarHider {
             done();
             return;
         }
-        box.ease({translation_y: to, duration: 220, mode, onStopped: done});
+        box.ease({translation_y: to, duration: dur(220), mode, onStopped: done});
     }
 
     /** The bar as GNOME has it (the island is going, or the setting is off). */

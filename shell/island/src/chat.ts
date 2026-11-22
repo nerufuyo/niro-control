@@ -12,6 +12,7 @@ import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
+import {dur, motionOn} from './motion.js';
 
 import {BotIcon} from './botIcon.js';
 import {VERTICAL, onUiScale, px} from './compat.js';
@@ -377,10 +378,10 @@ export const CommandCard = GObject.registerClass({
         // Ended, it steps back: the answer above is what matters now.
         this.style_class = ended ? 'island-card island-card-ended' : 'island-card';
         this.opacity = card.status === 'denied' || card.status === 'stopped' ? 165 : 255;
-        if (ended && previous && previous !== card.status && St.Settings.get().enable_animations) {
+        if (ended && previous && previous !== card.status && motionOn()) {
             this._statusIcon.set_pivot_point(0.5, 0.5);
             this._statusIcon.set({scale_x: 0.4, scale_y: 0.4, opacity: 0});
-            this._statusIcon.ease({scale_x: 1, scale_y: 1, opacity: 255, duration: 320, mode: Clutter.AnimationMode.EASE_OUT_BACK});
+            this._statusIcon.ease({scale_x: 1, scale_y: 1, opacity: 255, duration: dur(320), mode: Clutter.AnimationMode.EASE_OUT_BACK});
         }
     }
 
@@ -460,10 +461,10 @@ export const CommandCard = GObject.registerClass({
         if (this._state !== 'waiting' || GLib.get_monotonic_time() - this._waitingSince < ARMED_AFTER_MS * 1000)
             return;
         const button = run ? this._run : this._deny;
-        if (St.Settings.get().enable_animations) {
+        if (motionOn()) {
             button.set_pivot_point(0.5, 0.5);
-            button.ease({scale_x: 0.92, scale_y: 0.92, duration: 80, mode: Clutter.AnimationMode.EASE_OUT_QUAD,
-                onComplete: () => !this._destroyed && button.ease({scale_x: 1, scale_y: 1, duration: 240,
+            button.ease({scale_x: 0.92, scale_y: 0.92, duration: dur(80), mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+                onComplete: () => !this._destroyed && button.ease({scale_x: 1, scale_y: 1, duration: dur(240),
                     mode: Clutter.AnimationMode.EASE_OUT_BACK})});
             if (!run)
                 playMotion(this, 'shake');
@@ -549,11 +550,11 @@ export const ChatView = GObject.registerClass({
                     'island-chat-time', {x_align: Clutter.ActorAlign.CENTER}));
             const row = this._row(item, last?.role !== 'assistant');
             this._list.add_child(row);
-            if (index >= known && St.Settings.get().enable_animations) {
+            if (index >= known && motionOn()) {
                 const delay = 60 * (index - known);
                 row.opacity = 0;
-                slideBy(row, 'y', px(10), 0, {delay, duration: 260});
-                row.ease({opacity: 255, duration: 260, delay, mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
+                slideBy(row, 'y', px(10), 0, {delay: dur(delay), duration: dur(260)});
+                row.ease({opacity: 255, duration: dur(260), delay: dur(delay), mode: Clutter.AnimationMode.EASE_OUT_CUBIC});
             }
             last = item;
         });

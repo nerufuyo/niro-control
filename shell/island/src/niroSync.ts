@@ -11,6 +11,7 @@ import {effective, gtk3Scheme, migrateLegacy, PRESET_KEYS, resolveScheme} from '
 import {isDarkSurface, isThemeTranslucent, shellStylesheet} from './shellTheme.js';
 import {refresh as refreshGtk} from './gtkAdapter.js';
 import {setBlurRadius} from './blurPipeline.js';
+import {deriveAccent} from './shared/tokens.js';
 
 const EXTENSION_DIRS = [GLib.get_user_data_dir(), '/usr/local/share', '/usr/share'].map(base => `${base}/gnome-shell/extensions`);
 
@@ -59,7 +60,7 @@ export class NiroSync {
         this._shellStyle();
         this._probeGtk3();
         try {
-            this._applyAccent(this._shared.get_string('accent'));
+            this._applyAccent(this._shared.get_string('accent'), this._shared.get_string('tint'));
         } catch (e) {
             console.error(`Island: accent not applied: ${e.message}`);
         }
@@ -203,14 +204,16 @@ export class NiroSync {
     }
 
     /** Island's own highlights in the accent: its stylesheet names the colour in a few places, overridden here. */
-    _applyAccent(accent) {
+    _applyAccent(accent, tint) {
+        // Colours derived in shared/tokens.js: the accent itself while it reads (every default), a readable one when it would not.
+        const d = deriveAccent(accent, tint) ?? {fill: accent, onFill: '#ffffff', onDark: accent, indicator: accent};
         const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'niro']);
         GLib.mkdir_with_parents(dir, 0o755);
         const path = GLib.build_filenamev([dir, 'accent.css']);
         const css = `.island-pill-accent, .island-sys-fill, .island-privacy-dot.screenShare { background-color: ${accent}; }
-.island-power-on, .island-power-segment-on, .island-power-segment-on:hover, .island-power-tile-on, .island-power-tile-on:hover { background-color: ${accent}; color: #ffffff; }
+.island-power-on, .island-power-segment-on, .island-power-segment-on:hover, .island-power-tile-on, .island-power-tile-on:hover { background-color: ${d.fill}; color: ${d.onFill}; }
 .island-start-pill, .island-start-pill:hover { background-color: ${accent}; }
-.island-power-danger { color: ${accent}; }
+.island-power-danger { color: ${d.onDark}; }
 `;
         GLib.file_set_contents(path, css);
         const theme = St.ThemeContext.get_for_stage(global.stage).get_theme();
@@ -239,16 +242,17 @@ export class NiroSync {
         const accent = this._shared.get_string('accent');
         const tint = this._shared.get_string('tint');
         try {
-            this._applyAccent(accent);
+            this._applyAccent(accent, tint);
         } catch (e) {
             console.error(`Island: accent not applied: ${e.message}`);
         }
+        const indicator = deriveAccent(accent, tint)?.indicator ?? accent;
         if (this._dock) {
             this._dock.set_int('dock-opacity', opacity);
             this._dock.set_boolean('dock-blur-enabled', blur);
             this._dock.set_string('dock-background-color', tint);
             this._dock.set_string('custom-css',
-                `.dock-indicator-dot { background-color: ${accent}; } .dock-indicator-bar { background-color: ${accent}; }`);
+                `.dock-indicator-dot { background-color: ${indicator}; } .dock-indicator-bar { background-color: ${indicator}; }`);
         }
         if (this._blur) {
             try {

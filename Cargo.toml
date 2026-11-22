@@ -5,14 +5,15 @@ members = [
     "crates/island-daemon",
     "crates/island-shelf",
     "crates/island-whisper",
+    "crates/niro-flow",
 ]
 # island-shelf needs the GTK 4 development files, and island-whisper cmake, a C++
 # compiler, libclang and (for the GPU) the Vulkan headers and glslc, so they
 # are only built when asked for: `cargo build -p island-shelf -p island-whisper`.
-default-members = ["crates/island-core", "crates/island-daemon"]
+default-members = ["crates/island-core", "crates/island-daemon", "crates/niro-flow"]
 
 [workspace.package]
-version = "1.5.9"
+version = "1.6.0"
 edition = "2024"
 # island-core and island-daemon use let chains (1.88); island-shelf sets its own, for gtk-rs.
 rust-version = "1.88"
@@ -23,6 +24,7 @@ publish = false
 
 [workspace.dependencies]
 island-core = { path = "crates/island-core" }
+niro-flow = { path = "crates/niro-flow" }
 
 anyhow = "1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }

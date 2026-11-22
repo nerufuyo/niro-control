@@ -29,6 +29,7 @@ cp -r shell/dock/schemas "$EXT"/; rm -f "$EXT"/schemas/gschemas.compiled; glib-c
 # --- Search
 EXT="$EXTDIR/search@niro.local"
 for f in shell/search/build/*.js; do install -D -m 644 "$f" "$EXT/$(basename "$f")"; done
+for f in shell/shared/*.js; do install -D -m 644 "$f" "$EXT/shared/$(basename "$f")"; done
 install -D -m 644 shell/search/metadata.json "$EXT/metadata.json"
 install -D -m 644 shell/search/stylesheet.css "$EXT/stylesheet.css"
 
@@ -37,6 +38,8 @@ for pair in blur:blur corners:corners emoji:emoji tile:tile; do
   src="${pair%%:*}"; EXT="$EXTDIR/${pair##*:}@niro.local"; mkdir -p "$EXT"
   cp -r "shell/$src"/. "$EXT"/; rm -f "$EXT"/schemas/gschemas.compiled; glib-compile-schemas "$EXT/schemas"
 done
+# Tile imports the workspace cores from ./shared next to its extension.js
+for f in windowGroups snapshot monitorManager; do install -D -m 644 "shell/shared/$f.js" "$EXTDIR/tile@niro.local/shared/$f.js"; done
 EXT="$EXTDIR/emulator@niro.local"
 install -D -m 644 shell/emulator/build/extension.js "$EXT/extension.js"
 install -D -m 644 shell/emulator/metadata.json "$EXT/metadata.json"
@@ -60,12 +63,14 @@ install -D -m 644 README.md "$P/usr/share/doc/niro-control/README.md"
 
 # --- The control panel, the shared schema, the defaults
 for f in control/build/*.js; do install -D -m 644 "$f" "$P/usr/share/niro-control/$(basename "$f")"; done
+for f in control/build/shared/*.js; do install -D -m 644 "$f" "$P/usr/share/niro-control/shared/$(basename "$f")"; done
 for f in control/build/tile/*.js; do install -D -m 644 "$f" "$P/usr/share/niro-control/tile/$(basename "$f")"; done
 echo "$VER" | install -D -m 644 /dev/stdin "$P/usr/share/niro-control/VERSION"
 for f in control/profiles/*.json; do install -D -m 644 "$f" "$P/usr/share/niro-control/profiles/$(basename "$f")"; done
 install -D -m 644 control/gtk3-probe.js "$P/usr/share/niro-control/gtk3-probe.js"
 install -D -m 755 control/niro-control "$P/usr/bin/niro-control"
 install -D -m 755 control/niro-tile "$P/usr/bin/niro-tile"
+install -D -m 755 control/niro-plugin "$P/usr/bin/niro-plugin"
 install -D -m 755 control/niro-snip "$P/usr/bin/niro-snip"
 install -D -m 644 control/org.niro.Snip.desktop "$P/usr/share/applications/org.niro.Snip.desktop"
 install -D -m 644 control/org.niro.Control.desktop "$P/usr/share/applications/org.niro.Control.desktop"

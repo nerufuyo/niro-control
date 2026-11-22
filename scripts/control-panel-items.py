@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds the control panel's catalog from the schemas: docs/control-panel-items.{md,csv} and control/src/catalog.ts.
 
-Every setting the panel shows is one item here (201 in all). The schemas are the source of truth for keys, types, ranges and
+Every setting the panel shows is one item here (243 in all). The schemas are the source of truth for keys, types, ranges and
 defaults; this script adds what a person sees (title, help, group), the control to use, and a few UI-only hints
 (advanced, managed by Look, depends on). Run it again after a schema changes (`make catalog`)."""
 import csv, json, re, xml.etree.ElementTree as ET
@@ -47,6 +47,9 @@ MANAGED = {('island', 'glass-tint'): 'niro.opacity', ('dock', 'dock-opacity'): '
 # (the strength is applied to the blur whether or not blur is on).
 UNIVERSAL = {'app-rules', 'legacy-global-fade', 'shell-surfaces', 'universal-enabled', 'preset', 'sidebar-opacity', 'content-opacity', 'elevated-opacity', 'color-scheme', 'performance-mode', 'affect-shell', 'affect-gtk', 'affect-thirdparty', 'safe-mode'}
 DEPENDS = {
+    'niro.adaptive-live': ('niro.adaptive-suggestions', 'on', None),
+    'niro.smart-clipboard-minutes': ('niro.smart-clipboard', 'on', None), 'niro.notification-hub-apply': ('niro.notification-hub', 'on', None),
+    'niro.privacy-history': ('niro.privacy-dashboard', 'on', None),
     'island.hover-delay': ('island.open-on', 'eq', 'hover'), 'island.auto-hide-delay': ('island.auto-hide', 'ne', 'off'),
     'island.event-alert-minutes': ('island.event-alerts', 'on', None),
     'island.call-preview': ('island.call-activity', 'on', None),
@@ -83,7 +86,7 @@ def island_group(k):
     if re.match(r'usage-', k): return 'AI Usage'
     if re.match(r'agent-alerts', k): return 'AI Agents'
     if re.match(r'(alert-|system-alerts|event-|world-clocks|privacy-|call-|gnome-banners|replace-osd|fullscreen-alerts|fullscreen-reveal|chimes)', k): return 'Alerts'
-    if re.match(r'(island-|open-|notch-|hover-|auto-hide|top-bar|hide-top-bar|compact|glass|clock-)', k): return 'Appearance and Behavior'
+    if re.match(r'(island-|motion-|open-|notch-|hover-|auto-hide|top-bar|hide-top-bar|compact|glass|clock-)', k): return 'Appearance and Behavior'
     if re.match(r'(lyrics|track-peek)', k): return 'Music'
     if k.startswith('clipboard'): return 'Clipboard'
     if k.startswith('focus-'): return 'Focus'
@@ -136,6 +139,8 @@ def build(source, menu, name, group, k):
         s, op, v = DEPENDS[it['id']]; it['depends'] = dict(id=s, op=op, **({'value': v} if v else {}), **({'unverified': True} if it['id'] in UNVERIFIED else {}))
     return it
 
+SYSTEM_EXPERIENCE = ('smart-clipboard', 'smart-clipboard-minutes', 'notification-hub', 'notification-hub-apply', 'perf-recording', 'privacy-dashboard',
+                     'privacy-history', 'audio-router', 'universal-hud', 'shelf-collections', 'widgets-in-search', 'flow-events')
 items = []
 # Look (and the search shortcut, which has its own menu)
 for name, k in schema_keys('niro').items():
@@ -146,8 +151,10 @@ for name, k in schema_keys('niro').items():
     if name.startswith('snip-'):
         items.append(build('niro', 'Search', name, 'Screenshots', k)); continue
     if name.startswith(('theme-', 'dnd-')): grp = 'Schedule'
-    if name in ('tools-above-apps', 'world-clock-cities', 'search-language', 'weather-days', 'kill-protected'):
+    if name in ('adaptive-suggestions', 'adaptive-live', 'permissions-enforced', 'tools-above-apps', 'world-clock-cities', 'search-language', 'weather-days', 'kill-protected'):
         items.append(build('niro', 'Search', name, 'Search Behaviour', k)); continue
+    if name in SYSTEM_EXPERIENCE:
+        items.append(build('niro', 'Search', name, 'System Experience', k)); continue
     if name == 'switcher-shortcut':
         items.append(build('niro', 'Search', name, 'Window Switcher', k)); continue
     if name == 'ha-url':
@@ -267,7 +274,7 @@ items += [
 ids = [i['id'] for i in items]
 assert len(ids) == len(set(ids)), 'duplicate ids'
 from collections import Counter; print(dict(Counter(i['menu'] for i in items)), dict(Counter((i['menu'],i['group']) for i in items if i['menu']=='Dock')))
-assert len(items) == 224, f'expected 224 items, got {len(items)}'
+assert len(items) == 243, f'expected 243 items, got {len(items)}'
 for i in items:
     assert '&' not in re.sub(r'&\s', '', i['title'] + i['help']) or '&apos;' not in i['title'], i
 

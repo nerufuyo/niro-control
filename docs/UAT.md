@@ -69,5 +69,67 @@ Run in a normal GNOME Wayland session after logging in with the current package 
 | 63 | Dock tuning | Niro Control → Dock: set "Files listed in a stack" to 5 and "Download still going after" to 300; open Downloads | Five files; the bar stays up for a partial file changed within five minutes |
 | 64 | Kill protection and snip history size | Add `firefox` to "Processes kill never offers"; Search: `kill firefox`. Set "Snips kept" to 5 with history on | No Firefox row; only the newest five snips stay |
 | 65 | More recurring reminders | Add `standup /weekdays` and `rent /monthly` | After a Friday's, the next one comes on Monday; the monthly one on the same day next month |
+| 66 | Adaptive profile suggestion | Niro Control → Search → Search Behaviour: switch on the profile suggestion; open a code editor, press Super+Space | The first row reads "Switch to Deep Work?" with the reason; Enter applies it; opening Search again within 30 minutes does not repeat it |
 
 Nothing in this list has been run by the author yet; the report says so.
+
+## vNext Desktop UAT — Fedora 45, GNOME Shell 51.1, Wayland (real session, 2026-11-22)
+
+Run by Claude Code on the owner's live session after a re-login, driving the shell over D-Bus. Only `search@niro.local` and `tile@niro.local` were the vNext build (user copies in `~/.local/share/gnome-shell/extensions`, rollback: `~/niro-vnext-rollback.sh`); the other Niro extensions and `/usr/bin/island-daemon` stayed at 1.5.9. Nothing here was seen on screen by a person: panel pages and visual output are **Not Executed**.
+
+| # | Check | Result | Evidence |
+|---|---|---|---|
+| V1 | vNext extension loaded in the real shell | PASS | `GetExtensionInfo` path = `~/.local/share/...`, state 1 (enabled), no error; `ListActions` = 76 actions |
+| V2 | Search actions with no switch needed | PASS | `text.transform` upper → `HELLO WORLD`; `url.clean` dropped `utm_source`; `perf.report` returned live CPU/memory; `adaptive.history` → "No suggestions yet" |
+| V3 | Opt-in features refuse while off | PASS | `privacy.status`, `notifications.summary`, `audio.devices`, `collection.list` all `unavailable` naming the switch to turn on |
+| V4 | Extension conflict check | PASS | "10 of 15 extensions enabled … No known conflicts". `tiling-assistant@ubuntu.com` is listed in `enabled-extensions` but is not installed on this machine, so there is nothing to conflict with |
+| V5 | Session snapshot: take, list, plan, delete | PASS | 2 windows (Orca, Chrome) recorded; restore plan reported both as no-op; deleted; list empty |
+| V6 | Window group: create, list, delete | PASS | Created and removed `uat-group` |
+| V7 | Window Rules engine on real windows | PASS (narrow) | Float rules for the two open apps with Tile on: both windows `tiled:false`, geometry unchanged; Tile switched off and all settings restored to their previous values |
+| V8 | Flow CLI against the real, running Search | PASS (read-only) | `--flow actions` listed the live registry; isolated config dir, `~/.config/niro` untouched |
+| V9 | `gnome-shell` stayed up through all of the above | PASS | PID 721822 unchanged |
+| V10 | Flow run through the daemon on the real session | PASS | After installing the local vNext rpm (unsigned, `rpm -Uvh --replacepkgs --nosignature`) and restarting `island-daemon` with `systemctl --user`: `RunNow` refused while Flow was off; after `SetGlobalEnabled true` a saved `clipboard.copy` workflow ran, history `status:ok`, the real clipboard held the text, the live Search audit shows `caller:"island-daemon"` with the text hidden (`(hidden, 20 chars)`); a `system.restart` workflow was refused at Save. Workflow deleted, Flow switched off, history empty, clipboard cleared afterwards |
+| V11 | Tile layout/tiling, workspace/monitor rule actions, hotplug | Not Executed | Tiling was not switched on for real windows (it would have moved them); no second monitor |
+| V12 | Control Panel pages (Flow, Appearance Studio, grouped sidebar) | Not Executed | Needs a person to look at them; the packaged panel on this machine is 1.5.9 |
+| V13 | Notification, audio, mic/camera, HUD behaviour with their switches on | Not Executed | Switches left off; no hardware exercised |
+
+Install note (2026-11-22): the vNext rpm (`niro-control-1.5.9-939`) was installed with sudo over the same-version 1.5.9 package; it is unsigned (this machine cannot sign), so `--nosignature` was needed. The previous 1.5.9 rpm file in `out/` was overwritten by the rebuild (same name), so a rollback means rebuilding it from commit `27cd0d1`. The session was re-logged-in by the owner before the install, so the running shell still has the earlier vNext user copies (now removed) loaded; the fix wave (flow-events emitter, Tile `profile`/`opacity`, planner phrases, Look contrast, Notifications page) is **Not Executed** on the live desktop until the next login.
+
+### Fix-wave UAT (2026-11-22, after the owner's second re-login; system rpm `niro-control-1.5.9-939` loaded)
+
+| # | Check | Result | Evidence |
+|---|---|---|---|
+| W1 | Installed build loaded from the system path | PASS | `search@niro.local` and `tile@niro.local` from `/usr/share/gnome-shell/extensions`, state enabled, no error, 76 actions, `island-daemon` active |
+| W2 | `flow-events` on: launching an app fires a workflow | PASS | Workflow with trigger `app_launched` (`org.gnome.Calculator`) ran when Calculator was started: history `status:ok`, event id `launched-org.gnome.Calculator.desktop-…`, the real clipboard held the workflow's text |
+| W3 | `flow-events` off: nothing fires | PASS | Same workflow, setting off, Calculator started again: no new run (1 run in history), clipboard unchanged |
+| W4 | Cleanup | PASS | Workflow deleted, Flow off, `flow-events` false, history cleared; the two test entries removed from the clipboard history |
+| W5 | Tile `profile` condition, `opacity` action, workspace/monitor events, planner phrases, Look contrast, Notifications page | Not Executed live | Covered only in nested-shell tests (`tileWorkspace` 50 checks, e2e-flow event checks); not exercised on this desktop |
+| W6 | Backup & Restore, Motion preset, Theme derivation, Widgets in Search | Not Executed | Built after the installed rpm; need a rebuilt package and another login |
+
+Incident: while looking for the Clipboard1 methods, an `introspect` call printed the whole clipboard-history `Items` property into the session output, which included secret-looking entries of the owner. They were not copied or used; only the two UAT entries were removed. Consequence for the owner: rotate anything in that history that is a real password, and consider clearing the history (`Clipboard1.Clear`) and switching on `NIRO_CLIPBOARD_SKIP_SECRETS`.
+
+### Package with the Core-Only wave installed (2026-11-22)
+Rebuilt (`npm run build`, `packaging/build-rpm.sh`) and installed with `rpm -Uvh --replacepkgs --nosignature`; `island-daemon` restarted with `systemctl --user`; `gnome-shell` untouched (still the previous login's process, so the shell-side parts of this wave are **not loaded yet**).
+
+| # | Check | Result | Evidence |
+|---|---|---|---|
+| X1 | `niro-plugin check` from the installed package | PASS | A bad manifest printed `INVALID` with 4 specific problems |
+| X2 | `niro-control --backup-export` on the real settings | PASS | 283 settings from 7 schema groups, file mode 0600, 0 secret-shaped values, 0 secret-named keys; temp file deleted |
+| X3 | `niro-control --backup-preview` of that export | PASS | "0 to change, 283 already the same"; import was not run |
+| X4 | Backup page, motion preset, theme derivation, Widgets in Search, Notifications page on screen | Not Executed | Need another login and a person looking at the panel |
+
+### Clipboard secret filter (2026-11-22, live, switch `~/.config/niro/clipboard.skip-secrets` = true)
+- A fake AWS-style example key copied with `wl-copy`: `SecretsSkipped` 0 → 1, history stayed empty. PASS.
+- Open question: ordinary text copied with `wl-copy` (two tries) did not appear in the history either (`Items` stayed 0). It is not known whether `wl-copy` copies from a CLI are simply not picked up by the history on this desktop or whether the filter blocks too much; check by copying text in a normal application after the next login. Not resolved.
+
+### Live session, new package loaded (2026-11-22, after the third login; Search shows 78 actions)
+
+| # | Check | Result | Evidence |
+|---|---|---|---|
+| Y1 | Planner phrase | PASS | `plan.preview "copy hello to clipboard"` → "1. Copy text … Nothing was run." |
+| Y2 | Widgets in Search, opt-in | PASS | Off: refused naming the switch; on: `widgets.list` answered and `widgets.show` returned processor/memory/load/battery; switched off again and refused again |
+| Y3 | Island `motion-preset` setting present | PASS (setting only) | Default `default`; the visible effect on the island was not looked at |
+| Y4 | Tile Advanced Rules on windows that are already open | FAIL (known limitation) | Rules `monitor:0` for Orca with Tile switched on: nothing moved, because rules run only when a window is first seen (`shell/tile/extension.js` first-seen block). Settings restored afterwards |
+| Y5 | Window placement via Session Snapshot | PASS | Snapshot `orca-vertikal-chrome-horizontal` (the snapshot file was edited to put Orca on the portrait monitor 0, 1080×1920) → `plan` showed Orca "place", Chrome no-op → `restore` → read-back: Orca on monitor 0 maximized 1080×1920, Chrome on monitor 1 maximized 2560×1080 |
+| Y6 | Play the open Chrome video | Not Done | Chrome exposes no MPRIS player and the browser extension cannot see the owner's tabs; no key injection tool on this machine |
+| Y7 | Fullscreen as a rule action | Not Implemented | Being added in the next change together with an "apply rules to open windows" action |

@@ -14,6 +14,7 @@ import {habitLog, habitQuery, habitStats, markDone, noteLine, noteText, openTodo
 import {describe as weatherLines, forecastUrl, geocodeUrl, parseCities, parsePlace, weatherQuery, worldQuery} from '../../shell/search/build/weather.js';
 import {entities, haQuery, serviceFor, validBase, validEntity} from '../../shell/search/build/homeAssistant.js';
 import {columnsFor, move} from '../../shell/search/build/switcherRules.js';
+import {BUILT_IN_RULES, matches, QUIET_MS, suggest} from '../../shell/search/build/adaptive.js';
 import {agendaQuery, parseEvents, upcoming} from '../../shell/search/build/agenda.js';
 import {layoutQuery, planMoves} from '../../shell/search/build/layouts.js';
 import {autostartOverride, batteryReport, formatRate, netTotals, parseDesktop, parseNeighbours, parseVpns} from '../../shell/search/build/sysinfo.js';
@@ -391,4 +392,28 @@ test('adjustments: cities, language, forecast days, protected processes', () => 
     const ps = ' 100 firefox\n 200 my-helper\n 300 Zoom';
     assert.deepEqual(matchProcesses(ps, 'o', 999, 6, ['zoom']).map(p => p.pid), [100]);       // an extra protected name, whatever its case
     assert.deepEqual(matchProcesses(ps, 'o', 999, 6, ['', ' firefox ']).map(p => p.pid), [300]);
+});
+
+test('adaptive suggestions: suggestion-first, by the application in front', () => {
+    const at = (app, minute = 600) => ({app, minute, monitors: 1});
+    const none = new Map();
+    assert.equal(suggest(BUILT_IN_RULES, at('code.desktop code'), null, none, 1000).profile, 'deep-work');
+    assert.equal(suggest(BUILT_IN_RULES, at('steam.desktop steam'), null, none, 1000).profile, 'gaming');
+    assert.equal(suggest(BUILT_IN_RULES, at('org.gimp.gimp.desktop'), null, none, 1000).profile, 'creative');
+    assert.match(suggest(BUILT_IN_RULES, at('org.gimp.gimp.desktop'), null, none, 1000).reason, /gimp is in front/);
+    assert.equal(suggest(BUILT_IN_RULES, at('org.gnome.nautilus.desktop'), null, none, 1000), null);      // nothing fits: nothing is said
+    assert.equal(suggest(BUILT_IN_RULES, at(null), null, none, 1000), null);
+    assert.equal(suggest(BUILT_IN_RULES, at('code.desktop'), 'deep-work', none, 1000), null);              // already the active profile
+    const quiet = new Map([['code', 1000 + QUIET_MS]]);
+    assert.equal(suggest(BUILT_IN_RULES, at('code.desktop'), null, quiet, 1000 + QUIET_MS - 1), null);     // quiet after being suggested
+    assert.equal(suggest(BUILT_IN_RULES, at('code.desktop'), null, quiet, 1000 + QUIET_MS).profile, 'deep-work');
+    // a game launcher beats an editor when both could match (higher priority)
+    const both = [{...BUILT_IN_RULES[1], when: {apps: ['steam']}}, BUILT_IN_RULES[0]];
+    assert.equal(suggest(both, at('steam.desktop'), null, none, 0).profile, 'gaming');
+    // rules with a time window and monitors; a rule with no condition never matches
+    const night = {id: 'n', profile: 'deep-work', priority: 1, when: {between: [22 * 60, 6 * 60]}, reason: () => 'late'};
+    assert.equal(matches(night, at(null, 23 * 60)), true);
+    assert.equal(matches(night, at(null, 12 * 60)), false);
+    assert.equal(matches({...night, when: {monitorsAtLeast: 2}}, at(null)), false);
+    assert.equal(matches({...night, when: {}}, at('code')), false);
 });

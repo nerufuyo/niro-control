@@ -174,6 +174,18 @@ export function homePage(model, ctx, profilesApi, staleParts: string[]) {
         search.connect('clicked', () => ctx.focusSearch());
         r.add_suffix(search);
         cfg.add(r);
+        const studioRow = new Adw.ActionRow({title: 'Appearance Studio', subtitle: 'Try a change to the dock, island, windows or the panel look, then apply it or cancel'});
+        const studioOpen = new Gtk.Button({label: 'Open', valign: Gtk.Align.CENTER, css_classes: ['flat']});
+        studioOpen.connect('clicked', () => ctx.go('studio'));
+        studioRow.add_suffix(studioOpen);
+        cfg.add(studioRow);
+        // Flow is not asked about here: Home reads settings only, and Flow's state is behind the daemon
+        const flowRow = new Adw.ActionRow({title: 'Niro Flow', subtitle: 'Workflows that apply a profile or layout when something happens. Off until you turn it on'});
+        flowRow.set_name('home-flow');
+        const flowOpen = new Gtk.Button({label: 'Open', valign: Gtk.Align.CENTER, css_classes: ['flat']});
+        flowOpen.connect('clicked', () => ctx.go('flow'));
+        flowRow.add_suffix(flowOpen);
+        cfg.add(flowRow);
         body.append(cfg);
 
         // advanced: diagnostics

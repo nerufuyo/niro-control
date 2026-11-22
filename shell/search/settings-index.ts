@@ -193,6 +193,156 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "niro.adaptive-suggestions",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "Suggest a profile from the application in front",
+  "help": "When Search opens, offers one row that switches to a profile that fits the application in front (Gaming for a game launcher, Deep Work for a code…",
+  "key": "adaptive-suggestions",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.adaptive-live",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "Watch for suggestions while you work",
+  "help": "Needs \"Suggest a profile from the application in front\".",
+  "key": "adaptive-live",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.permissions-enforced",
+  "menu": "Search",
+  "group": "Search Behaviour",
+  "title": "Ask before other programs use Search actions",
+  "help": "When on, a program that calls Search's actions over D-Bus (the voice assistant, a script) needs your permission for each kind of thing it does…",
+  "key": "permissions-enforced",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.smart-clipboard",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Keep secrets out of the clipboard history",
+  "help": "When on, Search checks the island's clipboard history about once a minute and removes unpinned text that looks like a password, a key, a token or a…",
+  "key": "smart-clipboard",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.smart-clipboard-minutes",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Forget unpinned clipboard items after",
+  "help": "Needs \"Keep secrets out of the clipboard history\".",
+  "key": "smart-clipboard-minutes",
+  "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "niro.notification-hub",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Apply notification rules",
+  "help": "When on, Search watches notifications as they arrive and keeps which application sent each one and how urgent it was (never the title or the text),…",
+  "key": "notification-hub",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.notification-hub-apply",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Hide or silence notifications by rule",
+  "help": "Needs \"Apply notification rules\".",
+  "key": "notification-hub-apply",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.perf-recording",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Record performance history",
+  "help": "When on, Search takes a reading of processor, memory, swap and load every 30 seconds (every 60 on battery) and keeps the last 360 in memory only.",
+  "key": "perf-recording",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.privacy-dashboard",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Privacy overview in Search",
+  "help": "When on, \"privacy\" in Search says whether the microphone, the camera or the screen is in use now and by which application, as far as GNOME lets Niro…",
+  "key": "privacy-dashboard",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.privacy-history",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Remember privacy events",
+  "help": "Needs \"Privacy overview in Search\".",
+  "key": "privacy-history",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.audio-router",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Audio router actions",
+  "help": "When on, Search can list sound outputs and playing applications (\"audio devices\", \"audio streams\"), set one application's volume and move its sound…",
+  "key": "audio-router",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.universal-hud",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "On-screen display action",
+  "help": "When on, the hud action shows a short message and level (volume, brightness, battery or your own) in GNOME's own on-screen display, so macros and…",
+  "key": "universal-hud",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.shelf-collections",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Shelf collections",
+  "help": "When on, Search can keep named collections of references (file paths, web addresses, short text) in a private file under your Niro Control settings.",
+  "key": "shelf-collections",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.widgets-in-search",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Widgets in Search",
+  "help": "When on, Search can list the built-in widgets (processor, memory, load, battery) and show their current values from one reading shared with the…",
+  "key": "widgets-in-search",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "niro.flow-events",
+  "menu": "Search",
+  "group": "System Experience",
+  "title": "Tell Niro Flow about desktop events",
+  "help": "When on, Search tells the Niro Flow service (in the island daemon) when the workspace changes, a monitor is plugged or unplugged, a profile is…",
+  "key": "flow-events",
+  "kind": "switch",
+  "managed": false
+ },
+ {
   "id": "niro.tools-above-apps",
   "menu": "Search",
   "group": "Search Behaviour",
@@ -1123,6 +1273,16 @@ export const INDEX = [
   "managed": false
  },
  {
+  "id": "island.motion-preset",
+  "menu": "Island",
+  "group": "Appearance and Behavior",
+  "title": "How fast the island's fades and slides run",
+  "help": "\"default\" keeps the island's own timings.",
+  "key": "motion-preset",
+  "kind": "select",
+  "managed": false
+ },
+ {
   "id": "island.bot-glow",
   "menu": "Island",
   "group": "Voice Assistant",
@@ -1960,6 +2120,36 @@ export const INDEX = [
   "help": "The share of the screen one column takes in the Scrolling layout (0.2-1).",
   "key": "column-width",
   "kind": "stepper",
+  "managed": false
+ },
+ {
+  "id": "tile.monitor-recovery",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Move windows back and forth when a monitor leaves and returns",
+  "help": "When a monitor is unplugged its windows go to the primary monitor, and go back to it when it returns.",
+  "key": "monitor-recovery",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "tile.rules-engine",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Use the advanced window rules",
+  "help": "Reads the rules in \"advanced-rules\" (conditions, priority, stop) on top of the simple ones.",
+  "key": "rules-engine",
+  "kind": "switch",
+  "managed": false
+ },
+ {
+  "id": "tile.advanced-rules",
+  "menu": "Windows",
+  "group": "Tiling",
+  "title": "Advanced window rules",
+  "help": "JSON list: {\"id\": \"calc\", \"conditions\": {\"appId\": \"org.gnome.Calculator\"}, \"actions\": {\"tile\": \"float\", \"above\": true}, \"priority\": 1, \"stop\": false}.",
+  "key": "advanced-rules",
+  "kind": "text",
   "managed": false
  },
  {
