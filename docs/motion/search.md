@@ -102,3 +102,43 @@ One screenshot sequence (spring slowed to about 2 s so it can be caught mid-flig
 - Known and unrelated: GJS logs a `Gio.DesktopAppInfo has been moved` deprecation warning once (`Gio.DesktopAppInfo.search`), and mutter logs
   `Overwriting existing binding of keysym 20` on each enable.
 - After the panel closes one highlight spring (target 1, at rest) stays in the map until the next open clears it; harmless.
+
+## Keeping clear of the Niro Island
+
+Problem (measured in `docs/motion/coordination.md`): Search opens at 16% of the monitor height (y=173 at 1080p) and an expanded island ends near y=202-206,
+so the top ~30 px of Search sat under the island's bottom edge. Evidence before: `evidence/coordination/search-over-island.png`; after:
+`evidence/search/collision-after-*.png`.
+
+How it works (no D-Bus, no service, no import of the island's code):
+- `shell/search/placement.ts` (pure, node-tested): `placeSearch({work, panelX, panelWidth, defaultY, fixedHeight, wantedResults, island, gap})` returns
+  `{offset, maxResults, collides}`. Search moves only when its rectangle overlaps the island's on both axes (the island rect is grown by the gap below it, so
+  "closer than 12 px" counts); then its top becomes `max(defaultY, islandBottom + gap)`. `SAFE_GAP = 12` logical px is an exported constant: Search has no
+  GSettings schema of its own (it reads the shared `org.niro.control` one, owned elsewhere), so there is no key. All values are logical px, the unit GNOME's
+  layout uses at any scale, so nothing multiplies by a scale factor.
+- Bottom clamp: the panel's real height is measured (`box`, `scroll` and `list` preferred heights, so expanded results count). If it does not fit between the
+  new top and the bottom of the monitor's work area, the results list's `max-height` shrinks (the entry stays where it is); only if the bare entry does not fit
+  is the panel pushed up (never above the work area). The normal cap (50% of the monitor) is restored when the room returns.
+- Finding the island: `_findIsland()` walks `Main.layoutManager.uiGroup` for the actor named **`islandIsland`** (`shell/island/src/island.ts`), once per open.
+  This relies on that name staying stable. Fallback: no actor with that name, or it is hidden, unmapped, fully transparent, empty, or centred on another
+  monitor than Search => no obstacle, Search keeps its normal anchor. If the island is not there yet, Search waits for `child-added` on the chrome group.
+  The visible bounds are `get_transformed_extents()` (transforms included).
+- Reacting: while Search is open it connects to the island actor's `notify::` for x, y, width, height, visible, mapped, opacity, translation and scale, plus
+  `destroy`. Notifications only queue ONE `BEFORE_REDRAW` later (`_queuePlace`), so a morph that changes four properties a frame costs one evaluation per frame.
+  Everything is disconnected in `_release()` (close, disable, and island destroy); nothing polls.
+- Motion: `SearchMotion.dodge` is a third spring beside `panel` and `reveal`, using `springFor('search')` (critically damped). It is added to the box's
+  `translation_y` (a transform, not layout), so the entry never shifts inside the panel and focus/typing are untouched. Going back up (island collapsing)
+  is the spring, and retargeting keeps its velocity. Going further down follows the island's edge instead of chasing it: the island animates itself, and
+  a spring chasing it lagged and let it paint over the panel on 13 of 71 frames. A notification also does a cheap `_follow()` at once (the island moves in
+  its own frame step, after the `BEFORE_REDRAW` evaluation, which alone left 4 of 75 frames overlapping by up to 7 px); the full evaluation stays one per frame.
+  Reduced motion or animations off jump (`reset`). On open with the island already expanded the offset is applied at once (no slide from the old anchor)
+  unless the panel was still fading out, which then moves smoothly.
+- Because the island's own morph springs slightly past its final size, Search follows that target: it can be about 3 px lower than its final position for a
+  moment. It never travels more than a few px backwards.
+
+Runtime evidence: `tests/shell/search-collision.sh` (`WITH_SEARCH=1` island session, both extensions; `MONITOR=` and `SHOTS=1` optional), 43 checks, all
+passing at 1920x1080 and 1280x600 (a 1280x720 run passed before the last two fixes): expanded island gives Search top = island bottom + 12.00 exactly; compact
+island leaves the anchor (173) untouched; collapse restores it; 0 of 75 painted frames overlap; the panel bottom ends exactly at the work area when the list had to
+shrink (600 px monitor, cap 287 instead of 300); the entry holds key focus and typed letters land while it moves; 20 rapid expand/collapse cycles leave no
+offset behind; animations off jump; disable/enable x5 leaves 0 connections on the island actor and the chrome group; 0 shell log errors.
+Screenshots: `evidence/search/collision-before.png` (the old overlap, same image as coordination), `collision-after-island-expanded.png`, `collision-after-island-compact.png`.
+Node tests: `tests/island/searchPlacement.test.js`. Not verified: scale 2, two monitors (the pure rule is tested), a hover-opened island with a real pointer.

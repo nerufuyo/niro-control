@@ -86,17 +86,21 @@ export type MotionHost = {
 export class SearchMotion {
     panel = new Spring(0, 'standard');
     reveal = new Spring(1, 'standard');
+    /** Extra vertical offset (px) that keeps the panel clear of the island; the entry moves with the panel, never inside it. */
+    dodge = new Spring(0, 'standard');
     highlight = new Map<string, Spring>();
     animator: Animator;
     private closing = false;
 
     constructor(private host: MotionHost = {}) {
-        this.animator = new Animator([this.panel, this.reveal], {
+        this.animator = new Animator(this.springs(), {
             onWake: () => host.onWake?.(),
             onFrame: () => host.onFrame?.(),
             onSettled: () => this.settle(),
         });
     }
+
+    private springs() { return [this.panel, this.reveal, this.dodge, ...this.highlight.values()]; }
 
     private spec() { return springFor('search', {reduced: this.host.reduced?.() ?? false, off: this.host.off?.() ?? false}); }
 
@@ -108,13 +112,13 @@ export class SearchMotion {
 
     private settle() {
         for (const [k, s] of this.highlight) if (s.settled && s.target === 0) this.highlight.delete(k);
-        this.animator.springs = [this.panel, this.reveal, ...this.highlight.values()];
+        this.animator.springs = this.springs();
         if (this.closing && this.panel.settled && this.panel.target === 0) { this.closing = false; this.host.onClosed?.(); }
         else if (!this.closing && this.panel.settled && this.panel.target === 1) this.host.onOpened?.();
     }
 
     private go() {
-        this.animator.springs = [this.panel, this.reveal, ...this.highlight.values()];
+        this.animator.springs = this.springs();
         if (this.animator.springs.every(s => s.settled)) this.settle();        // everything jumped: finish now, no frames
         else this.animator.wake();
     }
@@ -129,6 +133,21 @@ export class SearchMotion {
     close() {
         this.closing = true;
         this.aim(this.panel, 0);
+        this.go();
+    }
+
+    /**
+     * Moves the panel to `offset` px below its anchor (island in the way) or back to 0.
+     * Going back (offset smaller than now) is the search spring: no overshoot, velocity kept when retargeted mid-flight.
+     * Going down further follows the island: it is the island that is animating (its own spring), and a spring chasing it would lag
+     * behind and let it paint over the panel for a few frames, so the offset takes the island's edge as it moves (the panel never overlaps it).
+     * `instant`, reduced motion and disabled animations jump either way.
+     */
+    place(offset: number, instant = false) {
+        const spec = this.spec();
+        if (instant || this.host.reduced?.() || !spec) this.dodge.reset(offset);
+        else if (offset > this.dodge.value) this.dodge.reset(offset);
+        else this.dodge.setTarget(offset, spec);
         this.go();
     }
 
