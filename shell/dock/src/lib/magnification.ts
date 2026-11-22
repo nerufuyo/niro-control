@@ -1,11 +1,13 @@
 import Clutter from "gi://Clutter";
 import type St from "gi://St";
+import { riseAbove } from "./dockLogic.js";
+import { animationsEnabled, gaussianScale, Spring } from "./motion.js";
 import { SignalManager } from "./signalManager.js";
 
 const MIN_SCALE = 1.0;
 type Profile = { x: number; w: number; h: number };
-const SPRING_K = 170; // stiffness: higher = snappier
-const SPRING_C = 17; // damping: below 2*sqrt(K) ~ 26 leaves a small, natural overshoot
+// Per-icon scale spring: damping below 2*sqrt(K) ~ 26 leaves a small, natural overshoot (the playful part of the dock).
+const ICON_SPRING = { stiffness: 170, damping: 17, mass: 1 };
 const HUMP_SHARE = 2 / 3;
 const POINTER_RATE = 22; // 1/s: how fast the magnified bump follows the pointer
 export class Magnification {
@@ -16,7 +18,10 @@ export class Magnification {
   _falloffDistance: number;
   _timeline: Clutter.Timeline | null = null;
   _lastMs = 0;
-  _velocity: number[] = [];
+  _pivotsNow: number[] = [];
+  _springs: InstanceType<typeof Spring>[] = [];
+  _active = false;
+  _onActivity: ((active: boolean) => void) | null = null;
   _smoothX: number | null = null;
   _currentScales: number[] = [];
   _pivotX = 0.5;
@@ -49,6 +54,15 @@ export class Magnification {
   setOnExtent(cb: (width: number, height: number, profile: Profile[]) => void) {
     this._onExtent = cb;
   }
+  /** Told when the pointer starts or stops being over the icons (the dock's Magnifying state). */
+  setOnActivity(cb: (active: boolean) => void) {
+    this._onActivity = cb;
+  }
+  _setActive(active: boolean) {
+    if (active === this._active) return;
+    this._active = active;
+    this._onActivity?.(active);
+  }
   setFramerate(_fps: number) {
     /* animation now follows the compositor's frame clock */
   }
@@ -65,8 +79,7 @@ export class Magnification {
   resume() {
     if (!this._paused) return;
     this._paused = false;
-    this._currentScales = [];
-    this._velocity = [];
+    this._springs = [];
     this._smoothX = null;
   }
   start() {
@@ -127,6 +140,7 @@ export class Magnification {
     let pointerNear = localY >= -40 && localY <= dh + 20;
     const widths: number[] = [];
     const centers: number[] = [];
+    const pivots: number[] = [];
     let nearest = Infinity;
     for (const child of children) {
       // Pivot on the icon's own bottom edge so every baseline stays level.
@@ -139,6 +153,7 @@ export class Magnification {
       const pp = child.get_pivot_point();
       if (pp[0] !== this._pivotX || Math.abs(pp[1] - pivotY) > 0.001)
         child.set_pivot_point(this._pivotX, pivotY);
+      pivots.push(pivotY);
       const [cx] = child.get_position();
       const [cw] = child.get_size();
       widths.push(cw);
@@ -146,30 +161,26 @@ export class Magnification {
       nearest = Math.min(nearest, Math.abs(localX - (cx + cw / 2)));
     }
     if (nearest > this._falloffDistance * 1.5) pointerNear = false;
-    while (this._currentScales.length < children.length) this._currentScales.push(MIN_SCALE);
-    // Each icon's scale is a damped spring toward its target (frame-rate independent sub-steps).
-    while (this._velocity.length < children.length) this._velocity.push(0);
+    this._pivotsNow = pivots;
+    this._setActive(pointerNear);
+    // Each icon's scale is a damped spring toward its Gaussian target. With animations off the scale jumps; with
+    // the desktop's reduce-animation switch the scales follow the pointer without a spring.
+    const animate = animationsEnabled();
+    const spec = ICON_SPRING;
+    while (this._springs.length < children.length) this._springs.push(new Spring(MIN_SCALE, spec));
+    this._springs.length = children.length;
     const sigma = this._falloffDistance * 0.62;
     let settled = true;
-    const steps = Math.max(1, Math.ceil(dt / 0.008));
-    const h = dt / steps;
     for (let i = 0; i < children.length; i++) {
-      let target = MIN_SCALE;
-      if (pointerNear) {
-        const d = Math.abs(centers[i] - localX);
-        target =
-          MIN_SCALE + (this._maxScale - MIN_SCALE) * Math.exp(-(d * d) / (2 * sigma * sigma));
-      }
-      let x = this._currentScales[i];
-      let v = this._velocity[i];
-      for (let k = 0; k < steps; k++) {
-        v += (SPRING_K * (target - x) - SPRING_C * v) * h;
-        x += v * h;
-      }
-      this._currentScales[i] = x;
-      this._velocity[i] = v;
-      if (Math.abs(x - MIN_SCALE) > 0.002 || Math.abs(v) > 0.01 || Math.abs(x - target) > 0.002)
-        settled = false;
+      const spring = this._springs[i];
+      const target = pointerNear
+        ? gaussianScale(Math.abs(centers[i] - localX), this._maxScale - MIN_SCALE, sigma)
+        : MIN_SCALE;
+      spring.setTarget(target, spec);
+      if (animate) spring.step(dt);
+      else spring.reset(target);
+      this._currentScales[i] = spring.value;
+      if (!spring.settled || Math.abs(spring.value - MIN_SCALE) > 0.002) settled = false;
     }
     if (!pointerNear && settled) {
       this._snapAllToMin();
@@ -212,13 +223,21 @@ export class Magnification {
     // Tell the dock how much its background must grow (width: total extra, height: tallest icon's growth).
     // Measure the real rendered top of every icon (scale, pivot and translation included),
     // so the hump always sits just above the enlarged icons whatever their padding is.
-    const [, barTop] = this._container.get_transformed_position();
+    // Plain geometry (each icon's position, height, pivot and scale) rather than get_transformed_position, which
+    // walks the whole actor tree for every icon on every frame.
     let peak = 0;
     const profile: Profile[] = [];
     for (let i = 0; i < children.length; i++) {
-      const [, top] = children[i].get_transformed_position();
+      const child = children[i];
+      const rise = riseAbove(
+        child.get_position()[1],
+        child.translation_y,
+        child.get_height(),
+        this._pivotsNow[i] ?? this._pivotY,
+        this._currentScales[i],
+      );
       // The hump reaches 2/3 of the way up what pokes out above the bar: the icon's top third stands free.
-      const h = HUMP_SHARE * Math.max(0, barTop - top);
+      const h = HUMP_SHARE * Math.max(0, rise);
       peak = Math.max(peak, h);
       profile.push({
         x: children[i].get_position()[0] + widths[i] / 2 + children[i].translation_x,
@@ -235,8 +254,9 @@ export class Magnification {
       child.translation_x = 0;
     }
     this._currentScales = [];
-    this._velocity = [];
+    this._springs = [];
     this._smoothX = null;
+    this._setActive(false);
     this._onExtent?.(0, 0, []);
   }
 }
