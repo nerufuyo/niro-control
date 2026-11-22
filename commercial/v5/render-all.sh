@@ -1,8 +1,9 @@
 #!/bin/bash
-# Renders the 60 s film at 1920x1080, 30 fps: chunks of 300 frames in parallel (frames are independent, nothing is stored but the segments),
-# joined, then muxed with audio/master.wav. usage: P=4 ./render-all.sh      -> out/niro-control-60s.mp4
+# Renders the 60 s film at 1920x1080, 30 fps from the real captures in shots/ (chunks of 300 frames in parallel), joins them and muxes the
+# soundtrack (audio/master.wav; build it with `node audio/synth.mjs`). usage: P=6 ./render-all.sh  -> out/niro-control-60s.mp4
 set -euo pipefail
 cd "$(dirname "$0")"
+[ -f audio/master.wav ] || { echo "build the soundtrack first: node audio/synth.mjs"; exit 1; }
 mkdir -p out/seg; rm -f out/seg/*
 P=${P:-4}
 seq 0 300 1799 | xargs -P "$P" -I{} bash -c 'node render.mjs {} $(({}+300)) out/seg/$(printf %04d {}).mp4 30 2>&1 | tail -1'
