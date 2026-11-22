@@ -35,6 +35,7 @@ import {entities, haQuery, validBase} from './homeAssistant.js';
 import {layoutQuery} from './layouts.js';
 import {agendaQuery, parseEvents, upcoming} from './agenda.js';
 import {Switcher} from './switcher.js';
+import {createSearchMachine, isLive, keepScrollValue, planUpdate, resultKey, rowReveal, SearchMotion} from './searchMotion.js';
 import {buildEngine, evaluateNow, QUIET_MS} from './adaptive.js';
 import {connectFlowSources, createFlowEmitter} from './flowEvents.js';
 import {savedLayouts} from './actions.js';
@@ -75,6 +76,19 @@ export default class NiroSearch extends Extension {
         this._rows = [];
         this._selected = 0;
         this._once = new Once();
+        this._sm = createSearchMachine();
+        this._keys = [];                   // identity of each result row, so a late update keeps the selection on the same result
+        this._rowByKey = new Map();
+        this._animRow = [];
+        this._lastQuery = null;
+        this._tick = 0;
+        this._motion = new SearchMotion({
+            onWake: () => this._wakeFrames(),
+            onFrame: () => this._drawMotion(),
+            onOpened: () => this._sm?.send('settled', {count: this._results.length}),
+            onClosed: () => { this._sm?.send('settled'); this._box?.hide(); },
+            off: () => !St.Settings.get().enable_animations,
+        });
         this._rates = new Map();
         this._files = new Map();
         this._vars = {};
@@ -122,6 +136,7 @@ export default class NiroSearch extends Extension {
         this._box.add_child(this._entry); this._box.add_child(this._status); this._box.add_child(this._scroll); this._box.add_child(this._hint);
         Main.layoutManager.uiGroup.add_child(this._box);
 
+        this._box.set_pivot_point(0.5, 0);
         const text = this._entry.clutter_text;
         text.connect('text-changed', () => this._refresh());
         text.connect('key-press-event', (_a, event) => this._onKey(event));
@@ -161,7 +176,11 @@ export default class NiroSearch extends Extension {
         endSpotlight();
         this._soup?.abort();
         this._soup = null;
-        this._close();
+        this._release();
+        this._motion?.cancel();
+        if (this._tick) { GLib.source_remove(this._tick); this._tick = 0; }
+        if (this._restore) { GLib.source_remove(this._restore); this._restore = 0; }
+        this._motion = this._sm = null;
         this._box?.destroy();
         this._box = this._entry = this._list = this._scroll = this._status = this._hint = null;
         this._registry = this._look = this._gate = this._ad = null;
@@ -332,6 +351,7 @@ export default class NiroSearch extends Extension {
 
     async _activate(result) {
         if (!result || !this._once.begin()) return;
+        this._sm.send('execute');          // the selected row stays lit while the panel fades; the action starts now, never after the fade
         this._close();
         let outcome;
         this._viaAdaptive = Boolean(result.adaptiveRule);
@@ -366,14 +386,18 @@ export default class NiroSearch extends Extension {
 
     /** Niro Snip: the desktop's own picker, then an editor for the shot. */
     _snip() {
-        if (this._box.visible) this._close();
+        if (this._live()) this._close();
         this._run('system.snip', {}, 'ui');
     }
 
     // ---- Showing
-    _toggle() { this._box.visible ? this._close() : this._open(); }
+    /** True from the first frame of opening until the user dismisses it; not while the panel is only fading out. */
+    _live() { return Boolean(this._sm) && (isLive(this._sm.state) || this._sm.state === 'Executing'); }
+
+    _toggle() { this._live() ? this._close() : this._open(); }
 
     _open() {
+        if (this._live()) return;
         this._adaptive = this._adaptiveSuggestion();       // before the palette takes the focus: it is about the window that had it
         this._grab = Main.pushModal(this._box, {actionMode: Shell.ActionMode.POPUP});
         if (!this._grab) return;
@@ -382,10 +406,15 @@ export default class NiroSearch extends Extension {
         this._box.set_position(Math.round(monitor.x + (monitor.width - WIDTH) / 2), Math.round(monitor.y + monitor.height * 0.16));
         this._scroll.style = `max-height: ${Math.round(monitor.height * 0.5)}px;`;
         this._windows = windows();
+        this._sm.send('open');
         this._entry.set_text('');
+        this._lastQuery = null;
+        this._motion.dropHighlights();
         this._box.show();
         this._refresh();
-        this._entry.grab_key_focus();
+        this._entry.grab_key_focus();                      // keys work from the first frame: the animation never gates typing
+        this._motion.open();
+        this._drawMotion();
         this._outside = global.stage.connect('button-press-event', (_s, event) => {
             const [x, y] = event.get_coords();
             const [bx, by] = this._box.get_transformed_position();
@@ -395,13 +424,50 @@ export default class NiroSearch extends Extension {
         });
     }
 
-    _close() {
+    /** Hands the keyboard back and forgets the moment's data at once; what is left of the panel is only a fade. */
+    _release() {
         if (this._outside) { global.stage.disconnect(this._outside); this._outside = 0; }
         if (this._grab) { Main.popModal(this._grab); this._grab = null; }
-        this._box?.hide();
         this._files?.clear();
         this._net?.clear(); this._procs?.clear(); this._contents?.clear();
         this._adaptive = null;                                   // file names are not kept once the palette is closed
+    }
+
+    _close() {
+        this._release();
+        if (!this._sm || this._sm.state === 'Closed') return;
+        this._sm.send('close');
+        this._motion.close();                                    // fades out; onClosed hides the actor
+    }
+
+    // ---- Motion: the frame loop exists only while a spring is moving
+    _wakeFrames() {
+        if (this._tick) return;
+        this._tick = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 16, () => {
+            if (this._motion?.tick(GLib.get_monotonic_time() / 1000)) return GLib.SOURCE_CONTINUE;
+            this._tick = 0;
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _drawMotion() {
+        if (!this._box || !this._motion) return;
+        const pose = this._motion.pose();
+        this._box.opacity = pose.opacity;
+        this._box.set_scale(pose.scale, pose.scale);
+        this._box.translation_y = pose.dy;
+        const reveal = this._motion.reveal.value;
+        this._rows.forEach((row, i) => {
+            const r = this._animRow[i] ? rowReveal(reveal, i) : {opacity: 255, dy: 0};
+            row.opacity = r.opacity; row.translation_y = r.dy;
+        });
+        for (const [key, spring] of this._motion.highlight) this._paintRow(this._rowByKey.get(key), spring.value);
+    }
+
+    _paintRow(row, alpha: number) {
+        if (!row) return;
+        const [r, g, b] = this._accent ?? [232, 71, 43];
+        row.set_style(alpha > 0.01 ? `background-color: rgba(${r}, ${g}, ${b}, ${(0.28 * alpha).toFixed(3)});` : '');
     }
 
     _applyLook() {
@@ -571,9 +637,9 @@ export default class NiroSearch extends Extension {
                 if (msg.get_status() !== Soup.Status.OK) throw new Error(`HTTP ${msg.get_status()}`);
                 entry.value = parse(JSON.parse(new TextDecoder().decode(bytes.get_data())));
                 if (!entry.value) throw new Error('nothing found');
-                if (this._box?.visible && this._entry.get_text() === query) this._refresh();
+                if (this._live() && this._entry.get_text() === query) this._refresh();
             } catch (e) {
-                if (this._box?.visible && this._entry.get_text() === query) this._say(`Lookup failed: ${e.message}`);
+                if (this._live() && this._entry.get_text() === query) this._say(`Lookup failed: ${e.message}`);
             }
         });
         return entry;
@@ -589,7 +655,7 @@ export default class NiroSearch extends Extension {
                 try {
                     const [, out] = p.communicate_utf8_finish(res);
                     this._procs?.set(needle, matchProcesses(out ?? '', needle, Number(new TextDecoder().decode(GLib.file_get_contents('/proc/self/stat')[1]).split(' ')[0]), 6, String(this._pref('kill-protected', '')).split(',')));
-                    if (this._box?.visible) this._refresh();
+                    if (this._live()) this._refresh();
                 } catch (_e) { /* no list */ }
             });
         } catch (_e) { /* no ps */ }
@@ -678,7 +744,7 @@ export default class NiroSearch extends Extension {
             try { [, out] = p.communicate_utf8_finish(res); } catch (_e) { out = ''; }
             if (!this._contents) return;
             this._contents.set(key, rankFiles((out ?? '').split('\n'), needle, GLib.get_home_dir()));
-            if (this._box?.visible) this._refresh();
+            if (this._live()) this._refresh();
         });
     }
 
@@ -717,7 +783,7 @@ export default class NiroSearch extends Extension {
             try { [, out] = p.communicate_utf8_finish(res); } catch (e) { out = ''; }
             if (!this._files) return;
             this._files.set(needle.toLowerCase(), rankFiles((out ?? '').split('\n'), needle, home));
-            if (this._box?.visible && fileNeedle(this._entry.get_text())?.toLowerCase() === needle.toLowerCase()) this._refresh();
+            if (this._live() && fileNeedle(this._entry.get_text())?.toLowerCase() === needle.toLowerCase()) this._refresh();
         });
     }
 
@@ -810,7 +876,7 @@ export default class NiroSearch extends Extension {
         this._liveTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
             this._liveTimer = 0;
             try {
-                if (this._box?.visible || !this._ad) return GLib.SOURCE_REMOVE;
+                if (this._live() || !this._ad) return GLib.SOURCE_REMOVE;
                 const list = profiles();
                 const active = list.find(p => p.active)?.id ?? null;
                 const found = evaluateNow(this._ad.engine, this._signals(), active, id => list.some(p => p.id === id));
@@ -879,14 +945,22 @@ export default class NiroSearch extends Extension {
         try { results = this._collect(query); } catch (e) { failure = e.message; }
         this._fetchRates(query);
         this._findFiles(query);
+        // A late answer for the same text (rates, files, the web) keeps the selection on the same result and the scroll where it was.
+        const queryChanged = query !== this._lastQuery;
+        this._lastQuery = query;
+        const adj = this._scroll.vadjustment ?? this._scroll.get_vscroll_bar?.().adjustment;
+        const scrollBefore = adj?.value ?? 0;
+        const before = {keys: this._keys, selected: this._selected};
         this._results = results;
         this._list.destroy_all_children();
         this._rows = [];
+        this._rowByKey.clear();
+        this._motion?.dropHighlights();
         this._status.visible = false;
         if (failure) {
             this._say(`Search failed: ${failure}`);
         } else if (!results.length) {
-            this._say(query.trim() ? `Nothing matches "${query.trim()}". Try an app name, a setting, "profile", or a sum like 2 + 2.` : 'Start typing to search.');
+            this._say(this._rateBusy && moneyQuery(query) ? 'Looking up the exchange rate…' : query.trim() ? `Nothing matches "${query.trim()}". Try an app name, a setting, "profile", or a sum like 2 + 2.` : 'Start typing to search.');
         }
         let section = null;
         results.forEach((r, i) => {
@@ -908,7 +982,25 @@ export default class NiroSearch extends Extension {
             this._list.add_child(row);
             this._rows.push(row);
         });
-        this._select(0);
+        this._keys = results.map(resultKey);
+        const plan = planUpdate(before, this._keys, queryChanged);
+        this._animRow = plan.animate;
+        this._keys.forEach((k, i) => this._rowByKey.set(k, this._rows[i]));
+        this._select(plan.selected, {instant: true, scroll: queryChanged});
+        if (plan.keepScroll && adj) this._keepScroll(adj, scrollBefore);
+        if (plan.animate.some(Boolean)) { this._motion?.revealList(); }
+        this._drawMotion();
+    }
+
+    /** The list was rebuilt, so its extent is not known until the next allocation: put the offset back now and once more after it. */
+    _keepScroll(adj, value: number) {
+        adj.value = keepScrollValue(value, adj.upper, adj.page_size) || value;
+        if (this._restore) GLib.source_remove(this._restore);
+        this._restore = GLib.idle_add(GLib.PRIORITY_HIGH_IDLE, () => {
+            this._restore = 0;
+            if (adj && this._live()) adj.value = keepScrollValue(value, adj.upper, adj.page_size);
+            return GLib.SOURCE_REMOVE;
+        });
     }
 
     /** A currency question needs the day's rate: fetched once, kept for six hours, and the list is drawn again when it arrives. */
@@ -926,9 +1018,9 @@ export default class NiroSearch extends Extension {
                 if (msg.get_status() !== Soup.Status.OK) throw new Error(`rates: HTTP ${msg.get_status()}`);
                 const data = JSON.parse(new TextDecoder().decode(bytes.get_data()));
                 this._rates?.set(money.from, {at: Date.now(), rates: data.rates ?? {}});
-                if (this._box?.visible && this._entry.get_text() === query) this._refresh();
+                if (this._live() && this._entry.get_text() === query) this._refresh();
             } catch (e) {
-                if (this._box?.visible && this._entry.get_text() === query) this._say(`Could not get the exchange rate: ${e.message}`);
+                if (this._live() && this._entry.get_text() === query) this._say(`Could not get the exchange rate: ${e.message}`);
             }
         });
     }
@@ -938,17 +1030,19 @@ export default class NiroSearch extends Extension {
         this._status.visible = true;
     }
 
-    _select(index) {
+    _select(index, {instant = false, scroll = true} = {}) {
         this._hint.text = hint(undefined);
-        if (!this._rows.length) return;
+        if (!this._rows.length || index < 0) { this._selected = 0; return; }
+        const from = this._keys[this._selected] ?? null;
         this._selected = index;
         const sel = this._results[index];
         this._hint.text = hint(sel && {title: sel.title, permission: this._registry.get(sel.action)?.permission});
-        const [r, g, b] = this._accent ?? [232, 71, 43];
-        this._rows.forEach((row, i) => row.set_style(i === this._selected ? `background-color: rgba(${r}, ${g}, ${b}, 0.28);` : ''));
+        // The old row fades out while the new one fades in (springs, no layout change); a rebuilt list lights its row at once.
+        this._motion.select(instant ? null : from, this._keys[index] ?? null, instant);
+        this._drawMotion();
         const adj = this._scroll.vadjustment ?? this._scroll.get_vscroll_bar?.().adjustment;
         const row = this._rows[this._selected];
-        if (adj && row) {
+        if (scroll && adj && row) {
             const y = row.get_allocation_box().y1, h = row.get_height();
             if (y < adj.value) adj.value = y - 30; else if (y + h > adj.value + adj.page_size) adj.value = y + h - adj.page_size + 8;
         }
