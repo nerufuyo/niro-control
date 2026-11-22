@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Niro, the mascot</title>
+<style>
+@font-face{font-family:"Inter";src:url("../../../data/fonts/InterVariable.ttf");font-weight:100 900}
+:root{--ember:#E8472B;--coral:#FF7A59;--mute:#9A9AA6}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1600px;height:1000px;overflow:hidden;background:#0a0a0e;font-family:"Inter",system-ui,sans-serif;color:#F4F4F7}
+.stage{position:relative;width:1600px;height:1000px;overflow:hidden;
+ background:radial-gradient(900px 620px at 100% 0%,rgba(46,110,210,.34),transparent 62%),radial-gradient(800px 560px at 0% 100%,rgba(232,71,43,.22),transparent 62%),linear-gradient(180deg,#101015,#09090c)}
+.stage:before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.026) 0 1px,transparent 1px 40px),repeating-linear-gradient(90deg,rgba(255,255,255,.026) 0 1px,transparent 1px 40px)}
+.eyebrow{position:absolute;left:96px;top:96px;font-size:17px;font-weight:700;letter-spacing:.3em;color:var(--ember)}
+.name{position:absolute;left:88px;top:128px;font-size:218px;font-weight:800;letter-spacing:-.05em;line-height:1;background:linear-gradient(180deg,#fff 20%,#7fbfff);-webkit-background-clip:text;color:transparent}
+.tag{position:absolute;left:96px;top:370px;width:700px;font-size:44px;font-weight:720;letter-spacing:-.02em;line-height:1.12}
+.tag em{font-style:normal;color:var(--coral)}
+.sub{position:absolute;left:98px;top:468px;width:660px;font-size:22px;line-height:1.55;color:var(--mute)}
+.pills{position:absolute;left:96px;top:586px;display:flex;gap:10px}
+.pill{font-size:18px;font-weight:650;padding:9px 19px;border-radius:999px;color:#E8E8EE;background:rgba(255,255,255,.065);border:1px solid rgba(255,255,255,.15)}
+.hero{position:absolute;left:880px;top:52px;width:620px;height:640px}
+.glow{position:absolute;left:930px;top:110px;width:540px;height:540px;border-radius:50%;background:radial-gradient(circle,rgba(70,150,255,.42),rgba(70,150,255,.08) 55%,transparent 70%)}
+.ring{position:absolute;left:760px;top:-110px;width:900px;height:900px;border-radius:50%;border:1px solid rgba(160,200,255,.12)}
+.bub{position:absolute;border-radius:50%;background:radial-gradient(circle at 32% 28%,rgba(255,255,255,.75),rgba(150,190,255,.18) 55%,rgba(255,255,255,.05));border:1px solid rgba(190,215,255,.4)}
+.panel{position:absolute;left:48px;top:742px;width:1504px;height:214px;border-radius:26px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.10)}
+.ptag{position:absolute;left:64px;top:722px;font-size:14px;font-weight:700;letter-spacing:.3em;padding:8px 18px;border-radius:999px;background:#10131c;border:1px solid rgba(255,255,255,.14);color:#8fc4ff}
+.moods{position:absolute;left:48px;top:764px;width:1504px;display:flex;justify-content:space-around}
+.m{width:116px;text-align:center}.m svg{width:112px;height:114px;display:block;margin:0 auto}
+.m b{display:block;margin-top:6px;font-size:18px;font-weight:650;color:#EDEDF4}
+</style></head><body><div class="stage">
+<div class="ring"></div><div class="glow"></div>
+<div class="eyebrow">MEET THE MASCOT</div>
+<div class="name">Niro</div>
+<div class="tag">A little slime with <em>a lot of feelings.</em></div>
+<div class="sub">Niro is the face of Niro Control: one small blue slime and twelve moods, each with its own look.</div>
+<div class="pills"><span class="pill">Niro Control</span><span class="pill">12 moods</span><span class="pill">GPL-3.0</span></div>
+<div class="hero" id="hero"></div>
+<div class="bub" style="left:858px;top:560px;width:56px;height:56px"></div>
+<div class="bub" style="left:1494px;top:240px;width:34px;height:34px"></div>
+<div class="bub" style="left:1560px;top:410px;width:22px;height:22px"></div>
+<div class="panel"></div><div class="ptag">HOW NIRO LOOKS</div>
+<div class="moods" id="moods"></div>
+</div>
+<script>
+// One slime, one function: the body is a smooth dome; `mood` picks the face and the little things around it.
+const BODY='M100,26 C152,26 192,72 192,136 C192,174 154,192 100,192 C46,192 8,174 8,136 C8,72 48,26 100,26 Z';
+let uid=0;
+const eye=(cx,cy,rx=15,ry=20,look=[0,0],glint=true)=>`<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="url(#eye${uid})"/><ellipse cx="${cx+look[0]}" cy="${cy+look[1]+6}" rx="${rx*.6}" ry="${rx*.6}" fill="#2f5fd0" opacity=".45"/>`+(glint?`<circle cx="${cx-6+look[0]}" cy="${cy-9+look[1]}" r="${rx*.4}" fill="#fff"/><circle cx="${cx+6+look[0]}" cy="${cy+10+look[1]}" r="${rx*.19}" fill="#fff" opacity=".9"/>`:'');
+const arc=(cx,cy,w,up=true,sw=4)=>`<path d="M${cx-w} ${cy} Q${cx} ${cy+(up?-w*.95:w*.95)} ${cx+w} ${cy}" fill="none" stroke="#0a1030" stroke-width="${sw}" stroke-linecap="round"/>`;
+const line=(cx,cy,w,sw=4)=>`<path d="M${cx-w} ${cy} L${cx+w} ${cy}" stroke="#0a1030" stroke-width="${sw}" stroke-linecap="round"/>`;
+const brow=(cx,cy,w,tilt)=>`<path d="M${cx-w} ${cy+tilt} L${cx+w} ${cy-tilt}" stroke="#0a1030" stroke-width="4.5" stroke-linecap="round"/>`;
+const cat=(y=152,s=1)=>`<path d="M${100-9*s} ${y} Q${100-4.5*s} ${y+8*s} 100 ${y} Q${100+4.5*s} ${y+8*s} ${100+9*s} ${y}" fill="none" stroke="#1B3F8F" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+const heart=(cx,cy,s,c='#FF5C8A')=>`<path transform="translate(${cx} ${cy}) scale(${s})" d="M0 8 C-14 -2 -12 -14 -5 -14 C-1 -14 0 -10 0 -9 C0 -10 1 -14 5 -14 C12 -14 14 -2 0 8Z" fill="${c}"/>`;
+const star=(x,y,s,o=.9)=>`<path transform="translate(${x} ${y}) scale(${s})" d="M0 -9 L2.4 -2.4 9 0 2.4 2.4 0 9 -2.4 2.4 -9 0 -2.4 -2.4Z" fill="#CFE6FF" opacity="${o}"/>`;
+const blush=(o=1)=>`<ellipse cx="42" cy="150" rx="15" ry="9" fill="url(#bl${uid})" opacity="${o}"/><ellipse cx="158" cy="150" rx="15" ry="9" fill="url(#bl${uid})" opacity="${o}"/>`;
+const FACES={
+ idle:()=>blush(.8)+eye(69,126)+eye(131,126)+cat(),
+ happy:()=>blush()+arc(69,128,14)+arc(131,128,14)+`<path d="M89 148 Q100 164 111 148 Z" fill="#1B3F8F"/><path d="M94 156 Q100 160 106 156" fill="none" stroke="#FF7FAE" stroke-width="3" stroke-linecap="round"/>`+star(176,30,1.1)+star(24,56,.7,.7),
+ listening:()=>blush(.6)+eye(69,124,15,23)+eye(131,124,15,23)+`<ellipse cx="100" cy="154" rx="5" ry="7" fill="#1B3F8F"/><ellipse cx="100" cy="156" rx="3" ry="3.5" fill="#FF7FAE"/>`+`<path d="M-6 100 Q-14 126 -6 152 M-18 92 Q-30 126 -18 160 M206 100 Q214 126 206 152 M218 92 Q230 126 218 160" fill="none" stroke="#9CC8FF" stroke-width="4" stroke-linecap="round" opacity=".8"/>`,
+ thinking:()=>blush(.5)+eye(69,126,14,18,[5,-5])+eye(131,126,14,18,[5,-5])+brow(69,100,11,-5)+line(100,154,7)+`<circle cx="150" cy="22" r="5" fill="#9CC8FF"/><circle cx="168" cy="14" r="6.5" fill="#9CC8FF"/><circle cx="190" cy="8" r="8" fill="#9CC8FF"/>`,
+ speaking:()=>blush(.7)+eye(69,126)+eye(131,126)+`<ellipse cx="100" cy="156" rx="12" ry="9" fill="#1B3F8F"/><ellipse cx="100" cy="161" rx="7" ry="4" fill="#FF7FAE"/>`+`<path d="M200 92 Q212 110 200 128 M212 82 Q230 110 212 138" fill="none" stroke="#9CC8FF" stroke-width="4" stroke-linecap="round" opacity=".8"/>`,
+ alert:()=>eye(69,124,15,23)+eye(131,124,15,23)+brow(69,92,12,5)+brow(131,92,12,-5)+`<ellipse cx="100" cy="156" rx="6" ry="8" fill="#1B3F8F"/>`+`<rect x="95" y="-14" width="10" height="26" rx="5" fill="#FF4B3A"/><circle cx="100" cy="24" r="6" fill="#FF4B3A"/>`,
+ curious:()=>blush(.6)+eye(69,126,15,20,[3,-2])+eye(131,126,15,20,[3,-2])+brow(131,100,11,-6)+cat(153,.8)+`<path d="M168 40 Q168 22 184 22 Q200 22 200 36 Q200 46 188 52 Q184 55 184 62" fill="none" stroke="#9CC8FF" stroke-width="6" stroke-linecap="round"/><circle cx="184" cy="76" r="4" fill="#9CC8FF"/>`,
+ love:()=>blush()+heart(69,124,2.3)+heart(131,124,2.3)+`<path d="M86 150 Q100 166 114 150" fill="none" stroke="#1B3F8F" stroke-width="3.6" stroke-linecap="round"/>`+heart(176,34,1.1)+heart(26,52,.8)+heart(158,6,.7,'#FF8FAE'),
+ sleepy:()=>blush(.5)+line(69,130,14)+line(131,130,14)+`<ellipse cx="100" cy="154" rx="4" ry="3" fill="#1B3F8F"/>`+`<g fill="#9CC8FF" font-family="Inter" font-weight="800"><text x="156" y="42" font-size="30">z</text><text x="174" y="22" font-size="38">Z</text></g>`,
+ sad:()=>eye(69,128,14,18,[0,2])+eye(131,128,14,18,[0,2])+brow(69,100,12,-6)+brow(131,100,12,6)+`<path d="M90 158 Q100 148 110 158" fill="none" stroke="#1B3F8F" stroke-width="3.6" stroke-linecap="round"/>`+`<path d="M57 148 q-5 9 0 14 q5 -5 0 -14z" fill="#BFE1FF"/>`,
+ waking:()=>blush(.5)+`<path d="M54 126 Q69 136 84 126 L84 122 L54 122Z" fill="#0a1030"/><path d="M116 126 Q131 136 146 126 L146 122 L116 122Z" fill="#0a1030"/>`+`<ellipse cx="100" cy="154" rx="5" ry="4" fill="#1B3F8F"/>`,
+ searching:()=>blush(.6)+eye(69,126,14,19,[-6,0])+eye(131,126,14,19,[-6,0])+line(100,154,7)+`<g fill="none" stroke="#FFB020" stroke-width="5" stroke-linecap="round"><path d="M80 12 Q100 -4 120 12"/><path d="M89 24 Q100 14 111 24"/></g><circle cx="100" cy="34" r="4" fill="#FFB020"/>`,
+};
+function slime(mood,size){uid++;
+ const r=mood==='alert';
+ return `<svg viewBox="-24 -22 248 238" xmlns="http://www.w3.org/2000/svg" style="overflow:visible"><defs>
+ <linearGradient id="sg${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9CDDFF"/><stop offset=".5" stop-color="#5BAEFF"/><stop offset="1" stop-color="#2F80EA"/></linearGradient>
+ <linearGradient id="rim${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${r?'#FF7A6A':'#3C86EE'}"/><stop offset="1" stop-color="${r?'#E8472B':'#1B5FD4'}"/></linearGradient>
+ <linearGradient id="eye${uid}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a1030"/><stop offset="1" stop-color="#1a2a6c"/></linearGradient>
+ <radialGradient id="bl${uid}"><stop offset="0" stop-color="#FF7FAE" stop-opacity=".85"/><stop offset="1" stop-color="#FF7FAE" stop-opacity="0"/></radialGradient></defs>
+ <ellipse cx="100" cy="193" rx="82" ry="7" fill="#0a1a40" opacity=".9"/>
+ <path d="${BODY}" fill="url(#rim${uid})"/>
+ <path d="${BODY}" fill="url(#sg${uid})" transform="translate(100 122) scale(.93) translate(-100 -122)"/>
+ <ellipse cx="54" cy="88" rx="24" ry="11" fill="#fff" opacity=".66" transform="rotate(-16 54 88)"/><circle cx="34" cy="106" r="4.4" fill="#fff" opacity=".7"/><circle cx="158" cy="92" r="3.2" fill="#fff" opacity=".35"/>
+ ${FACES[mood]()}</svg>`;}
+document.getElementById('hero').innerHTML=slime('happy').replace('<svg ','<svg width="620" height="592" ');
+const names=['idle','happy','listening','thinking','speaking','alert','curious','love','sleepy','sad','waking','searching'];
+document.getElementById('moods').innerHTML=names.map(n=>`<div class="m">${slime(n)}<b>${n[0].toUpperCase()+n.slice(1)}</b></div>`).join('');
+</script></body></html>
