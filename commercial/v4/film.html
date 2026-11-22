@@ -1,0 +1,177 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Niro Control, 60 seconds</title>
+<style>
+@font-face{font-family:"Inter";src:url("/data/fonts/InterVariable.ttf");font-weight:100 900}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:1920px;height:1080px;overflow:hidden;background:#09090c;font-family:"Inter",system-ui,sans-serif;color:#F4F4F7}
+#v{position:absolute;inset:0;overflow:hidden;background:radial-gradient(1100px 700px at 100% 0%,rgba(46,110,210,.30),transparent 62%),radial-gradient(1000px 700px at 0% 100%,rgba(232,71,43,.20),transparent 62%),linear-gradient(180deg,#101015,#09090c)}
+#grid{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.026) 0 1px,transparent 1px 48px),repeating-linear-gradient(90deg,rgba(255,255,255,.026) 0 1px,transparent 1px 48px)}
+.scene{position:absolute;inset:0;opacity:0;overflow:hidden}
+.scene img{position:absolute;left:0;top:0;transform-origin:0 0;will-change:transform}
+#scrim{position:absolute;inset:0;background:linear-gradient(90deg,rgba(6,7,12,.96) 0%,rgba(6,7,12,.9) 28%,rgba(6,7,12,.55) 48%,rgba(6,7,12,0) 66%),linear-gradient(0deg,rgba(6,7,12,.55),rgba(6,7,12,0) 40%)}
+.cap{position:absolute;left:96px;bottom:128px;width:700px;opacity:0}
+.cap h2{font-size:104px;font-weight:800;letter-spacing:-.04em;line-height:1;margin-bottom:18px}
+.cap p{font-size:32px;line-height:1.4;color:#C9C9D6;font-weight:500}
+.cap .tag{display:inline-block;margin-top:18px;font-size:18px;font-weight:700;letter-spacing:.2em;color:#9A9AA6;border:1px solid rgba(255,255,255,.2);padding:6px 14px;border-radius:999px}
+.ember{color:#FF7A59}
+#sl{position:absolute;left:0;top:0;transform-origin:50% 100%;will-change:transform}
+#sl svg{display:block;overflow:visible}
+.big{position:absolute;left:0;right:0;text-align:center;font-weight:760;letter-spacing:-.03em;opacity:0}
+.key{position:absolute;min-width:200px;height:120px;padding:0 36px;border-radius:26px;display:flex;align-items:center;justify-content:center;font-size:42px;font-weight:600;background:linear-gradient(160deg,rgba(255,255,255,.30),rgba(150,170,255,.10));border:1px solid rgba(255,255,255,.3);box-shadow:0 16px 40px rgba(0,0,0,.5),inset 0 1.5px 1px rgba(255,255,255,.5);backdrop-filter:blur(14px)}
+.chip{position:absolute;border-radius:12px;border:3px solid #FF7A59;box-shadow:0 0 30px rgba(255,122,89,.8),inset 0 0 18px rgba(255,122,89,.35);opacity:0}
+.try{position:absolute;font-size:30px;font-weight:600;padding:12px 24px;border-radius:999px;background:rgba(20,22,32,.82);border:1px solid rgba(255,255,255,.2);color:#EDEDF4;opacity:0;white-space:nowrap}
+.win{position:absolute;border-radius:16px;overflow:hidden;background:rgba(24,26,36,.92);border:1px solid rgba(255,255,255,.14);box-shadow:0 20px 50px rgba(0,0,0,.5)}
+.win i{display:block;height:34px;background:rgba(255,255,255,.07)}
+.win b{position:absolute;left:14px;top:12px;width:10px;height:10px;border-radius:50%;background:#ff5f57;box-shadow:16px 0 #febc2e,32px 0 #28c840}
+.win u{position:absolute;left:20px;right:20px;top:60px;bottom:20px;border-radius:10px;opacity:.9}
+.lname{position:absolute;font-size:30px;font-weight:700;color:#C9C9D6;letter-spacing:.02em;opacity:0}
+.node{position:absolute;width:320px;height:170px;border-radius:26px;background:rgba(22,24,34,.92);border:1.5px solid rgba(255,255,255,.16);box-shadow:0 24px 60px rgba(0,0,0,.5);padding:26px 28px;opacity:0}
+.node small{display:block;font-size:17px;font-weight:700;letter-spacing:.22em;color:#8fc4ff;margin-bottom:12px}
+.node span{font-size:34px;font-weight:700;letter-spacing:-.02em;line-height:1.15}
+#vig{position:absolute;inset:0;background:radial-gradient(130% 110% at 50% 50%,rgba(0,0,0,0) 55%,rgba(0,2,10,.6) 100%);pointer-events:none}
+#fade{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none}
+</style>
+<div id="v"><div id="grid"></div>
+ <div class="scene" id="s1"><div class="big" id="t1" style="top:210px;font-size:96px">GNOME is great.</div><div class="big" id="t2" style="top:210px;font-size:88px;color:#C9C9D6">…but it can feel a little <span class="ember">quiet.</span></div></div>
+ <div class="scene" id="s2"><div id="bar" style="position:absolute;left:0;right:0;top:0;height:14px;background:rgba(0,0,0,.55)"></div>
+ <div id="isl" style="position:absolute;left:50%;top:0;transform:translateX(-50%);background:#000;border-radius:0 0 38px 38px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08)">
+  <div id="vc" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:700;letter-spacing:.02em">07:25</div>
+  <div id="vm" style="position:absolute;inset:0;padding:30px 34px;display:flex;gap:30px;opacity:0"><div style="width:190px;height:190px;flex:none;border-radius:24px;background:linear-gradient(135deg,#8B6CFF,#E8472B);display:flex;align-items:center;justify-content:center;font-size:84px">♪</div>
+   <div style="flex:1;display:flex;flex-direction:column;justify-content:center"><div style="font-size:38px;font-weight:750;letter-spacing:-.02em">Midnight Drive</div><div style="font-size:24px;color:#9A9AA6;margin-top:4px">Niro Quartet</div>
+    <div style="height:7px;border-radius:4px;background:rgba(255,255,255,.18);margin-top:26px;overflow:hidden"><div id="pg" style="height:100%;background:#fff;width:30%"></div></div>
+    <div style="display:flex;justify-content:space-between;font-size:18px;color:#9A9AA6;margin-top:8px"><span>1:12</span><span>3:40</span></div>
+    <div style="font-size:40px;letter-spacing:.5em;margin-top:6px;padding-left:6px">⏮ ⏸ ⏭</div></div></div>
+  <div id="vt" style="position:absolute;inset:0;padding:26px 40px;display:flex;align-items:center;gap:34px;opacity:0"><svg width="130" height="130" viewBox="0 0 130 130"><circle cx="65" cy="65" r="54" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="10"/><circle id="ring" cx="65" cy="65" r="54" fill="none" stroke="#FF7A59" stroke-width="10" stroke-linecap="round" stroke-dasharray="339" stroke-dashoffset="40" transform="rotate(-90 65 65)"/></svg>
+   <div><div style="font-size:22px;letter-spacing:.22em;color:#8fc4ff;font-weight:700">FOCUS</div><div id="tm" style="font-size:78px;font-weight:800;letter-spacing:-.03em;line-height:1.05">24:59</div></div></div>
+ </div></div>
+ <div class="scene" id="s3"><img id="i3" src="/docs/images/search-calculator.png" width="1440" height="900"></div>
+ <div class="scene" id="s4"><img id="i4" src="/docs/images/search-calculator.png" width="1440" height="900"><div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(6,7,12,.96) 0%,rgba(6,7,12,.9) 52%,rgba(6,7,12,0) 76%)"></div></div>
+ <div class="scene" id="s5"></div>
+ <div class="scene" id="s6"><img id="i6" src="/docs/images/panel-home.png" width="1440" height="900"></div>
+ <div class="scene" id="s7"></div>
+ <div class="scene" id="s8"></div>
+ <div id="scrim"></div>
+ <div class="cap" id="c2"><h2>Island</h2><p>Music, timers and alerts, right on the top bar.</p><span class="tag">ILLUSTRATION</span></div>
+ <div class="cap" id="c3"><h2>Search</h2><p>Apps, maths, units, currency, weather and world clocks.</p></div>
+ <div class="cap" id="c4"><h2>Dock</h2><p>Magnifying icons, frosted windows and rounded corners everywhere.</p></div>
+ <div class="cap" id="c5"><h2>Tile</h2><p>Ten layouts. Off until you switch it on.</p><span class="tag">ILLUSTRATION</span></div>
+ <div class="cap" id="c6"><h2>Profiles</h2><p>Save the whole desktop. Switch with one action.</p></div>
+ <div class="cap" id="c7"><h2>Flow</h2><p>Workflows that run through Search. Off until you turn them on.</p><span class="tag">ILLUSTRATION</span></div>
+ <div id="fx"></div>
+ <div id="sl"></div>
+ <div id="vig"></div><div id="fade"></div>
+</div>
+<script>
+const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x)), sm=x=>x*x*(3-2*x), ease=x=>x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;
+const win=(t,a,b)=>sm(clamp((t-a)/(b-a))), pulse=(t,a,b,f=.5)=>win(t,a,a+f)*(1-win(t,b-f,b));
+const $=id=>document.getElementById(id);
+function keys(t,K){ if(t<=K[0].t) return {...K[0]}; for(let i=0;i<K.length-1;i++){const a=K[i],b=K[i+1]; if(t<b.t){const u=ease((t-a.t)/(b.t-a.t)),o={};for(const k in a) if(k!=='t') o[k]=typeof a[k]==='number'?a[k]+(b[k]-a[k])*u:a[k]; return o;}} return {...K[K.length-1]}; }
+const SC=[[0,6],[6,14],[14,24],[24,32],[32,38],[38,46],[46,54],[54,60]];
+// ---- the slime: one function, a smooth dome; the face follows `st` (mood, how open the eyes are, where it looks)
+const BODY='M100,26 C152,26 192,72 192,136 C192,174 154,192 100,192 C46,192 8,174 8,136 C8,72 48,26 100,26 Z';
+const eye=(cx,cy,st)=>{const o=st.o; if(o<.14) return `<path d="M${cx-13} ${cy+3} L${cx+13} ${cy+3}" stroke="#0a1030" stroke-width="4.5" stroke-linecap="round"/>`; const rx=15,ry=20*o+ (st.big||0),lx=st.lx*5,ly=st.ly*4+(1-o)*6;
+ return `<ellipse cx="${cx}" cy="${cy+ly}" rx="${rx}" ry="${ry}" fill="url(#e)"/><ellipse cx="${cx+lx}" cy="${cy+ly+6}" rx="9" ry="${9*o}" fill="#2f5fd0" opacity=".45"/><circle cx="${cx-6+lx}" cy="${cy+ly-9*o}" r="6" fill="#fff"/><circle cx="${cx+6+lx}" cy="${cy+ly+10*o}" r="2.8" fill="#fff" opacity=".9"/>`;};
+const arc=(cx,cy,w)=>`<path d="M${cx-w} ${cy} Q${cx} ${cy-w*.95} ${cx+w} ${cy}" fill="none" stroke="#0a1030" stroke-width="4.5" stroke-linecap="round"/>`;
+const cat=(y=152)=>`<path d="M91 ${y} Q95.5 ${y+8} 100 ${y} Q104.5 ${y+8} 109 ${y}" fill="none" stroke="#1B3F8F" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/>`;
+const blush=o=>`<ellipse cx="42" cy="150" rx="15" ry="9" fill="url(#b)" opacity="${o}"/><ellipse cx="158" cy="150" rx="15" ry="9" fill="url(#b)" opacity="${o}"/>`;
+const star=(x,y,s,o=.9)=>`<path transform="translate(${x} ${y}) scale(${s})" d="M0 -9 L2.4 -2.4 9 0 2.4 2.4 0 9 -2.4 2.4 -9 0 -2.4 -2.4Z" fill="#CFE6FF" opacity="${o}"/>`;
+function face(m,st,t){
+ switch(m){
+ case 'bored': return blush(.3)+eye(69,128,{...st,o:st.o*.5})+eye(131,128,{...st,o:st.o*.5})+`<path d="M90 156 L110 156" stroke="#1B3F8F" stroke-width="3.6" stroke-linecap="round"/>`;
+ case 'curious': return blush(.6)+eye(69,126,st)+eye(131,126,st)+`<path d="M120 100 L142 94" stroke="#0a1030" stroke-width="4.5" stroke-linecap="round"/>`+cat(153)+`<path d="M168 40 Q168 22 184 22 Q200 22 200 36 Q200 46 188 52 Q184 55 184 62" fill="none" stroke="#9CC8FF" stroke-width="6" stroke-linecap="round" opacity="${.6+.4*Math.sin(t*5)}"/><circle cx="184" cy="76" r="4" fill="#9CC8FF"/>`;
+ case 'happy': return blush(1)+arc(69,128,14)+arc(131,128,14)+`<path d="M89 148 Q100 164 111 148 Z" fill="#1B3F8F"/><path d="M94 156 Q100 160 106 156" fill="none" stroke="#FF7FAE" stroke-width="3" stroke-linecap="round"/>`+star(176,30,1.1)+star(24,56,.7,.7);
+ case 'wow': return blush(.7)+eye(69,124,{...st,o:1,big:3})+eye(131,124,{...st,o:1,big:3})+`<ellipse cx="100" cy="156" rx="6" ry="8" fill="#1B3F8F"/><ellipse cx="100" cy="158" rx="3.5" ry="4" fill="#FF7FAE"/>`+star(176,30,1.2)+star(22,50,.8)+star(180,100,.6,.6);
+ default: return blush(.8)+eye(69,126,st)+eye(131,126,st)+cat();
+ }}
+function slimeSVG(m,st,t){return `<svg viewBox="-24 -22 248 238" xmlns="http://www.w3.org/2000/svg"><defs>
+ <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9CDDFF"/><stop offset=".5" stop-color="#5BAEFF"/><stop offset="1" stop-color="#2F80EA"/></linearGradient>
+ <linearGradient id="r" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3C86EE"/><stop offset="1" stop-color="#1B5FD4"/></linearGradient>
+ <linearGradient id="e" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0a1030"/><stop offset="1" stop-color="#1a2a6c"/></linearGradient>
+ <radialGradient id="b"><stop offset="0" stop-color="#FF7FAE" stop-opacity=".85"/><stop offset="1" stop-color="#FF7FAE" stop-opacity="0"/></radialGradient></defs>
+ <ellipse cx="100" cy="193" rx="82" ry="7" fill="#0a1a40" opacity=".9"/><path d="${BODY}" fill="url(#r)"/>
+ <path d="${BODY}" fill="url(#g)" transform="translate(100 122) scale(.93) translate(-100 -122)"/>
+ <ellipse cx="54" cy="88" rx="24" ry="11" fill="#fff" opacity=".66" transform="rotate(-16 54 88)"/><circle cx="34" cy="106" r="4.4" fill="#fff" opacity=".7"/><circle cx="158" cy="92" r="3.2" fill="#fff" opacity=".35"/>
+ ${face(m,st,t)}</svg>`;}
+const MOOD=[[0,'idle'],[2.2,'bored'],[5.3,'curious'],[9,'idle'],[14,'curious'],[18,'happy'],[24,'idle'],[27,'happy'],[32,'curious'],[35,'happy'],[38,'idle'],[41,'happy'],[46,'curious'],[51.6,'wow'],[52.8,'happy']];
+const moodAt=t=>MOOD.filter(m=>m[0]<=t).pop()[1];
+const BLINKS=[1.6,4.4,7.9,11.2,15.4,19.0,22.6,26.5,30.1,34.0,37.7,41.3,44.6,48.2,50.4,56.4,58.2];
+const blink=t=>{let o=1;for(const b of BLINKS){const d=Math.abs(t-b);if(d<.09)o=Math.min(o,d/.09);}return o;};
+// where the slime stands: x, y (the bottom of the body), size, and where it looks
+const SK=[{t:0,x:960,y:-260,s:330,lx:0,ly:0},{t:.5,x:960,y:790,s:330,lx:0,ly:0},{t:2.6,x:960,y:790,s:330,lx:-1,ly:0},{t:4.4,x:960,y:790,s:330,lx:1,ly:0},{t:5.6,x:960,y:790,s:330,lx:0,ly:-1},
+ {t:7,x:1640,y:1090,s:250,lx:-1,ly:-1},{t:13.4,x:1640,y:1090,s:250,lx:-1,ly:-1},{t:15,x:1650,y:1060,s:260,lx:-1,ly:-1},{t:23.4,x:1650,y:1060,s:260,lx:-1,ly:-1},
+ {t:25,x:1660,y:1060,s:260,lx:-1,ly:0},{t:31.4,x:1660,y:1060,s:260,lx:-1,ly:0},{t:33,x:1700,y:1070,s:250,lx:-1,ly:-1},{t:37.4,x:1700,y:1070,s:250,lx:-1,ly:-1},
+ {t:39,x:1660,y:1066,s:260,lx:-1,ly:-1},{t:45.4,x:1660,y:1066,s:260,lx:-1,ly:-1},{t:47,x:1640,y:1030,s:290,lx:-1,ly:0},{t:53.4,x:1640,y:1030,s:290,lx:-1,ly:0},{t:55.2,x:960,y:640,s:360,lx:0,ly:0},{t:60,x:960,y:640,s:360,lx:0,ly:0}];
+const HITS=[.5,1.0,3.0,5.0,6.0,14.0,24.0,32.0,34.2,36.0,38.0,46.0,51.6,54.0];       // a small squash on each
+const squash=t=>{let e=0;for(const h of HITS){const d=t-h;if(d>=0&&d<1.2)e+=Math.exp(-d*5)*Math.cos(d*20);}return clamp(e,-.8,1);};
+// the camera on a screenshot: (cx, cy) in 0..1 is the point put at the middle of the picture, z the zoom over "cover"
+function cam(img,W,H,c){const sc=Math.max(1920/W,1080/H)*c.z,tx=clamp(960-c.cx*W*sc,1920-W*sc,0),ty=clamp(540-c.cy*H*sc,1080-H*sc,0);img.style.transform=`translate(${tx}px,${ty}px) scale(${sc})`;return {sc,tx,ty};}
+const CAM2=[{t:6,cx:.5,cy:.5,z:1.02},{t:7.4,cx:.5,cy:.06,z:1.7},{t:12.5,cx:.5,cy:.05,z:1.95},{t:14,cx:.5,cy:.3,z:1.2}];
+const CAM3=[{t:14,cx:.5,cy:.5,z:1.02},{t:15.4,cx:.5,cy:.3,z:1.35},{t:22.4,cx:.5,cy:.28,z:1.45},{t:24,cx:.5,cy:.4,z:1.2}];
+const CAM4=[{t:24,cx:.5,cy:.5,z:1.02},{t:25.6,cx:.5,cy:.97,z:1.7},{t:30.4,cx:.46,cy:.97,z:1.85},{t:32,cx:.5,cy:.6,z:1.2}];
+const CAM6=[{t:38,cx:.5,cy:.5,z:1.02},{t:39.6,cx:.55,cy:.24,z:1.5},{t:45,cx:.55,cy:.24,z:1.55},{t:46,cx:.5,cy:.4,z:1.2}];
+// the real Control Panel's profile chips, in screenshot pixels (panel-home.png, 1440x900)
+const CHIPS=[[473,160,82,27],[564,160,92,27],[665,160,66,27],[740,160,68,27]], CHIPT=[[40.2,41.8],[41.8,43.4],[43.4,45],[45,46.4]];
+const fxEl=$('fx'); fxEl.style.cssText='position:absolute;inset:0';
+fxEl.innerHTML=
+ `<div class="key" id="k1" style="left:900px;top:300px;opacity:0">Super</div><div class="key" id="k2" style="left:1140px;top:300px;opacity:0">Space</div>`+
+ ['150 usd to idr','jam di tokyo','cuaca bandung','qr niro'].map((q,i)=>`<div class="try" id="q${i}" style="left:${760+i*0}px;top:${300+i*0}px">${q}</div>`).join('')+
+ CHIPS.map((c,i)=>`<div class="chip" id="ch${i}"></div>`).join('')+
+ `<div class="lname" id="ln" style="left:700px;top:772px;width:1120px;text-align:center"></div>`;
+// ---- Tile (an illustration, not a capture): four windows, three layouts
+const AREA={x:700,y:150,w:1120,h:600}, WC=['#3C86EE','#E8472B','#8B6CFF','#27B07A'];
+const LAY={dwindle:[[0,0,.5,1],[.5,0,.5,.5],[.5,.5,.25,.5],[.75,.5,.25,.5]],master:[[0,0,.6,1],[.6,0,.4,1/3],[.6,1/3,.4,1/3],[.6,2/3,.4,1/3]],grid:[[0,0,.5,.5],[.5,0,.5,.5],[0,.5,.5,.5],[.5,.5,.5,.5]]};
+$('s5').innerHTML=WC.map((c,i)=>`<div class="win" id="w${i}"><i></i><b></b><u style="background:linear-gradient(135deg,${c},${c}55)"></u></div>`).join('');
+function layoutAt(t){const T=[[32.6,'dwindle'],[34.2,'master'],[36.0,'grid']];let from=LAY.dwindle,to=LAY.dwindle,u=1;
+ if(t<34.2){from=to=LAY.dwindle;} else if(t<35.0){from=LAY.dwindle;to=LAY.master;u=ease((t-34.2)/.8);} else if(t<36.0){from=to=LAY.master;} else if(t<36.8){from=LAY.master;to=LAY.grid;u=ease((t-36)/.8);} else {from=to=LAY.grid;}
+ return from.map((r,i)=>r.map((v,k)=>v+(to[i][k]-v)*u));}
+// ---- Flow (an illustration): trigger -> action -> action -> done
+$('s7').innerHTML=`<div class="node" id="n0" style="left:700px;top:350px"><small>WHEN</small><span>An app opens</span></div><div class="node" id="n1" style="left:1060px;top:350px"><small>THEN</small><span>Do Not Disturb on</span></div><div class="node" id="n2" style="left:1420px;top:350px"><small>THEN</small><span>Profile: Deep Work</span></div>
+ <svg id="wire" width="1920" height="1080" style="position:absolute;left:0;top:0"><path d="M1020 435 H1060 M1380 435 H1420" stroke="rgba(255,255,255,.25)" stroke-width="4" stroke-linecap="round"/><circle id="dot" r="9" fill="#FF7A59" cx="1020" cy="435"/></svg>
+ <div id="done" style="position:absolute;left:1500px;top:560px;width:160px;height:160px;border-radius:50%;background:#1f9d62;display:flex;align-items:center;justify-content:center;font-size:96px;font-weight:800;opacity:0;box-shadow:0 0 60px rgba(40,200,120,.6)">✓</div>`;
+// ---- the end
+$('s8').innerHTML=`<div id="word" style="position:absolute;left:0;right:0;top:700px;text-align:center;opacity:0"><div style="font-size:120px;font-weight:800;letter-spacing:-.045em;line-height:1">Niro <span style="color:#9A9AA6">Control</span></div><div style="font-size:36px;color:#C9C9D6;margin-top:22px;font-weight:500">GNOME Shell extensions for Fedora and Ubuntu</div><div style="font-size:30px;color:#8a8a98;margin-top:18px;letter-spacing:.04em">github.com/nerufuyo/niro-control &nbsp;·&nbsp; GPL-3.0</div></div>`;
+window.__render=function(t){
+ // scenes
+ SC.forEach(([a,b],i)=>{const o=(i===0?1-win(t,b-.35,b+.35):i===7?win(t,a-.35,a+.35):win(t,a-.35,a+.35)*(1-win(t,b-.35,b+.35)));$('s'+(i+1)).style.opacity=o;});
+ // scene 1: the two lines
+ $('t1').style.opacity=pulse(t,.9,3.2,.5); $('t2').style.opacity=pulse(t,3.3,5.9,.5);
+ $('t1').style.transform=`translateY(${(1-win(t,.9,1.5))*24}px)`; $('t2').style.transform=`translateY(${(1-win(t,3.3,3.9))*24}px)`;
+ // cameras
+ cam($('i3'),1440,900,keys(t,CAM3)); cam($('i4'),1440,900,keys(t,CAM4)); const c6=keys(t,CAM6), k6=cam($('i6'),1440,900,c6);
+ // captions
+ [[2,6.6,13.6],[3,14.6,23.6],[4,24.6,31.6],[5,32.4,37.6],[6,38.6,45.6],[7,46.4,53.6]].forEach(([n,a,b])=>{const e=$('c'+n);e.style.opacity=pulse(t,a,b,.55);e.style.transform=`translateY(${(1-win(t,a,a+.6))*30}px)`;});
+ $('scrim').style.opacity=Math.max(+$('s3').style.opacity,+$('s4').style.opacity,+$('s6').style.opacity);
+ // search: the keys and a few things to type
+ const ka=pulse(t,15.0,17.6,.4); $('k1').style.opacity=ka; $('k2').style.opacity=ka; $('k1').style.transform=`translateY(${(1-win(t,15,15.5))*40}px) scale(${1-.06*(win(t,16.2,16.3)-win(t,16.4,16.6))})`; $('k2').style.transform=`translateY(${(1-win(t,15.2,15.7))*40}px) scale(${1-.06*(win(t,16.5,16.6)-win(t,16.7,16.9))})`;
+ [[17.6,19.6],[19.4,21.4],[21.2,23.2],[22.4,23.6]].slice(0,3).forEach(([a,b],i)=>{const e=$('q'+i);e.style.opacity=pulse(t,a+.2,b+.8,.4);e.style.left=(1020+(i%2)*60)+'px';e.style.top=(640+i*96)+'px';e.style.transform=`translateY(${(1-win(t,a+.2,a+.7))*24}px)`;});
+ $('q3').style.opacity=0;
+ // profile chips, on the real picture
+ CHIPS.forEach((c,i)=>{const e=$('ch'+i),[a,b]=CHIPT[i];const x=k6.tx+c[0]*k6.sc,y=k6.ty+c[1]*k6.sc;Object.assign(e.style,{left:(x-8)+'px',top:(y-8)+'px',width:(c[2]*k6.sc+16)+'px',height:(c[3]*k6.sc+16)+'px',opacity:pulse(t,a,b,.3)*pulse(t,38,46,.6)});});
+ // island (an illustration): clock -> music -> focus timer -> clock
+const IS=[{t:6,w:260,h:60},{t:7.2,w:260,h:60},{t:8.2,w:830,h:250},{t:10.6,w:830,h:250},{t:11.7,w:580,h:200},{t:13,w:580,h:200},{t:13.9,w:260,h:60}], I=keys(t,IS);
+ $('isl').style.width=I.w+'px'; $('isl').style.height=I.h+'px';
+ $('vc').style.opacity=t<7.4?1-win(t,7.0,7.5):win(t,13.4,13.9); $('vm').style.opacity=win(t,7.8,8.5)*(1-win(t,10.4,10.9)); $('vt').style.opacity=win(t,11.0,11.7)*(1-win(t,12.8,13.3));
+ $('pg').style.width=(30+Math.max(0,t-8.2)*9)+'%'; const rs=Math.max(0,Math.floor(t-11.0)); $('tm').textContent='24:'+String(59-rs).padStart(2,'0'); $('ring').setAttribute('stroke-dashoffset',40+Math.max(0,t-11)*6);
+ $('isl').style.top=(1-win(t,6.2,6.9))*-90+'px';
+ // tile
+ const L=layoutAt(t),ws=pulse(t,32.2,37.8,.5);
+ L.forEach((r,i)=>{const e=$('w'+i),g=8,en=win(t,32.5+i*.18,33.3+i*.18);Object.assign(e.style,{left:(AREA.x+r[0]*AREA.w+g)+'px',top:(AREA.y+r[1]*AREA.h+g)+'px',width:(r[2]*AREA.w-2*g)+'px',height:(r[3]*AREA.h-2*g)+'px',opacity:en*ws,transform:`scale(${.85+.15*en})`});});
+ const ln=$('ln'); ln.style.opacity=pulse(t,33.4,37.6,.4); ln.textContent=t<34.6?'Dwindle':t<36.4?'Master left':'Grid';
+ // flow
+ [[0,46.6],[1,48.0],[2,49.6]].forEach(([i,a])=>{const e=$('n'+i);e.style.opacity=win(t,a,a+.5)*pulse(t,46.4,53.6,.5);e.style.transform=`translateY(${(1-win(t,a,a+.6))*30}px)`;e.style.borderColor=`rgba(255,122,89,${.9*pulse(t,a+.4,a+1.8,.3)+.16})`;});
+ const dx=t<48.0?1020:(t<48.8?1020+(win(t,48.0,48.8))*40:(t<49.6?1060+win(t,48.8,49.6)*320:1380+win(t,49.6,50.2)*40)); $('dot').setAttribute('cx',dx); $('dot').style.opacity=pulse(t,47.4,51.4,.3);
+ const dn=$('done'); dn.style.opacity=win(t,51.4,51.8)*pulse(t,46,53.6,.5); dn.style.transform=`scale(${.6+.4*win(t,51.4,51.9)+.08*Math.sin(clamp((t-51.4)/.6)*Math.PI)})`;
+ // the end
+ $('word').style.opacity=win(t,55.6,56.8)*(1-win(t,59.6,60)); $('word').style.transform=`translateY(${(1-win(t,55.6,56.6))*26}px)`;
+ // the slime
+ const k=keys(t,SK),m=moodAt(t),sq=squash(t),st={o:blink(t),lx:k.lx,ly:k.ly};
+ const sl=$('sl'),h=k.s*238/248;sl.innerHTML=slimeSVG(m,st,t).replace('<svg ',`<svg width="${k.s}" height="${h}" `);
+ const bob=Math.sin(t*2.4)*.012;
+ sl.style.transform=`translate(${k.x-k.s/2}px,${k.y-h}px) scale(${1+.14*sq+bob},${1-.16*sq-bob})`;
+ sl.style.opacity=1-win(t,59.6,60);
+ $('fade').style.opacity=(1-win(t,0,.4))+win(t,59.5,60);
+ $('vig').style.opacity=.9;
+};
+document.fonts.ready.then(()=>Promise.all([...document.images].map(i=>i.complete?1:new Promise(r=>i.onload=r)))).then(()=>{window.__render(0);window.__ready=true;});
+</script>
