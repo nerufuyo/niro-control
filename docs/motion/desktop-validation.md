@@ -1,5 +1,8 @@
 # Desktop validation plan for the motion system
 
+> Superseded for execution by the UAT in [`uat/README.md`](uat/README.md) (42 scenarios, install/rollback, probes, evidence rules, and the generated
+> [`uat/matrix.md`](uat/matrix.md)). This 15-row table stays as the original acceptance list; every row is covered there. Do not record results in both.
+
 Everything below is **unverified** until someone runs it on a real desktop session and ticks it. The headless runs
 (GNOME Shell 51, virtual monitor, virtual input) cover geometry and state, not feel, real input devices or GPU timing.
 Record the date, GNOME version, display setup and outcome next to each item. A failed item is a finding, not a retry.
