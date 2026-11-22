@@ -61,6 +61,10 @@ import {BarHider} from './barHider.js';
 import {SessionRestore} from './sessionRestore.js';
 import {TextWriter} from './writer.js';
 import * as Motion from './motion.js';
+import {Coalescer} from './surfaceMotion.js';
+
+/** Volume key repeat is shown at most this often (ms): about two frames. */
+const OSD_BURST_MS = 33;
 
 /** While the pointer rests before the island opens (Settings: hover-delay), it moves at most this far (CSS px). */
 const REST_DISTANCE_PX = 10;
@@ -198,6 +202,9 @@ export class Controller {
         // Heard once everything listening is built (see `_connectAll`).
         this._daemon.hold();
         this._timeouts = new Map();
+        /** Volume/brightness bursts (see `_postOsd`): at most one shown per interval, the newest held. */
+        this._osdBurst = new Coalescer(OSD_BURST_MS);
+        this._osdHeld = null;
         /** When the island last asked for each agent session (`provider:session`); see `_onAgentEvent`. */
         this._askedAt = new Map();
         /** The AIs whose hook island-daemon is changing now, and whether to ask again after (see `_hookAgent`). */
@@ -2577,6 +2584,28 @@ export class Controller {
 
     /** Shows an OSD as the island's alert. */
     _postOsd(icon, label, level, maxLevel) {
+        // Key repeat sends many a second: the first shows at once, the rest are held and only the newest shows, so the
+        // level bar keeps moving without a rebuild per event (the dismiss timer restarts with each shown one).
+        const now = GLib.get_monotonic_time() / 1000;
+        const turn = this._osdBurst.offer(now);
+        if (!turn.apply) {
+            this._osdHeld = [icon, label, level, maxLevel];
+            if (turn.schedule)
+                this._later('osd-flush', turn.wait, () => {
+                    const held = this._osdHeld;
+                    this._osdHeld = null;
+                    this._osdBurst.flush(GLib.get_monotonic_time() / 1000);
+                    if (held)
+                        this._showOsdNow(...held);
+                });
+            return;
+        }
+        this._cancel('osd-flush');
+        this._osdHeld = null;
+        this._showOsdNow(icon, label, level, maxLevel);
+    }
+
+    _showOsdNow(icon, label, level, maxLevel) {
         const alert = Alerts.osd(icon, label, level, maxLevel);
         // Pressing on at 0% or 100% stretches the island like a rubber band.
         const atLimit = alert.level !== null && (alert.level >= 1 || alert.level <= 0);
