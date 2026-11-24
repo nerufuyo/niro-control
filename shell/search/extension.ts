@@ -36,7 +36,7 @@ import {layoutQuery} from './layouts.js';
 import {agendaQuery, parseEvents, upcoming} from './agenda.js';
 import {Switcher} from './switcher.js';
 import {obstacle, placeSearch, SAFE_GAP} from './placement.js';
-import {anchoredScroll, createSearchMachine, isLive, keepScrollValue, planUpdate, resultKey, rowReveal, SearchMotion} from './searchMotion.js';
+import {anchoredScroll, canActivateOnReturn, createSearchMachine, isLive, keepScrollValue, planUpdate, resultKey, rowReveal, SearchMotion} from './searchMotion.js';
 import {buildEngine, evaluateNow, QUIET_MS} from './adaptive.js';
 import {connectFlowSources, createFlowEmitter} from './flowEvents.js';
 import {savedLayouts} from './actions.js';
@@ -142,6 +142,10 @@ export default class NiroSearch extends Extension {
         const text = this._entry.clutter_text;
         text.connect('text-changed', () => this._refresh());
         text.connect('key-press-event', (_a, event) => this._onKey(event));
+        // GNOME 51: ClutterText takes Return and KP_Enter for its own 'activate' signal and emits no key-press-event for them (measured in an isolated
+        // 51.1 session: Down and Tab reach _onKey, Return does not), so Enter never started a result. The signal is the Return path now; where
+        // key-press-event still carries Return it STOPs the event, the entry emits no 'activate', and `_activate` runs once either way.
+        text.connect('activate', () => { if (canActivateOnReturn(this._sm?.state)) this._activate(this._results[this._selected]); });
 
         Main.wm.addKeybinding('search-shortcut', this._look, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._toggle());
