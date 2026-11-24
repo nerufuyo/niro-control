@@ -59,8 +59,11 @@
         const keys = [];            // pending printable key presses: {t, ch}
         const lat = [], latPaint = [], extra = {printable: 0, backspace: 0, other: 0, duringOpen: 0, matched: 0, unmatched: 0};
         let prevLen = text.get_text().length, openAt = 0, opening = false;
-        // key presses as the focused entry sees them (this signal runs before the entry's own handler inserts the character)
-        connect(text, 'key-press-event', (a, ev) => {
+        // Key presses reaching the focused entry. 'key-press-event' is NOT emitted on this entry in GNOME 51 (the input method consumes the press before
+        // the actor signal), but 'captured-event' on the entry is: measured with mutter's RemoteDesktop path in the isolated session, 21 captured events
+        // for 4 typed characters and 0 key-press-event. Physical keyboards use the same stage path, but that is not yet verified on hardware.
+        connect(entry, 'captured-event', (a, ev) => {
+            if (ev.type() !== Clutter.EventType.KEY_PRESS) return Clutter.EVENT_PROPAGATE;
             const sym = ev.get_key_symbol(), uni = ev.get_key_unicode();
             const t = now();
             const printable = uni && uni >= 32 && uni !== 127 && !(ev.get_state() & (Clutter.ModifierType.CONTROL_MASK | Clutter.ModifierType.MOD1_MASK));
@@ -110,7 +113,7 @@
                 if (i && poses[i].t - poses[i - 1].t < 50) maxStepY = Math.max(maxStepY, Math.abs(poses[i].y - poses[i - 1].y));
             }
             const finalLen = text.get_text().length;
-            const hookWarning = extra.printable === 0 && extra.unmatched > 0 ? 'The entry showed text but its key-press-event never fired, so key latency was NOT measured. Record this as a finding (what kind of keyboard/input method?) and fall back to the video method.' : null;
+            const hookWarning = extra.printable === 0 && extra.unmatched > 0 ? 'The entry showed text but no key press was seen by the entry (captured-event), so key latency was NOT measured. Record this as a finding (what kind of keyboard/input method?) and fall back to the video method.' : null;
             return {
                 keys: extra, final_text_length: finalLen, key_hook_warning: hookWarning,
                 lost_characters_estimate: Math.max(0, extra.printable - extra.matched - keys.length) + keys.length,
