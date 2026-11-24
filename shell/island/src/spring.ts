@@ -7,64 +7,24 @@
 
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
+import {Spring as EngineSpring} from './shared/motionEngine.js';
 
 /** The island's size spring: ~3.5% overshoot, peaking at ~0.37 s and at rest by ~0.57 s. */
 const ISLAND = {stiffness: 155, damping: 18};
 /** Same speed without overshoot, for corner and shoulder radii. */
 export const GENTLE = {stiffness: 155, damping: 25};
 
-const MAX_STEP = 1 / 240;
-const MAX_FRAME = 0.25;
 /** At rest within a quarter pixel, slower than 2 px/s: closer is invisible, and creeping on would keep
  * nudging the island's edges by a pixel for a second more. */
 const REST_DISTANCE = 0.25;
 const REST_SPEED = 2;
 
-/** One animated value pulled toward its target by a damped spring. */
-export class Spring {
+/** One animated value pulled toward its target by a damped spring. The physics (sub-stepped, velocity kept on
+ * retarget) is the shared engine's; this fixes the island's pixel rest thresholds and its two-field config. */
+export class Spring extends EngineSpring {
     /** Starts at rest on `value`; `config` sets stiffness and damping. */
     constructor(value, config = ISLAND) {
-        this.value = value;
-        this.target = value;
-        this.velocity = 0;
-        this.config = config;
-    }
-
-    /** Retargets mid-flight, keeping the current velocity. */
-    setTarget(target, config = this.config) {
-        this.target = target;
-        this.config = config;
-    }
-
-    /** Jumps straight to `value` with no motion. */
-    reset(value) {
-        this.value = this.target = value;
-        this.velocity = 0;
-    }
-
-    /** Whether it is close and slow enough to count as at rest. */
-    get settled() {
-        return Math.abs(this.value - this.target) < REST_DISTANCE &&
-            Math.abs(this.velocity) < REST_SPEED;
-    }
-
-    /** Advances by `dt` seconds; returns whether the spring is at rest. */
-    step(dt) {
-        let remaining = Math.min(Math.max(dt, 0), MAX_FRAME);
-        while (remaining > 0 && !this.settled) {
-            const h = Math.min(remaining, MAX_STEP);
-            const {stiffness, damping} = this.config;
-            const acceleration = -stiffness * (this.value - this.target) - damping * this.velocity;
-            this.velocity += acceleration * h;
-            this.value += this.velocity * h;
-            remaining -= h;
-        }
-        if (this.settled) {
-            this.value = this.target;
-            this.velocity = 0;
-            return true;
-        }
-        return false;
+        super(value, config, {restDistance: REST_DISTANCE, restSpeed: REST_SPEED});
     }
 }
 

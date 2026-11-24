@@ -1,0 +1,60 @@
+# after: screen x of each actor per painted frame (ms; stage = the island's clip; actor x+width @ paint opacity, h = hidden)
+## to_split
+     0 stage 884..1036 h28 | compact:884+152@255 lead:888+22@255 right:1012+18@255 expanded:600+720@0h tab0:620+80@0h tab1:702+36@0h page:600+453@0h
+    21 stage 884..1037 h28 | compact:865+190@255 lead:888+22@255 right:1012+18@0 expanded:600+720@0h tab0:620+80@0h tab1:702+36@0h page:600+453@0h
+    34 stage 883..1038 h28 | compact:865+190@255 lead:887+22@255 right:1013+18@0 expanded:599+720@0h tab0:619+80@0h tab1:701+36@0h page:599+453@0h
+    51 stage 881..1039 h28 | compact:865+190@255 lead:885+22@255 right:1015+18@0 expanded:597+720@0h tab0:617+80@0h tab1:699+36@0h page:597+453@0h
+    68 stage 880..1041 h28 | compact:865+190@255 lead:884+22@255 right:1016+18@0 expanded:596+720@0h tab0:616+80@0h tab1:698+36@0h page:596+453@0h
+    84 stage 878..1042 h28 | compact:865+190@255 lead:882+22@255 right:1018+18@0 expanded:594+720@0h tab0:614+80@0h tab1:696+36@0h page:594+453@0h
+   101 stage 876..1044 h28 | compact:865+190@255 lead:880+22@255 right:1020+18@0 expanded:592+720@0h tab0:612+80@0h tab1:694+36@0h page:592+453@0h
+   118 stage 875..1046 h28 | compact:865+190@255 lead:879+22@255 right:1021+18@0 expanded:591+720@0h tab0:611+80@0h tab1:693+36@0h page:591+453@0h
+   136 stage 873..1048 h28 | compact:865+190@255 lead:877+22@255 right:1023+18@5 expanded:589+720@0h tab0:609+80@0h tab1:691+36@0h page:589+453@0h
+   151 stage 871..1049 h28 | compact:865+190@255 lead:875+22@255 right:1025+18@31 expanded:587+720@0h tab0:607+80@0h tab1:689+36@0h page:587+453@0h
+   168 stage 870..1050 h28 | compact:865+190@255 lead:874+22@255 right:1026+18@77 expanded:586+720@0h tab0:606+80@0h tab1:688+36@0h page:586+453@0h
+   185 stage 869..1052 h28 | compact:865+190@255 lead:873+22@255 right:1027+18@130 expanded:585+720@0h tab0:605+80@0h tab1:687+36@0h page:585+453@0h
+   201 stage 868..1053 h28 | compact:865+190@255 lead:872+22@255 right:1028+18@176 expanded:584+720@0h tab0:604+80@0h tab1:686+36@0h page:584+453@0h
+   218 stage 867..1053 h28 | compact:865+190@255 lead:871+22@255 right:1029+18@213 expanded:583+720@0h tab0:603+80@0h tab1:685+36@0h page:583+453@0h
+   234 stage 866..1054 h28 | compact:865+190@255 lead:870+22@255 right:1030+18@234 expanded:582+720@0h tab0:602+80@0h tab1:684+36@0h page:582+453@0h
+   251 stage 866..1055 h28 | compact:865+190@255 lead:870+22@255 right:1030+18@245 expanded:582+720@0h tab0:602+80@0h tab1:684+36@0h page:582+453@0h
+   267 stage 865..1055 h28 | compact:865+190@255 lead:869+22@255 right:1031+18@251 expanded:581+720@0h tab0:601+80@0h tab1:683+36@0h page:581+453@0h
+   284 stage 865..1056 h28 | compact:865+190@255 lead:869+22@255 right:1031+18@253 expanded:581+720@0h tab0:601+80@0h tab1:683+36@0h page:581+453@0h
+   300 stage 865..1056 h28 | compact:865+190@255 lead:869+22@255 right:1031+18@254 expanded:581+720@0h tab0:601+80@0h tab1:683+36@0h page:581+453@0h
+   319 stage 865..1056 h28 | compact:865+190@255 lead:869+22@255 right:1031+18@255 expanded:581+720@0h tab0:601+80@0h tab1:683+36@0h page:581+453@0h
+   334 stage 864..1056 h28 | compact:865+190@255 lead:868+22@255 right:1032+18@255 expanded:580+720@0h tab0:600+80@0h tab1:682+36@0h page:580+453@0h
+   351 stage 864..1056 h28 | compact:865+190@255 lead:868+22@255 right:1032+18@255 expanded:580+720@0h tab0:600+80@0h tab1:682+36@0h page:580+453@0h
+## compact_to_expanded
+     0 stage 883..1038 h28 | compact:884+152@255 lead:888+22@255 right:1012+18@255 expanded:600+720@0 tab0:903+80@0 tab1:985+36@0 page:600+720@0
+    15 stage 873..1049 h28 | compact:884+152@252 lead:888+22@252 right:1012+18@252 expanded:600+720@0 tab0:892+80@0 tab1:974+36@0 page:600+720@0
+    32 stage 854..1066 h28 | compact:884+152@244 lead:888+22@244 right:1012+18@244 expanded:600+720@0 tab0:874+80@0 tab1:956+36@0 page:600+720@0
+    48 stage 832..1090 h28 | compact:884+152@230 lead:888+22@230 right:1012+18@230 expanded:600+720@0 tab0:851+80@0 tab1:933+36@0 page:600+720@0
+    67 stage 806..1115 h33 | compact:884+152@210 lead:888+22@210 right:1012+18@210 expanded:600+720@0 tab0:826+80@0 tab1:908+36@0 page:600+720@0
+    82 stage 779..1141 h42 | compact:884+152@186 lead:888+22@186 right:1012+18@186 expanded:600+720@0 tab0:799+80@0 tab1:881+36@0 page:600+720@0
+    98 stage 753..1168 h56 | compact:884+152@155 lead:888+22@155 right:1012+18@155 expanded:600+720@0 tab0:773+80@0 tab1:855+36@0 page:600+720@0
+   115 stage 728..1194 h71 | compact:884+152@118 lead:888+22@118 right:1012+18@118 expanded:600+720@26 tab0:747+80@0 tab1:829+36@0 page:600+720@0
+   132 stage 704..1217 h87 | compact:884+152@78 lead:888+22@78 right:1012+18@78 expanded:600+720@49 tab0:724+80@0 tab1:806+36@0 page:600+720@0
+   149 stage 683..1237 h104 | compact:884+152@30 lead:888+22@30 right:1012+18@30 expanded:600+720@73 tab0:703+80@0 tab1:785+36@0 page:600+720@0
+   165 stage 665..1257 h119 | compact:866+152@0h lead:870+22@0h right:994+18@0h expanded:600+720@95 tab0:684+80@0 tab1:766+36@0 page:600+720@0
+   182 stage 648..1272 h134 | compact:849+152@0h lead:853+22@0h right:977+18@0h expanded:600+720@115 tab0:668+80@0 tab1:750+36@0 page:600+720@0
+   198 stage 635..1286 h147 | compact:836+152@0h lead:840+22@0h right:964+18@0h expanded:600+720@134 tab0:655+80@0 tab1:737+36@0 page:600+720@0
+   215 stage 624..1298 h159 | compact:825+152@0h lead:829+22@0h right:953+18@0h expanded:600+720@152 tab0:643+80@0 tab1:725+36@0 page:600+720@0
+   232 stage 614..1306 h170 | compact:815+152@0h lead:819+22@0h right:943+18@0h expanded:600+720@167 tab0:634+80@0 tab1:716+36@0 page:600+720@0
+   249 stage 607..1313 h179 | compact:808+152@0h lead:812+22@0h right:936+18@0h expanded:600+720@183 tab0:627+80@25 tab1:709+36@25 page:600+720@25
+   265 stage 602..1320 h186 | compact:803+152@0h lead:807+22@0h right:931+18@0h expanded:600+720@196 tab0:621+80@51 tab1:703+36@51 page:600+720@51
+   282 stage 597..1323 h192 | compact:798+152@0h lead:802+22@0h right:926+18@0h expanded:600+720@208 tab0:620+80@77 tab1:702+36@77 page:600+720@77
+   299 stage 594..1326 h197 | compact:795+152@0h lead:799+22@0h right:923+18@0h expanded:600+720@219 tab0:620+80@105 tab1:702+36@105 page:600+720@105
+   316 stage 593..1329 h201 | compact:794+152@0h lead:798+22@0h right:922+18@0h expanded:600+720@228 tab0:620+80@131 tab1:702+36@131 page:600+720@131
+   332 stage 591..1329 h203 | compact:792+152@0h lead:796+22@0h right:920+18@0h expanded:600+720@236 tab0:620+80@155 tab1:702+36@155 page:600+720@155
+   349 stage 591..1330 h205 | compact:792+152@0h lead:796+22@0h right:920+18@0h expanded:600+720@242 tab0:620+80@178 tab1:702+36@178 page:600+720@178
+## judge
+ok   sign_comes              164 frames  nothing moved off its edge, nothing cut
+ok   to_split                 39 frames  nothing moved off its edge, nothing cut
+ok   split_to_expanded       173 frames  nothing moved off its edge, nothing cut
+ok   expanded_to_split        63 frames  nothing moved off its edge, nothing cut
+ok   split_to_compact        147 frames  nothing moved off its edge, nothing cut
+ok   compact_to_expanded     150 frames  nothing moved off its edge, nothing cut
+ok   expanded_to_compact     149 frames  nothing moved off its edge, nothing cut
+ok   sign_goes               110 frames  nothing moved off its edge, nothing cut
+ok   flips                   207 frames  nothing moved off its edge, nothing cut
+ok   retarget_open            66 frames  nothing moved off its edge, nothing cut
+ok   retarget_close          172 frames  nothing moved off its edge, nothing cut
+CLIP_JUDGE PASS

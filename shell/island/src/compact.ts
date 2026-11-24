@@ -20,7 +20,8 @@ import * as Format from './format.js';
 import * as Palette from './palette.js';
 import * as Playback from './playback.js';
 import * as Theme from './theme.js';
-import {dur, motionOn} from './motion.js';
+import {dur, motionMode, motionOn} from './motion.js';
+import {arrivalGate, revealDelays, splitRevealDelay} from './surfaceMotion.js';
 import {watchClock} from './wallClock.js';
 import {Art, Bars, PrivacyDots, RecordingDot, Ring, icon, restsAt} from './widgets.js';
 
@@ -44,6 +45,8 @@ const CORNER_RADIUS = {hanging: 16, inBar: 10};
 const TEXT_INSET = {hanging: 13, inBar: 10};
 /** Between the Do Not Disturb moon and the time, in CSS pixels (as .island-compact-clock-box's spacing). */
 const MOON_GAP = 6;
+/** A sign that leaves fades out this long (ms). */
+const GHOST_MS = 140;
 /** The music bars' opacity while the song is paused. */
 const PAUSED_OPACITY = 110;
 /** How often the focus ring is redrawn; it moves too slowly to need more. */
@@ -80,7 +83,7 @@ class CentreLayout extends Clutter.LayoutManager {
 
 /** The closed island's contents; emits `width-changed` when it needs another width. */
 export const CompactView = GObject.registerClass({
-    Signals: {'width-changed': {}},
+    Signals: {'width-changed': {}, 'activities-changed': {}},
 }, class CompactView extends St.Widget {
     /** `privacy` and `call` are the shell's recording and call watchers. */
     _init(daemon, settings, privacy, call) {
@@ -97,6 +100,10 @@ export const CompactView = GObject.registerClass({
         /** In a pill (Settings → Shape): its ends as round as half its height (see `_fit`). */
         this._pill = false;
         this._timeouts = {};
+        /** The live activities (recording, call, music, timer) in order, and whether two or more share the island (see `_refresh`). */
+        this._activities = [];
+        /** Clones of signs fading out where they were (see `_leave`). */
+        this._ghosts = new Set();
 
         const row = new St.BoxLayout({style_class: 'island-compact-row', x_expand: true, y_expand: true});
         this._row = row;
@@ -453,6 +460,9 @@ export const CompactView = GObject.registerClass({
         const activities = [recording && 'recording', onCall && 'call', hasTrack && 'music', timerActive && 'timer']
             .filter(Boolean);
         const [primary, second] = activities;
+        const splitBefore = this._activities.length >= 2;
+        this._activities = activities;
+        const split = activities.length >= 2;
         // On a call the green phone already says the microphone is on, unless another app records too.
         const privacy = this._showingPrivacy() ? this._privacy : {};
         const microphone = privacy.microphone && (!onCall || this._call.othersRecording);
@@ -466,7 +476,7 @@ export const CompactView = GObject.registerClass({
         if (!left && this._unseen)
             left = this._dot;
         if (this._lead.child !== left)
-            this._swap(this._lead, left);
+            this._swap(this._lead, left, 0);
         this._lead.visible = Boolean(left);
         // Right, the first that applies: island-daemon down, the assistant at work, a call's muted microphone, the next
         // activity's sign, what goes with the first (the song's bars, the timer's time left).
@@ -481,7 +491,7 @@ export const CompactView = GObject.registerClass({
             right = this._serviceDown;
         this._privacyDots.update(dots);
         if (this._right.child !== right)
-            this._swap(this._right, right);
+            this._swap(this._right, right, this._revealDelay(second ? 'split' : 'companion'));
         // Hidden when empty: then nothing on the right is measured (see `_fit`).
         this._right.visible = Boolean(right);
         this._tickSecond();
@@ -490,8 +500,11 @@ export const CompactView = GObject.registerClass({
         for (const [actor, on] of [[this._bars, playing], [this._timerIcon, pomodoro?.running], [this._timerTime, pomodoro?.running],
             [this._ring, pomodoro?.running], [this._secondRing, pomodoro?.running]]) {
             const opacity = on ? 255 : PAUSED_OPACITY;
-            if (!restsAt(actor, 'opacity', opacity))
-                actor.ease({opacity, duration: dur(200)});
+            if (!restsAt(actor, 'opacity', opacity)) {
+                // A sign just put in keeps the wait of its reveal (see `_swap`); without it the dim-to-rest ease cut that short.
+                actor.ease({opacity, delay: dur(actor._revealDelay ?? 0), duration: dur(200)});
+                actor._revealDelay = 0;
+            }
         }
         this._syncBars();
 
@@ -518,19 +531,89 @@ export const CompactView = GObject.registerClass({
         }
 
         this._fit();
+        if (split !== splitBefore)
+            this.emit('activities-changed');
         if (this.preferredWidth !== widthBefore)
             this.emit('width-changed');
+        // No move came of it (the island has the width already): nothing to wait for.
+        for (const slot of [this._lead, this._right]) {
+            if (slot._arrival?.from === null) {
+                slot._arrival = null;
+                slot.opacity = 255;
+            }
+        }
     }
 
-    /** Puts `sign` in `side`, fading in once on screen: one sign giving way to another reads as a change. */
-    _swap(side, sign) {
+    /** How many activities (recording, call, music, timer) are live: two or more share the island (the surface is `split`). */
+    get activityCount() {
+        return this._activities.length;
+    }
+
+    /** Ms a sign waits before it fades in, so the content arrives in order, after the shape: the first sign at once, what goes
+     * with it (its bars, its time left) the next step of the stagger, and the second activity of a split once the shape has made
+     * room for it (see surfaceMotion.ts). None when motion is reduced. */
+    _revealDelay(kind) {
+        const mode = motionMode();
+        if (kind === 'split')
+            return splitRevealDelay({mode});
+        return revealDelays(2, {reduced: mode !== 'full'})[1];
+    }
+
+    /** Puts `sign` in `side`, fading in (after `delay` ms) once on screen: one sign giving way to another reads as a change. */
+    _swap(side, sign, delay = 0) {
+        this._leave(side.child);
         side.child = sign;
         if (!sign || !this.mapped || !motionOn())
             return;
         // To full: a paused song's bars or timer's time are dimmed after (see `_refresh`).
         sign.remove_transition('opacity');
         sign.opacity = 0;
-        sign.ease({opacity: 255, duration: dur(200), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        sign._revealDelay = delay;
+        sign.ease({opacity: 255, delay: dur(delay), duration: dur(200), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+        // It also waits for the surface to have the room: its slot is shown by how wide the surface is (see `followSurface`).
+        side._arrival = {from: null, to: null};
+    }
+
+    /** The island tells, every frame while it changes size, how far each edge of its surface is from where it will rest (null at
+     * rest): the sign at each end keeps its place from that edge instead of sitting at its final one at once (past the surface's clip
+     * when it widens, teleported when it narrows); the clock stays in the middle. A sign that arrives is shown by how much of the
+     * way to the new width the surface has made, not by time alone (see surfaceMotion.ts `arrivalGate`). */
+    followSurface(state) {
+        this._left.translation_x = state ? state.left : 0;
+        this._rightSide.translation_x = state ? state.right : 0;
+        for (const slot of [this._lead, this._right]) {
+            const arrival = slot._arrival;
+            if (!arrival)
+                continue;
+            if (state && arrival.from === null) {
+                arrival.from = state.width;
+                arrival.to = state.finalWidth;
+            }
+            const gate = state ? arrivalGate(state.width, arrival.from, arrival.to) : 1;
+            slot.opacity = Math.round(255 * gate);
+            // Settled, or nothing to wait for (the surface is not growing).
+            if (!state || arrival.to - arrival.from < 1)
+                slot._arrival = null;
+        }
+    }
+
+    /** A sign that leaves (the timer ended, the song stopped) fades out where it was, as a clone of it, while the slot is already given
+     * to what comes next: the slot's width follows at once, the sign does not vanish with it. */
+    _leave(old) {
+        if (!old || old.opacity === 0 || !this.mapped || !motionOn())
+            return;
+        const ghost = new Clutter.Clone({source: old, x_expand: false, y_expand: false,
+            x_align: Clutter.ActorAlign.START, y_align: Clutter.ActorAlign.START, reactive: false});
+        const [x, y] = old.get_transformed_position();
+        const [left, top] = this.get_transformed_position();
+        ghost.set_translation(x - left, y - top, 0);
+        ghost.opacity = old.opacity;
+        this._ghosts.add(ghost);
+        this.add_child(ghost);
+        ghost.ease({opacity: 0, duration: dur(GHOST_MS), mode: Clutter.AnimationMode.EASE_IN_QUAD, onStopped: () => {
+            if (this._ghosts.delete(ghost))
+                ghost.destroy();
+        }});
     }
 
     /** Fades `actor` in and the other centre actors out. */
@@ -658,6 +741,11 @@ export const CompactView = GObject.registerClass({
     /** Stops timers and signals, and destroys the signs not in a slot right now. */
     _onDestroy() {
         this._stopClock();
+        // Emptied first: a ghost's own stop callback then finds it gone and leaves it be.
+        const ghosts = [...this._ghosts];
+        this._ghosts.clear();
+        for (const ghost of ghosts)
+            ghost.destroy();
         for (const name of Object.keys(this._timeouts))
             this._cancel(name);
         this._daemon.disconnect(this._daemonChanged);

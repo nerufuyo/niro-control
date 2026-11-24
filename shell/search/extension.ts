@@ -35,12 +35,15 @@ import {entities, haQuery, validBase} from './homeAssistant.js';
 import {layoutQuery} from './layouts.js';
 import {agendaQuery, parseEvents, upcoming} from './agenda.js';
 import {Switcher} from './switcher.js';
+import {obstacle, placeSearch, SAFE_GAP} from './placement.js';
+import {anchoredScroll, canActivateOnReturn, createSearchMachine, isLive, keepScrollValue, planUpdate, resultKey, rowReveal, SearchMotion} from './searchMotion.js';
 import {buildEngine, evaluateNow, QUIET_MS} from './adaptive.js';
 import {connectFlowSources, createFlowEmitter} from './flowEvents.js';
 import {savedLayouts} from './actions.js';
 import {contentNeedle, defineQuery, definitions, grepArgs, historyMatches, historyNeedle, killName, matchProcesses, qrText, translateQuery, translated} from './lookups.js';
 
 const WIDTH = 680;
+const ISLAND_ACTOR = 'islandIsland';       // the Niro Island's actor name; see _findIsland
 /** JSON with the keys in order, so the same arguments written in another order are the same request. */
 const canon = (v) => JSON.stringify(v, (_k, x) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.keys(x).sort().map(k => [k, x[k]])) : x));
 const LIMITS = {Applications: 5, Windows: 4, Settings: 5, Profiles: 4, Actions: 4, Clipboard: 6, Files: 8};
@@ -75,6 +78,19 @@ export default class NiroSearch extends Extension {
         this._rows = [];
         this._selected = 0;
         this._once = new Once();
+        this._sm = createSearchMachine();
+        this._keys = [];                   // identity of each result row, so a late update keeps the selection on the same result
+        this._rowByKey = new Map();
+        this._animRow = [];
+        this._lastQuery = null;
+        this._frames = null;
+        this._motion = new SearchMotion({
+            onWake: () => this._wakeFrames(),
+            onFrame: () => this._drawMotion(),
+            onOpened: () => this._sm?.send('settled', {count: this._results.length}),
+            onClosed: () => { this._sm?.send('settled'); this._box?.hide(); },
+            off: () => !St.Settings.get().enable_animations,
+        });
         this._rates = new Map();
         this._files = new Map();
         this._vars = {};
@@ -122,9 +138,14 @@ export default class NiroSearch extends Extension {
         this._box.add_child(this._entry); this._box.add_child(this._status); this._box.add_child(this._scroll); this._box.add_child(this._hint);
         Main.layoutManager.uiGroup.add_child(this._box);
 
+        this._box.set_pivot_point(0.5, 0);
         const text = this._entry.clutter_text;
         text.connect('text-changed', () => this._refresh());
         text.connect('key-press-event', (_a, event) => this._onKey(event));
+        // GNOME 51: ClutterText takes Return and KP_Enter for its own 'activate' signal and emits no key-press-event for them (measured in an isolated
+        // 51.1 session: Down and Tab reach _onKey, Return does not), so Enter never started a result. The signal is the Return path now; where
+        // key-press-event still carries Return it STOPs the event, the entry emits no 'activate', and `_activate` runs once either way.
+        text.connect('activate', () => { if (canActivateOnReturn(this._sm?.state)) this._activate(this._results[this._selected]); });
 
         Main.wm.addKeybinding('search-shortcut', this._look, Meta.KeyBindingFlags.IGNORE_AUTOREPEAT,
             Shell.ActionMode.NORMAL | Shell.ActionMode.OVERVIEW, () => this._toggle());
@@ -161,7 +182,10 @@ export default class NiroSearch extends Extension {
         endSpotlight();
         this._soup?.abort();
         this._soup = null;
-        this._close();
+        this._release();
+        this._motion?.cancel();
+        this._stopFrames();
+        this._motion = this._sm = null;
         this._box?.destroy();
         this._box = this._entry = this._list = this._scroll = this._status = this._hint = null;
         this._registry = this._look = this._gate = this._ad = null;
@@ -332,6 +356,7 @@ export default class NiroSearch extends Extension {
 
     async _activate(result) {
         if (!result || !this._once.begin()) return;
+        this._sm.send('execute');          // the selected row stays lit while the panel fades; the action starts now, never after the fade
         this._close();
         let outcome;
         this._viaAdaptive = Boolean(result.adaptiveRule);
@@ -366,26 +391,41 @@ export default class NiroSearch extends Extension {
 
     /** Niro Snip: the desktop's own picker, then an editor for the shot. */
     _snip() {
-        if (this._box.visible) this._close();
+        if (this._live()) this._close();
         this._run('system.snip', {}, 'ui');
     }
 
     // ---- Showing
-    _toggle() { this._box.visible ? this._close() : this._open(); }
+    /** True from the first frame of opening until the user dismisses it; not while the panel is only fading out. */
+    _live() { return Boolean(this._sm) && (isLive(this._sm.state) || this._sm.state === 'Executing'); }
+
+    _toggle() { this._live() ? this._close() : this._open(); }
 
     _open() {
+        if (this._live()) return;
         this._adaptive = this._adaptiveSuggestion();       // before the palette takes the focus: it is about the window that had it
         this._grab = Main.pushModal(this._box, {actionMode: Shell.ActionMode.POPUP});
         if (!this._grab) return;
         this._applyLook();
         const monitor = Main.layoutManager.currentMonitor;
-        this._box.set_position(Math.round(monitor.x + (monitor.width - WIDTH) / 2), Math.round(monitor.y + monitor.height * 0.16));
-        this._scroll.style = `max-height: ${Math.round(monitor.height * 0.5)}px;`;
+        this._monitor = monitor;
+        this._defaultY = Math.round(monitor.y + monitor.height * 0.16);
+        this._box.set_position(Math.round(monitor.x + (monitor.width - WIDTH) / 2), this._defaultY);
+        this._scrollMax = Math.round(monitor.height * 0.5);
+        this._scroll.style = `max-height: ${this._scrollMax}px;`;
         this._windows = windows();
+        this._sm.send('open');
         this._entry.set_text('');
+        this._lastQuery = null;
+        this._motion.dropHighlights();
+        const wasHidden = !this._box.visible;
         this._box.show();
         this._refresh();
-        this._entry.grab_key_focus();
+        this._watchIsland();
+        this._placeNow(wasHidden);                         // clear of the island from the first frame; a panel still fading out moves smoothly instead
+        this._entry.grab_key_focus();                      // keys work from the first frame: the animation never gates typing
+        this._motion.open();
+        this._drawMotion();
         this._outside = global.stage.connect('button-press-event', (_s, event) => {
             const [x, y] = event.get_coords();
             const [bx, by] = this._box.get_transformed_position();
@@ -395,13 +435,155 @@ export default class NiroSearch extends Extension {
         });
     }
 
-    _close() {
+    /** Hands the keyboard back and forgets the moment's data at once; what is left of the panel is only a fade. */
+    _release() {
+        this._unwatchIsland();
+        this._fit = null;
         if (this._outside) { global.stage.disconnect(this._outside); this._outside = 0; }
         if (this._grab) { Main.popModal(this._grab); this._grab = null; }
-        this._box?.hide();
         this._files?.clear();
         this._net?.clear(); this._procs?.clear(); this._contents?.clear();
         this._adaptive = null;                                   // file names are not kept once the palette is closed
+    }
+
+    _close() {
+        this._release();
+        if (!this._sm || this._sm.state === 'Closed') return;
+        this._sm.send('close');
+        this._motion.close();                                    // fades out; onClosed hides the actor
+    }
+
+    // ---- Keeping clear of the Niro Island
+    // The island is another extension. Search does not import it or ask it anything: it finds the island's actor in the shell's chrome by its
+    // NAME, 'islandIsland' (set in shell/island/src/island.ts and not to be renamed), and reads what GNOME itself reports about that actor
+    // (its stage rectangle, visibility), the same way any shell code can see any actor. FALLBACK: if no actor has that name (island not
+    // enabled, renamed, or destroyed) or it is hidden/unmapped/on another monitor, nothing is an obstacle and Search sits at its normal anchor.
+    // The actor is looked up once per open and the signals are connected only while Search is open (no polling, no per-frame queries).
+    _findIsland() {
+        const walk = (actor, depth) => {
+            if (actor.get_name?.() === ISLAND_ACTOR) return actor;
+            if (depth > 3) return null;
+            for (const child of actor.get_children?.() ?? []) { const hit = walk(child, depth + 1); if (hit) return hit; }
+            return null;
+        };
+        return walk(Main.layoutManager.uiGroup, 0);
+    }
+
+    _watchIsland() {
+        this._unwatchIsland();
+        const island = this._findIsland();
+        if (!island) {
+            // Not there yet (enabled while Search is open): look again when the shell's chrome gains a child; until then no obstacle.
+            this._groupId = Main.layoutManager.uiGroup.connect('child-added', (_g, actor) => {
+                if (actor.get_name?.() !== ISLAND_ACTOR) return;
+                this._watchIsland();
+                this._queuePlace();
+            });
+            return;
+        }
+        this._island = island;
+        this._islandIds = ['x', 'y', 'width', 'height', 'visible', 'mapped', 'opacity', 'translation-x', 'translation-y', 'scale-x', 'scale-y']
+            .map(prop => island.connect(`notify::${prop}`, () => { this._follow(); this._queuePlace(); }));
+        this._islandIds.push(island.connect('destroy', () => { this._island = null; this._islandIds = null; this._queuePlace(); }));
+    }
+
+    _unwatchIsland() {
+        if (this._groupId) { try { Main.layoutManager.uiGroup.disconnect(this._groupId); } catch (_e) { /* gone */ } this._groupId = 0; }
+        if (this._island && this._islandIds) for (const id of this._islandIds) { try { this._island.disconnect(id); } catch (_e) { /* destroyed */ } }
+        this._island = null; this._islandIds = null;
+        if (this._placeLater) { global.compositor.get_laters().remove(this._placeLater); this._placeLater = 0; }
+    }
+
+    /**
+     * The island moves in its own frame step, which can land after this frame's `BEFORE_REDRAW` evaluation: acting only there leaves Search one frame
+     * behind a growing island (measured: up to 7 px of overlap on 4 of 75 frames). So a notification also does the cheap part at once: if the island's
+     * edge now reaches the panel, push it down (cached measurements, one rectangle read, no layout queries). The full evaluation stays one per frame.
+     */
+    _follow() {
+        if (!this._box || !this._motion || !this._fit || !this._live()) return;
+        const rect = this._islandRect();
+        if (!rect) return;
+        const plan = placeSearch({...this._fit, island: rect, panelX: this._box.x, defaultY: this._defaultY, gap: SAFE_GAP});
+        if (plan.offset <= this._motion.dodge.value) return;
+        this._motion.place(plan.offset, false);
+        this._box.translation_y = this._motion.pose().dy + this._motion.dodge.value;
+    }
+
+    /** One evaluation per frame however many island notifications arrive (a morph changes x, y, width and height every frame). */
+    _queuePlace() {
+        if (this._placeLater || !this._box || !this._live()) return;
+        this._placeLater = global.compositor.get_laters().add(Meta.LaterType.BEFORE_REDRAW, () => {
+            this._placeLater = 0;
+            this._placeNow(false);
+            return false;
+        });
+    }
+
+    /** The island's visible rectangle in stage pixels, if it is an obstacle on Search's monitor. */
+    _islandRect() {
+        const a = this._island;
+        if (!a) return null;
+        const visible = a.visible && a.mapped && a.get_paint_opacity() > 0;
+        if (!visible) return null;
+        const rect = a.get_transformed_extents();
+        return obstacle({x: rect.get_x(), y: rect.get_y(), width: rect.get_width(), height: rect.get_height()}, visible, this._monitor);
+    }
+
+    /** Moves the panel clear of the island (or back), and keeps its results list inside the work area. `instant`: no spring. */
+    _placeNow(instant) {
+        if (!this._box || !this._motion || !this._monitor) return;
+        const m = this._monitor;
+        // Heights are outer boxes: the scroll view's own padding is inside `max-height`'s outside, so it is taken off when the cap is written.
+        const pad = this._scroll.get_theme_node().get_vertical_padding();
+        const total = this._box.get_preferred_height(WIDTH)[1];
+        const fixed = total - this._scroll.get_preferred_height(WIDTH)[1];
+        const normalCap = Math.round(m.height * 0.5);
+        const wanted = Math.min(this._list.get_preferred_height(WIDTH)[1], normalCap) + pad;
+        this._fit = {work: Main.layoutManager.getWorkAreaForMonitor(m.index), panelWidth: WIDTH, fixedHeight: fixed, wantedResults: wanted};
+        const plan = placeSearch({...this._fit, panelX: this._box.x, defaultY: this._defaultY, island: this._islandRect(), gap: SAFE_GAP});
+        const cap = plan.maxResults < wanted ? Math.max(0, plan.maxResults - pad) : normalCap;
+        if (cap !== this._scrollMax) { this._scrollMax = cap; this._scroll.style = `max-height: ${cap}px;`; }
+        this._motion.place(plan.offset, instant);
+        this._drawMotion();
+    }
+
+    // ---- Motion: the frame loop exists only while a spring is moving
+    /** One step per real frame: a Clutter timeline on the box runs in the stage's frame clock, so every step lands before a paint (a GLib timeout beats against it). */
+    _wakeFrames() {
+        if (this._frames || !this._box) return;
+        const frames = new Clutter.Timeline({actor: this._box, duration: 3_600_000});
+        frames.connect('new-frame', (_t, ms: number) => {
+            this._motion?.tick(ms);
+            if (!this._motion?.animator.active) this._stopFrames();        // a spring woken during the last step keeps the loop going
+        });
+        this._frames = frames;
+        frames.start();
+    }
+
+    _stopFrames() {
+        const frames = this._frames;
+        this._frames = null;
+        frames?.stop();
+    }
+
+    _drawMotion() {
+        if (!this._box || !this._motion) return;
+        const pose = this._motion.pose();
+        this._box.opacity = pose.opacity;
+        this._box.set_scale(pose.scale, pose.scale);
+        this._box.translation_y = pose.dy + this._motion.dodge.value;
+        const reveal = this._motion.reveal.value;
+        this._rows.forEach((row, i) => {
+            const r = this._animRow[i] ? rowReveal(reveal, i) : {opacity: 255, dy: 0};
+            row.opacity = r.opacity; row.translation_y = r.dy;
+        });
+        for (const [key, spring] of this._motion.highlight) this._paintRow(this._rowByKey.get(key), spring.value);
+    }
+
+    _paintRow(row, alpha: number) {
+        if (!row) return;
+        const [r, g, b] = this._accent ?? [232, 71, 43];
+        row.set_style(alpha > 0.01 ? `background-color: rgba(${r}, ${g}, ${b}, ${(0.28 * alpha).toFixed(3)});` : '');
     }
 
     _applyLook() {
@@ -571,9 +753,9 @@ export default class NiroSearch extends Extension {
                 if (msg.get_status() !== Soup.Status.OK) throw new Error(`HTTP ${msg.get_status()}`);
                 entry.value = parse(JSON.parse(new TextDecoder().decode(bytes.get_data())));
                 if (!entry.value) throw new Error('nothing found');
-                if (this._box?.visible && this._entry.get_text() === query) this._refresh();
+                if (this._live() && this._entry.get_text() === query) this._refresh();
             } catch (e) {
-                if (this._box?.visible && this._entry.get_text() === query) this._say(`Lookup failed: ${e.message}`);
+                if (this._live() && this._entry.get_text() === query) this._say(`Lookup failed: ${e.message}`);
             }
         });
         return entry;
@@ -589,7 +771,7 @@ export default class NiroSearch extends Extension {
                 try {
                     const [, out] = p.communicate_utf8_finish(res);
                     this._procs?.set(needle, matchProcesses(out ?? '', needle, Number(new TextDecoder().decode(GLib.file_get_contents('/proc/self/stat')[1]).split(' ')[0]), 6, String(this._pref('kill-protected', '')).split(',')));
-                    if (this._box?.visible) this._refresh();
+                    if (this._live()) this._refresh();
                 } catch (_e) { /* no list */ }
             });
         } catch (_e) { /* no ps */ }
@@ -678,7 +860,7 @@ export default class NiroSearch extends Extension {
             try { [, out] = p.communicate_utf8_finish(res); } catch (_e) { out = ''; }
             if (!this._contents) return;
             this._contents.set(key, rankFiles((out ?? '').split('\n'), needle, GLib.get_home_dir()));
-            if (this._box?.visible) this._refresh();
+            if (this._live()) this._refresh();
         });
     }
 
@@ -717,7 +899,7 @@ export default class NiroSearch extends Extension {
             try { [, out] = p.communicate_utf8_finish(res); } catch (e) { out = ''; }
             if (!this._files) return;
             this._files.set(needle.toLowerCase(), rankFiles((out ?? '').split('\n'), needle, home));
-            if (this._box?.visible && fileNeedle(this._entry.get_text())?.toLowerCase() === needle.toLowerCase()) this._refresh();
+            if (this._live() && fileNeedle(this._entry.get_text())?.toLowerCase() === needle.toLowerCase()) this._refresh();
         });
     }
 
@@ -810,7 +992,7 @@ export default class NiroSearch extends Extension {
         this._liveTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 1500, () => {
             this._liveTimer = 0;
             try {
-                if (this._box?.visible || !this._ad) return GLib.SOURCE_REMOVE;
+                if (this._live() || !this._ad) return GLib.SOURCE_REMOVE;
                 const list = profiles();
                 const active = list.find(p => p.active)?.id ?? null;
                 const found = evaluateNow(this._ad.engine, this._signals(), active, id => list.some(p => p.id === id));
@@ -879,14 +1061,24 @@ export default class NiroSearch extends Extension {
         try { results = this._collect(query); } catch (e) { failure = e.message; }
         this._fetchRates(query);
         this._findFiles(query);
+        // A late answer for the same text (rates, files, the web) keeps the selection on the same result and the scroll where it was.
+        const queryChanged = query !== this._lastQuery;
+        this._lastQuery = query;
+        const adj = this._scroll.vadjustment ?? this._scroll.get_vscroll_bar?.().adjustment;
+        const selRow = this._rows[this._selected];
+        // where the selected row sits in the viewport now (its allocation is current: nothing was rebuilt yet)
+        const anchor = adj && selRow ? selRow.get_allocation_box().y1 - adj.value : null;
+        const before = {keys: this._keys, selected: this._selected};
         this._results = results;
         this._list.destroy_all_children();
         this._rows = [];
+        this._rowByKey.clear();
+        this._motion?.dropHighlights();
         this._status.visible = false;
         if (failure) {
             this._say(`Search failed: ${failure}`);
         } else if (!results.length) {
-            this._say(query.trim() ? `Nothing matches "${query.trim()}". Try an app name, a setting, "profile", or a sum like 2 + 2.` : 'Start typing to search.');
+            this._say(this._rateBusy && moneyQuery(query) ? 'Looking up the exchange rate…' : query.trim() ? `Nothing matches "${query.trim()}". Try an app name, a setting, "profile", or a sum like 2 + 2.` : 'Start typing to search.');
         }
         let section = null;
         results.forEach((r, i) => {
@@ -908,7 +1100,27 @@ export default class NiroSearch extends Extension {
             this._list.add_child(row);
             this._rows.push(row);
         });
-        this._select(0);
+        this._keys = results.map(resultKey);
+        const plan = planUpdate(before, this._keys, queryChanged);
+        this._animRow = plan.animate;
+        this._keys.forEach((k, i) => this._rowByKey.set(k, this._rows[i]));
+        this._select(plan.selected, {instant: true, scroll: queryChanged});
+        if (plan.keepScroll && adj) this._keepScroll(adj, plan.selected, anchor);
+        if (plan.animate.some(Boolean)) { this._motion?.revealList(); }
+        this._drawMotion();
+        this._queuePlace();                                // the list's height changed: it may now reach the island, or fit again
+    }
+
+    /**
+     * The list was rebuilt, so adj.upper and every row position are those of the previous layout until the next frame. Allocate now (the same box,
+     * synchronously) so they are current, then put the selected row back where it was in the viewport. Rows that arrived above it push the offset
+     * down by their height, rows that arrived below leave it alone, and the offset can never pass the new end.
+     */
+    _keepScroll(adj, selected: number, anchor: number | null) {
+        this._list.queue_relayout();
+        this._scroll.allocate(this._scroll.get_allocation_box());
+        const row = this._rows[selected];
+        adj.value = row && anchor !== null ? anchoredScroll(row.get_allocation_box().y1, anchor, adj.upper, adj.page_size) : keepScrollValue(adj.value, adj.upper, adj.page_size);
     }
 
     /** A currency question needs the day's rate: fetched once, kept for six hours, and the list is drawn again when it arrives. */
@@ -926,9 +1138,9 @@ export default class NiroSearch extends Extension {
                 if (msg.get_status() !== Soup.Status.OK) throw new Error(`rates: HTTP ${msg.get_status()}`);
                 const data = JSON.parse(new TextDecoder().decode(bytes.get_data()));
                 this._rates?.set(money.from, {at: Date.now(), rates: data.rates ?? {}});
-                if (this._box?.visible && this._entry.get_text() === query) this._refresh();
+                if (this._live() && this._entry.get_text() === query) this._refresh();
             } catch (e) {
-                if (this._box?.visible && this._entry.get_text() === query) this._say(`Could not get the exchange rate: ${e.message}`);
+                if (this._live() && this._entry.get_text() === query) this._say(`Could not get the exchange rate: ${e.message}`);
             }
         });
     }
@@ -938,17 +1150,19 @@ export default class NiroSearch extends Extension {
         this._status.visible = true;
     }
 
-    _select(index) {
+    _select(index, {instant = false, scroll = true} = {}) {
         this._hint.text = hint(undefined);
-        if (!this._rows.length) return;
+        if (!this._rows.length || index < 0) { this._selected = 0; return; }
+        const from = this._keys[this._selected] ?? null;
         this._selected = index;
         const sel = this._results[index];
         this._hint.text = hint(sel && {title: sel.title, permission: this._registry.get(sel.action)?.permission});
-        const [r, g, b] = this._accent ?? [232, 71, 43];
-        this._rows.forEach((row, i) => row.set_style(i === this._selected ? `background-color: rgba(${r}, ${g}, ${b}, 0.28);` : ''));
+        // The old row fades out while the new one fades in (springs, no layout change); a rebuilt list lights its row at once.
+        this._motion.select(instant ? null : from, this._keys[index] ?? null, instant);
+        this._drawMotion();
         const adj = this._scroll.vadjustment ?? this._scroll.get_vscroll_bar?.().adjustment;
         const row = this._rows[this._selected];
-        if (adj && row) {
+        if (scroll && adj && row) {
             const y = row.get_allocation_box().y1, h = row.get_height();
             if (y < adj.value) adj.value = y - 30; else if (y + h > adj.value + adj.page_size) adj.value = y + h - adj.page_size + 8;
         }

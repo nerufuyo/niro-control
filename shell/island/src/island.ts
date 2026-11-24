@@ -6,6 +6,7 @@
 // cross-fades views. On a bar that is not black it hangs from the screen's top edge, like a notch.
 
 import Clutter from 'gi://Clutter';
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Meta from 'gi://Meta';
 import St from 'gi://St';
@@ -16,7 +17,8 @@ import {RIM_FUNCTIONS, RIM_UNIFORMS, rimCode, rimUniforms} from './glow.js';
 import {effectPoint, shaderEffect} from './shader.js';
 import {GENTLE, Spring, SpringDriver} from './spring.js';
 import * as Theme from './theme.js';
-import {dur, motionOn} from './motion.js';
+import {dur, motionMode, motionOn} from './motion.js';
+import {edgeShifts, morphPlan} from './surfaceMotion.js';
 import {fence, setEnabled, slideBy} from './widgets.js';
 
 
@@ -209,6 +211,12 @@ export const Island = GObject.registerClass({
         this._monitor = null;
         this._view = null;
         this._pointerAtMorph = null;
+        this._axisLag = 0;
+        /** Whether the shown view follows its surface's edges both ways (it only changes size) or only from past them (it came in
+         * on this move): see `_followViews`. */
+        this._pinSigned = false;
+        /** How the last morph was planned (axis order, delays, spring): read by the runtime checks. */
+        this._lastPlan = null;
         this._views = [];
         this._tint = null;
         this._tintStyle = 'wash';
@@ -457,19 +465,46 @@ export const Island = GObject.registerClass({
             y + height <= top + Math.max(0, this._height.target);
     }
 
-    /** Animates to `size` ({width, height, radius, shoulder}) and shows `view`, already sized to fit. */
-    morph(size, view) {
+    /** Animates to `size` ({width, height, radius, shoulder}) and shows `view`, already sized to fit. `spring` overrides the size
+     * spring for this move (an alert's, see surfaceMotion.ts `alertMotion`); the next morph names its own. */
+    morph(size, view, {spring = null} = {}) {
         // Content travels with the shape: out with it as it grows, in from it as it shrinks.
         const growing = size.height + size.width > this._height.target + this._width.target;
         this._pointerAtMorph = global.get_pointer();
-        this._width.setTarget(size.width);
-        this._height.setTarget(size.height);
-        this._radius.setTarget(size.radius);
-        this._shoulder.setTarget(size.shoulder);
-
         // The first shape appears without animating: an island of zero size
         // is on no monitor, so it would get no frames to animate with.
         const firstShow = this._view === null;
+        // One surface, two axes: growing in both it widens first and drops after, shrinking it lifts first, all by
+        // retargeting springs that keep their velocity (see surfaceMotion.ts). The lagging axis' retarget is a timer
+        // that the next morph or destroy cancels, so an interruption never leaves a stale target behind.
+        this._cancelAxisLag();
+        // The same view in another size follows the surface's edges both ways; a view that comes in only from past them.
+        if (view !== this._view)
+            this._pinSigned = false;
+        else if (this._springs.every(spring => spring.settled))
+            this._pinSigned = true;
+        const mode = motionMode();
+        const plan = morphPlan({width: this._width.value, height: this._height.value}, size, {off: mode === 'off', reduced: mode === 'reduced'});
+        // Each move names its springs, so an alert's snappy or calm one never lingers into the next move.
+        const sizeSpring = spring && !plan.instant ? spring : plan.size;
+        this._lastPlan = {order: plan.order, widthDelay: plan.widthDelay, heightDelay: plan.heightDelay, size: sizeSpring, instant: plan.instant};
+        this._width.setTarget(size.width, sizeSpring);
+        this._height.setTarget(size.height, sizeSpring);
+        this._radius.setTarget(size.radius, plan.radius);
+        this._shoulder.setTarget(size.shoulder, plan.radius);
+        if (!firstShow && !plan.instant && (plan.widthDelay || plan.heightDelay)) {
+            const heightLags = plan.heightDelay > 0;
+            const lagging = heightLags ? this._height : this._width;
+            const wanted = lagging.target;
+            lagging.setTarget(lagging.value);
+            this._axisLag = GLib.timeout_add(GLib.PRIORITY_DEFAULT, plan.heightDelay || plan.widthDelay, () => {
+                this._axisLag = 0;
+                lagging.setTarget(wanted);
+                this._driver?.start();
+                return GLib.SOURCE_REMOVE;
+            });
+        }
+
         if (firstShow || !motionOn()) {
             for (const spring of this._springs)
                 spring.reset(spring.target);
@@ -479,6 +514,15 @@ export const Island = GObject.registerClass({
             this._driver.start();
         }
         this._showView(view, growing);
+        // Before the first frame: the content is laid out for the new size at once and must not show there.
+        this._followViews();
+    }
+
+    /** Drops a pending second-axis retarget (a new morph, or destroy, takes over). */
+    _cancelAxisLag() {
+        if (this._axisLag)
+            GLib.source_remove(this._axisLag);
+        this._axisLag = 0;
     }
 
     /** Away in the top edge at once, without the motion of `setAutoHidden(true)`: for coming in from there next (the reveal over a
@@ -805,8 +849,43 @@ export const Island = GObject.registerClass({
         this._placeBackdrop();
         this._syncShape();
         this._syncViews(room);
+        this._followViews();
         this._queueGlow();
         this.emit('geometry-changed');
+    }
+
+    /** The content of a view is laid out at the size the island will have, centred on the display, and stays still on screen as the
+     * surface moves (see `_placeView`): so, while the surface is narrower or wider than that, what sits at its edges would be at its final
+     * place at once, past the surface's clip (widening) or teleported (narrowing). Each view that has `followSurface` is told, every
+     * frame, how far each edge of the surface is from where it will rest (whole pixels), and how much of its final size the surface
+     * is, so it can keep its edge content with the edge and show the rest only once there is room (see surfaceMotion.ts). At rest it
+     * is told null. */
+    _followViews() {
+        if (!this._monitor)
+            return;
+        const settled = !this._axisLag && this._springs.every(spring => spring.settled);
+        const margin = Math.max(0, this._shoulder.value);
+        const width = Math.max(0, this._width.value);
+        const height = Math.max(0, this._height.value);
+        const left = this._monitor.x + (this._monitor.width - (width + 2 * margin)) / 2 + margin;
+        for (const view of this._views) {
+            if (!view.followSurface)
+                continue;
+            if (settled || !view.visible) {
+                // A view that is hidden is told only once, so it is clean when it shows.
+                if (view._followed || settled)
+                    view.followSurface(null);
+                view._followed = false;
+                continue;
+            }
+            // Where this view rests: centred on the display at its own size, whichever view it is.
+            const restLeft = this._screenX(view);
+            const shifts = edgeShifts({left, right: left + width}, {left: restLeft, right: restLeft + view.width},
+                this._pinSigned && view === this._view);
+            view._followed = true;
+            view.followSurface({left: Math.round(shifts.left), right: Math.round(shifts.right), width, height,
+                finalWidth: view.width, finalHeight: view.height});
+        }
     }
 
     /** The size of the layers drawn by shaders: the island's own at rest; while it moves, grown to where it goes. */
@@ -1003,6 +1082,7 @@ export const Island = GObject.registerClass({
 
     /** Stops the springs and a pending glow redraw. */
     _onDestroy() {
+        this._cancelAxisLag();
         this._pulse?.stop();
         this._pulse = null;
         this._liftTimeline?.stop();

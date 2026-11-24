@@ -24,6 +24,7 @@ cp -r shell/island/build/. "$EXT"/; glib-compile-schemas "$EXT/schemas"
 # --- Dock
 EXT="$EXTDIR/dock@niro.local"; mkdir -p "$EXT"
 cp -r shell/dock/dist/. "$EXT"/; cp shell/dock/metadata.json shell/dock/stylesheet.css "$EXT"/
+install -D -m 644 shell/shared/motionEngine.js "$EXT/shared/motionEngine.js"
 cp -r shell/dock/schemas "$EXT"/; rm -f "$EXT"/schemas/gschemas.compiled; glib-compile-schemas "$EXT/schemas"
 
 # --- Search
