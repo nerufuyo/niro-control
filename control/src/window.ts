@@ -201,7 +201,9 @@ export function buildWindow(app) {
     const sideTop = new Adw.HeaderBar({show_title: false, css_classes: ['flat'], decoration_layout: LEFT});
     const sideBody = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL});
     const searchBox = new Gtk.Box({margin_start: 10, margin_end: 10, margin_bottom: 8}); searchBox.append(search);
-    sideBody.append(searchBox); sideBody.append(list);
+    // the module list scrolls on its own: with many modules it is taller than a small window, and the search stays pinned above it
+    const listScroll = new Gtk.ScrolledWindow({child: list, vexpand: true, hscrollbar_policy: Gtk.PolicyType.NEVER, vscrollbar_policy: Gtk.PolicyType.AUTOMATIC});
+    sideBody.append(searchBox); sideBody.append(listScroll);
     const sideView = new Adw.ToolbarView({content: sideBody}); sideView.add_top_bar(sideTop);
     sideView.add_css_class('niro-sidebar');
 
