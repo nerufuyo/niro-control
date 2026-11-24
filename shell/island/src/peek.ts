@@ -16,7 +16,13 @@ import {VERTICAL, onUiScale, px} from './compat.js';
 import * as Palette from './palette.js';
 import * as Theme from './theme.js';
 import {Art, LevelBar, Ring, VolumeGlyph, WrapLayout, cornerClose, icon, isSymbolic, ownIcon, pillButton, playMotion,
-    revealClose, wrapLines} from './widgets.js';
+    revealClose, slideBy, wrapLines} from './widgets.js';
+import {dur, motionMode} from './motion.js';
+import {REVEAL_RISE_PX, revealDelays} from './surfaceMotion.js';
+
+/** A critical alert's pieces rise in after the island has made room for them (ms), each fading over this long. */
+const REVEAL_AFTER_MS = 90;
+const REVEAL_MS = 240;
 
 /** The widest an alert gets; narrower, it fits its content. Sizes are in CSS pixels (see `px`). */
 const MAX_WIDTH = 380;
@@ -206,6 +212,23 @@ export const PeekView = GObject.registerClass({
     /** The app's icon on the cover's corner, unless the cover already is that icon. */
     _syncArtBadge() {
         this._artBadge.visible = Boolean(this._artBadgeIcon.gicon) && !this._art.showsIcon;
+    }
+
+    /** A critical alert's pieces (badge, words, the value or button at the end) come in one after another, each rising into place,
+     * once the island has made room: the quiet ones just fade in with the view. Not with reduced motion or none. Called with
+     * the view on screen (see the controller's `_showAlert`). */
+    reveal() {
+        if (motionMode() !== 'full')
+            return;
+        const pieces = [this._lead, this._texts, this._accessory];
+        const delays = revealDelays(pieces.length);
+        pieces.forEach((piece, i) => {
+            const delay = dur(REVEAL_AFTER_MS + delays[i]);
+            piece.remove_transition('opacity');
+            piece.opacity = 0;
+            piece.ease({opacity: 255, delay, duration: dur(REVEAL_MS), mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            slideBy(piece, 'y', px(REVEAL_RISE_PX), 0, {delay, duration: dur(REVEAL_MS + 80)});
+        });
     }
 
     /** What the alert shown last was, so one updating in place doesn't animate in again. */

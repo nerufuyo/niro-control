@@ -5,6 +5,7 @@
 // (it carries the live level, not decoration). Loops and auto-hide/voice/chat transitions ask `motionOn()`.
 import St from 'gi://St';
 import {motionAllowed, scaleDuration} from './shared/tokens.js';
+import {motionModeFor} from './surfaceMotion.js';
 
 const KEY = 'motion-preset';
 let settings = null;
@@ -40,3 +41,7 @@ export const motionOn = () => motionAllowed({preset, reduced: St.Settings.get().
 
 /** `ms` for the chosen preset (see scaleDuration in shared/tokens.js). */
 export const dur = ms => scaleDuration(ms, {preset, reduced});
+
+/** 'off' (instant: preset "off" or GNOME's animations off), 'reduced' (the "minimal" preset: moves, never overshoots, no stagger) or 'full'
+ * (see surfaceMotion.ts `motionModeFor`). The springs and the choreography read this; fades and slides read `dur()`. */
+export const motionMode = () => motionModeFor({preset, reduced: St.Settings.get().enable_animations === false});

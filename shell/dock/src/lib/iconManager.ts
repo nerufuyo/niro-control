@@ -11,6 +11,7 @@ import * as PopupMenu from "resource:///org/gnome/shell/ui/popupMenu.js";
 import { box } from "./compat.js";
 import { appTitle, partialDownloads, stackTitle } from "./downloadRules.js";
 import { ThemeResolver } from "./iconTheme.js";
+import { animationsEnabled } from "./motion.js";
 import { SignalManager } from "./signalManager.js";
 import type { WindowPreviewPopup } from "./windowPreview.js";
 
@@ -606,7 +607,9 @@ export class IconManager {
     this._removeDropIndicator();
     // The stacks go first: the icons are placed before what is counted at the end.
     this._clearStacks();
-    this._container.remove_all_children();
+    // Destroyed, not just detached: a detached icon would live on with its handlers (its closures keep it from being collected).
+    // Each actor's connections are forgotten as it is destroyed (SignalManager.connectActor).
+    this._container.destroy_all_children();
     this._icons.clear();
     this._apps.clear();
     this._separator = null;
@@ -688,9 +691,7 @@ export class IconManager {
           scale_y: 0.8,
           duration: 200,
           mode: Clutter.AnimationMode.EASE_IN_QUAD,
-          onComplete: () => {
-            this._container.remove_child(actor);
-          },
+          onComplete: () => actor.destroy(),
         });
         changed = true;
       }
@@ -822,7 +823,7 @@ export class IconManager {
     this._decorateIcon(appData);
     this._refreshBadge(appData);
 
-    this._signals.connect(actor, "button-press-event", (_actor, event) => {
+    this._signals.connectActor(actor, "button-press-event", (_actor, event) => {
       const button = (event as { get_button: () => number }).get_button();
       if (button === 3) {
         this._showContextMenu(actor, app);
@@ -838,7 +839,7 @@ export class IconManager {
       return Clutter.EVENT_PROPAGATE;
     });
 
-    this._signals.connect(actor, "button-release-event", (_actor, event) => {
+    this._signals.connectActor(actor, "button-release-event", (_actor, event) => {
       const button = (event as { get_button: () => number }).get_button();
       if (button !== 1) {
         return Clutter.EVENT_PROPAGATE;
@@ -855,7 +856,7 @@ export class IconManager {
     });
 
     // Tooltip events - use notify::hover since track_hover is enabled
-    this._signals.connect(actor, "notify::hover", () => {
+    this._signals.connectActor(actor, "notify::hover", () => {
       if (this._dragging) {
         // Keep tooltips and previews out of the way while reordering.
         this._hideTooltip();
@@ -1037,30 +1038,31 @@ export class IconManager {
 
     indicatorBox.visible = true;
 
-    // Clear all children before adding new style.
-    indicatorBox.remove_all_children();
-
-    if (this._indicatorStyle === 0) {
-      // Dots per window (macOS style).
-      const needed = focused ? Math.max(windowCount, 1) : windowCount;
-
-      // Add or remove dots to match window count.
-      while (indicatorBox.get_n_children() < needed) {
-        const dot = new St.Widget({
-          style_class: "dock-indicator-dot",
+    // Reconcile instead of rebuilding: focus changes call this for every icon, and a rebuild per switch both
+    // flickers and (remove_all_children does not destroy) leaks actors under rapid app switching.
+    const styleClass = this._indicatorStyle === 0 ? "dock-indicator-dot" : "dock-indicator-bar";
+    // Dots per window (macOS style), or one horizontal bar.
+    const needed =
+      this._indicatorStyle === 0 ? (focused ? Math.max(windowCount, 1) : windowCount) : 1;
+    for (const child of indicatorBox.get_children() as InstanceType<typeof St.Widget>[]) {
+      if (child.style_class !== styleClass) child.destroy();
+    }
+    while (indicatorBox.get_n_children() < needed) {
+      const mark = new St.Widget({ style_class: styleClass });
+      indicatorBox.add_child(mark);
+      // A new mark fades in instead of popping.
+      if (animationsEnabled()) {
+        mark.opacity = 0;
+        (mark as unknown as { ease(p: Record<string, unknown>): void }).ease({
+          opacity: 255,
+          duration: 160,
+          mode: Clutter.AnimationMode.EASE_OUT_QUAD,
         });
-        indicatorBox.add_child(dot);
       }
-      while (indicatorBox.get_n_children() > needed) {
-        const last = indicatorBox.get_n_children() - 1;
-        (indicatorBox.get_child_at_index(last) as InstanceType<typeof St.Widget>).destroy();
-      }
-    } else {
-      // Horizontal bar style.
-      const bar = new St.Widget({
-        style_class: "dock-indicator-bar",
-      });
-      indicatorBox.add_child(bar);
+    }
+    while (indicatorBox.get_n_children() > needed) {
+      const last = indicatorBox.get_n_children() - 1;
+      (indicatorBox.get_child_at_index(last) as InstanceType<typeof St.Widget>).destroy();
     }
   }
 
@@ -1474,6 +1476,10 @@ export class IconManager {
   }
 
   private _bounce(actor: IconActor): void {
+    // Reduced motion: no jump. Rapid app switching: a bounce still running is cut short, so jumps never stack on each other.
+    if (!animationsEnabled()) return;
+    actor.remove_transition("translation_y");
+    actor.translation_y = 0;
     const baseY = 0;
     const up = -28;
     const small = -10;
@@ -1701,7 +1707,7 @@ export class IconManager {
     });
     appButton.add_child(this._appButtonIcon);
 
-    this._signals.connect(appButton, "button-press-event", () => {
+    this._signals.connectActor(appButton, "button-press-event", () => {
       if (Main.overview.visible) {
         Main.overview.hide();
       } else {
@@ -1711,7 +1717,7 @@ export class IconManager {
     });
 
     // Tooltip on hover
-    this._signals.connect(appButton, "notify::hover", () => {
+    this._signals.connectActor(appButton, "notify::hover", () => {
       if (appButton.hover) {
         this._showTooltip(appButton, "Applications");
       } else {
@@ -1977,7 +1983,7 @@ export class IconManager {
       });
       actor.add_child(glyph);
       if (folder === "downloads") this._watchDownloads(actor);
-      this._signals.connect(actor, "notify::hover", () => {
+      this._signals.connectActor(actor, "notify::hover", () => {
         if (actor.hover)
           this._showTooltip(
             actor,
@@ -1985,7 +1991,7 @@ export class IconManager {
           );
         else this._hideTooltip();
       });
-      this._signals.connect(actor, "button-release-event", (_a, event) => {
+      this._signals.connectActor(actor, "button-release-event", (_a, event) => {
         const button = (event as { get_button: () => number }).get_button();
         if (button === 1 || button === 3) this._openStack(actor, folder);
         return Clutter.EVENT_STOP;
@@ -2111,7 +2117,10 @@ export class IconManager {
     this._downloadTimer = 0;
     if (this._downloadPulse) GLib.source_remove(this._downloadPulse);
     this._downloadPulse = 0;
-    this._downloadMonitor?.cancel();
+    if (this._downloadMonitor) {
+      this._signals.disconnectSource(this._downloadMonitor);
+      this._downloadMonitor.cancel();
+    }
     this._downloadMonitor = null;
     this._downloadBar?.remove_all_transitions();
     this._downloadBar = null;
@@ -2419,7 +2428,7 @@ export class IconManager {
     actor.add_child(thumb);
     (actor as unknown as Record<string, unknown>)._minimizedWindow = win;
 
-    this._signals.connect(actor, "button-release-event", (_a, event) => {
+    this._signals.connectActor(actor, "button-release-event", (_a, event) => {
       if ((event as { get_button: () => number }).get_button() !== 1)
         return Clutter.EVENT_PROPAGATE;
       if (!this._isPointerOver(actor)) return Clutter.EVENT_PROPAGATE;
@@ -2428,7 +2437,7 @@ export class IconManager {
       win.activate(global.get_current_time());
       return Clutter.EVENT_STOP;
     });
-    this._signals.connect(actor, "notify::hover", () => {
+    this._signals.connectActor(actor, "notify::hover", () => {
       if (actor.hover) this._showTooltip(actor, win.get_title() || app.get_name());
       else this._hideTooltip();
     });
