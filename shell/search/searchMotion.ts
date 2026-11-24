@@ -27,6 +27,10 @@ export const createSearchMachine = () => new Machine(SEARCH_TABLE, 'Closed');
 export const isShown = (s: SearchState) => s !== 'Closed';
 export const isLive = (s: SearchState) => s === 'Opening' || s === 'Ready' || s === 'ResultsExpanded';
 
+/** Whether the entry's own 'activate' (Return, which GNOME 51's ClutterText takes for itself instead of emitting key-press-event) may start the
+ * selected result: only while the panel is open. Never once an activation is under way, so a Return that also reaches the key handler does nothing twice. */
+export const canActivateOnReturn = (s: SearchState | null | undefined): boolean => s != null && isLive(s);
+
 const REVEAL_ROWS = 8;       // only the first rows animate; the rest are simply there
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
