@@ -1,0 +1,7 @@
+{
+  "uuid": "e2e-telemetry@niro.test",
+  "name": "Niro E2E telemetry (test only)",
+  "description": "Read-only snapshots of Search, Island and Dock state for the isolated E2E sessions. Does nothing unless NIRO_E2E=1 is in the shell's environment. Never packaged, never installed outside tests/e2e/session.sh.",
+  "shell-version": ["51"],
+  "version": 1
+}

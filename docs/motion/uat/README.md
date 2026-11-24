@@ -120,9 +120,7 @@ What each kind measures, and what it cannot:
 Known limits of the probe itself, to be recorded not hidden:
 
 - Verified headless: it loads, records and stops cleanly for frames, island, search and dock, with 0 shell errors.
-- **Not verified headless: the Search key-press hook.** The headless virtual keyboard reaches the entry through the input method only, so
-  the probe reported `key_hook_warning` and measured no key latency there. On a real keyboard it should fire; if the summary still carries
-  that warning, key latency was not measured: write that as a finding and use the phone-video method for UAT-SRCH-03.
+- **Search key hook:** headless with mutter RemoteDesktop input, the entry gets `captured-event` for key presses (the `key-press-event` signal never fires there, so the probe uses `captured-event`). Not yet confirmed on a physical keyboard.
 - The island `outside`/`jump` figures are indicative. The headless clip tests judged the morph with `outside <= 3` and `jump <= edge + 4`;
   no such reference exists for voice, peek or alert, so judge those with the video.
 - A still screen paints nothing: intervals above 100 ms end a burst and are never counted as stalls.
