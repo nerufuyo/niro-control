@@ -6,7 +6,7 @@
 rounded corners, a tiling window manager (layout manager), an emoji picker, and a control panel that sets them all from one place. One repository, one package.
 
 Runs on **Fedora 45 (GNOME Shell 51)** and **Ubuntu 24.04 (GNOME Shell 46)**, on Wayland. The extensions declare GNOME Shell 46 to 51.
-Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.6.3** ([releases](https://github.com/nerufuyo/niro-control/releases)).
+Packages: `.rpm` for Fedora, `.deb` for Ubuntu and Debian. Both are built from the same tree. Current version: **1.6.4** ([releases](https://github.com/nerufuyo/niro-control/releases)).
 
 Jump to: [Install](#install) · [Screenshots](#screenshots) · [What you get](#what-you-get) · [Updating](#updating)
 
