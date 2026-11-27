@@ -24,6 +24,7 @@ export interface ApplyResult {
     ok: boolean;
     changed: Change[];
     notes?: Note[];                  // changes that have no effect until something else is on
+    skipped?: string[];              // stored values that are not valid (any more), so were not written
     reset?: number;                  // settings put back to unset (their default, not stored) rather than written
     failed?: {id: string; title: string; error: string};
     rolledBack?: boolean;
@@ -223,14 +224,20 @@ export class ProfileEngine {
     get backupsDir() { return `${this.root}/backups`; }
     get statePath() { return `${this.root}/state.json`; }
 
+    /** The ids a new profile may not take: those listed, and every file there, so one that is not listed is not overwritten. */
+    private takenIds(): string[] {
+        return [...this.list().map(p => p.id), ...jsonFiles(this.profilesDir).map(f => GLib.path_get_basename(f).slice(0, -5))];
+    }
+
     private load(dir: string, builtin: boolean): Profile[] {
         const out = [];
         for (const file of jsonFiles(dir)) {
             try {
-                const checked = validateProfile(readJson(file), CATALOG);
+                const checked = validateProfile(readJson(file), CATALOG, true);
                 if (!checked.ok) continue;
                 const p = checked.profile;
                 if (builtin) p.builtin = true;
+                if (checked.errors.length) p.skipped = {problems: checked.errors, settings: checked.invalid};
                 out.push(p);
             } catch (_e) {
                 // a file that is not a profile is not listed
@@ -257,8 +264,9 @@ export class ProfileEngine {
     }
 
     private save(profile: Profile) {
-        const {builtin: _b, ...clean} = profile;
-        writeJson(`${this.profilesDir}/${profile.id}.json`, clean);
+        const {builtin: _b, skipped, ...clean} = profile;
+        // what could not be read stays in the file as it was
+        writeJson(`${this.profilesDir}/${profile.id}.json`, {...clean, settings: {...skipped?.settings, ...clean.settings}});
     }
 
     private guardBuiltin(profile: Profile, what: string) {
@@ -268,7 +276,7 @@ export class ProfileEngine {
     /** A new profile from the settings now in force (all of them, or those of the `menus` given: a partial profile). */
     create(name: string, opts: {menus?: string[]; description?: string; extends?: string} = {}): Profile {
         if (!name.trim()) throw new Error('Give the profile a name');
-        const taken = this.list().map(p => p.id);
+        const taken = this.takenIds();
         let settings = this.capture();
         if (opts.menus?.length) settings = pick(settings, opts.menus, this.items);
         const p = makeProfile(name, settings, {id: uniqueId(slugify(name), taken), description: opts.description, extends: opts.extends});
@@ -289,7 +297,7 @@ export class ProfileEngine {
         const p = this.get(id);
         if (!p) throw new Error('No such profile');
         const name = `${p.name} copy`;
-        const copy = makeProfile(name, {...this.settingsOf(p)}, {id: uniqueId(slugify(name), this.list().map(x => x.id)), description: p.description});
+        const copy = makeProfile(name, {...this.settingsOf(p)}, {id: uniqueId(slugify(name), this.takenIds()), description: p.description});
         this.save(copy);
         return copy;
     }
@@ -307,7 +315,8 @@ export class ProfileEngine {
         const p = this.get(id);
         if (!p) throw new Error('No such profile');
         this.guardBuiltin(p, 'changed');
-        const ids = menus?.length ? Object.keys(pick(this.capture(), menus, this.items)) : Object.keys(p.settings).length ? Object.keys(p.settings) : undefined;
+        const own = {...p.skipped?.settings, ...p.settings};
+        const ids = menus?.length ? Object.keys(pick(this.capture(), menus, this.items)) : Object.keys(own).length ? Object.keys(own) : undefined;
         p.settings = {...p.settings, ...this.capture(ids)};
         this.save(p);
     }
@@ -316,7 +325,7 @@ export class ProfileEngine {
     exportTo(id: string, path: string) {
         const p = this.get(id);
         if (!p) throw new Error('No such profile');
-        const {builtin: _b, ...clean} = p;
+        const {builtin: _b, skipped: _s, ...clean} = p;
         writeJson(path, {...clean, settings: this.settingsOf(p), extends: undefined});
     }
 
@@ -330,8 +339,7 @@ export class ProfileEngine {
         const checked = validateProfile(raw, CATALOG);
         if (!checked.ok) throw new Error(`Not imported:\n${checked.errors.join('\n')}`);
         const p = checked.profile;
-        const taken = this.list().map(x => x.id);
-        p.id = uniqueId(p.id, taken);
+        p.id = uniqueId(p.id, this.takenIds());
         delete p.extends;     // an imported profile stands alone: what it extended may not be here
         this.save(p);
         return {profile: p, warnings: checked.warnings};
@@ -343,7 +351,7 @@ export class ProfileEngine {
         if (!p) throw new Error(`No profile "${id}"`);
         const result = this.applySettings(this.settingsOf(p), `Before applying ${p.name}`);
         if (result.ok) this.setActive(id);
-        return result;
+        return {...result, skipped: p.skipped?.problems};
     }
 
     active(): string | null {
@@ -389,11 +397,11 @@ export class ProfileEngine {
     restore(file: string): ApplyResult {
         const b = readJson(file);
         if (b.format !== BACKUP_FORMAT || b.version > VERSION) throw new Error('Not a backup this version can read');
-        const checked = validateProfile({format: 'niro-profile', version: b.version, name: 'backup', settings: b.settings}, CATALOG);
+        const checked = validateProfile({format: 'niro-profile', version: b.version, name: 'backup', settings: b.settings}, CATALOG, true);
         if (!checked.ok) throw new Error(`The backup is damaged:\n${checked.errors.join('\n')}`);
         const result = this.applySettings(checked.profile.settings, 'Before restoring a backup', Array.isArray(b.unset) ? b.unset.filter(x => typeof x === 'string') : []);
         if (result.ok) this.setActive(null);
-        return result;
+        return {...result, skipped: checked.errors};
     }
 
     deleteBackup(file: string) {

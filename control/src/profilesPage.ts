@@ -7,7 +7,7 @@ import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk?version=4.0';
 
 import {CATALOG} from './catalog.js';
-import {describeValue, diff, stalePartsAffected, summarize} from './profileLogic.js';
+import {describeValue, diff, stalePartsAffected, summarize, validateProfile} from './profileLogic.js';
 import type {Change, Summary} from './profileLogic.js';
 import type {ProfileEngine} from './profiles.js';
 
@@ -69,7 +69,7 @@ export function profilesPage(engine: ProfileEngine, ctx) {
             const t = result.changed.length ? `Applied "${name}": ${plural(result.changed.length, 'setting')} changed` : `"${name}" already matches`;
             ctx.toast(t, result.changed.length ? () => undoLast() : undefined, 'Undo');
             const pending = stalePartsAffected(result.changed, ctx.stale ?? [], CATALOG);
-            const lines = [...(result.notes ?? []).map(n => n.text), ...(pending.length ? [`${pending.join(', ')} ${pending.length === 1 ? 'has' : 'have'} an update that loads at your next login: until then these settings are read by the older version.`] : [])];
+            const lines = [...(result.skipped ?? []).map(s => `Left out, not a valid value: ${s}`), ...(result.notes ?? []).map(n => n.text), ...(pending.length ? [`${pending.join(', ')} ${pending.length === 1 ? 'has' : 'have'} an update that loads at your next login: until then these settings are read by the older version.`] : [])];
             if (lines.length) failure('Applied, with notes', lines.join('\n\n'));
         } else {
             failure(`Couldn't apply "${name}"`,
@@ -259,7 +259,9 @@ export function profilesPage(engine: ProfileEngine, ctx) {
             const row = new Adw.ActionRow({title: GLib.markup_escape_text(b.label, -1), subtitle: `${when(b.createdAt)} · ${plural(b.count, 'setting')}`});
             const restore = new Gtk.Button({label: 'Restore', valign: Gtk.Align.CENTER});
             restore.connect('clicked', () => attempt('Restore failed', () => {
-                const target = JSON.parse(new TextDecoder().decode(GLib.file_get_contents(b.file)[1])).settings;
+                const stored = JSON.parse(new TextDecoder().decode(GLib.file_get_contents(b.file)[1])).settings;
+                // only what a restore will write
+                const target = validateProfile({format: 'niro-profile', version: 1, name: 'backup', settings: stored}, CATALOG, true).profile.settings;
                 { const changes = engine.preview(target); confirm(`Restore "${b.label}"?`, changes, 'Restore', () => attempt('Restore failed', () => report('the backup', engine.restore(b.file))), summarize(changes, {...engine.capture(), ...target}, engine.items, ctx.stale ?? [], 'The settings as they are now are backed up first.')); }
             }));
             const del = new Gtk.Button({icon_name: 'user-trash-symbolic', css_classes: ['flat'], valign: Gtk.Align.CENTER, tooltip_text: 'Delete this backup'});

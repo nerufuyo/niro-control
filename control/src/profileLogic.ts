@@ -21,6 +21,7 @@ export interface Profile {
     createdAt: string;
     builtin?: boolean;      // set by the app for what it ships, never read from a file
     settings: Settings;
+    skipped?: {problems: string[]; settings: Record<string, unknown>};   // set on reading: values that are not valid, never applied
 }
 
 export interface Change {id: string; title: string; menu: string; group: string; from: Value | undefined; to: Value}
@@ -86,10 +87,11 @@ export function validateValue(item: Item, value: unknown): string | null {
     return 'unknown kind';
 }
 
-export interface Checked {ok: boolean; profile?: Profile; errors: string[]; warnings: string[]}
+export interface Checked {ok: boolean; profile?: Profile; errors: string[]; warnings: string[]; invalid?: Record<string, unknown>}
 
-/** Reads a profile from parsed JSON: checks the format and version, every value, drops what this version does not know. */
-export function validateProfile(raw: unknown, catalog: Item[]): Checked {
+/** Reads a profile from parsed JSON: checks the format and version, every value, drops what this version does not know.
+ * `lenient` (reading what is already on disk): a bad value is left out and listed, and the rest still reads. */
+export function validateProfile(raw: unknown, catalog: Item[], lenient = false): Checked {
     const errors: string[] = [], warnings: string[] = [];
     const fail = (m: string): Checked => ({ok: false, errors: [m, ...errors], warnings});
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return fail('not a profile: the file does not hold an object');
@@ -101,20 +103,21 @@ export function validateProfile(raw: unknown, catalog: Item[]): Checked {
     if (!r.settings || typeof r.settings !== 'object' || Array.isArray(r.settings)) return fail('the profile has no settings');
     const byId = new Map(catalog.map(i => [i.id, i]));
     const settings: Settings = {};
+    const invalid: Record<string, unknown> = {};
     for (const [id, value] of Object.entries(r.settings)) {
         const item = byId.get(id);
         if (!item) { warnings.push(`unknown setting "${id}" was left out`); continue; }
         if (item.managed) { warnings.push(`"${item.title}" follows ${item.managed}, so it was left out`); continue; }
         const problem = validateValue(item, value);
-        if (problem) errors.push(`${item.title}: ${problem}`);
+        if (problem) { errors.push(`${item.title}: ${problem}`); invalid[id] = value; }
         else settings[id] = value as Value;
     }
-    if (errors.length) return {ok: false, errors, warnings};
+    if (errors.length && !lenient) return {ok: false, errors, warnings};
     const profile: Profile = {format: FORMAT, version: VERSION, id: slugify(String(r.id ?? r.name)), name: r.name.trim().slice(0, 60),
         description: typeof r.description === 'string' ? r.description.slice(0, 200) : '',
         createdAt: typeof r.createdAt === 'string' ? r.createdAt : new Date(0).toISOString(), settings};
     if (typeof r.extends === 'string' && r.extends) profile.extends = r.extends;
-    return {ok: true, profile, errors, warnings};
+    return {ok: true, profile, errors, warnings, invalid};
 }
 
 /** The settings of `profile` with the ones it extends underneath (its own win). Cycles and long chains are cut. */
