@@ -55,6 +55,7 @@ const VERTICAL = parseInt(PACKAGE_VERSION, 10) >= 48 ? {orientation: Clutter.Ori
 
 const PAGE_OF = {Look: 'look', Island: 'island', Dock: 'dock', Windows: 'windows', Search: 'search'};
 const RATE_TTL_MS = 6 * 3600 * 1000;
+const REST_MS = 300;                       // no typing for this long before anything is fetched or searched for
 const ICON = {Calculator: 'accessories-calculator-symbolic', Conversion: 'edit-find-replace-symbolic', Settings: 'preferences-system-symbolic',
     Profiles: 'user-bookmarks-symbolic', Actions: 'system-run-symbolic', Clipboard: 'edit-paste-symbolic', Files: 'folder-documents-symbolic', Tools: 'applications-utilities-symbolic', Windows: 'focus-windows-symbolic'};
 
@@ -441,8 +442,12 @@ export default class NiroSearch extends Extension {
         this._fit = null;
         if (this._outside) { global.stage.disconnect(this._outside); this._outside = 0; }
         if (this._grab) { Main.popModal(this._grab); this._grab = null; }
+        this._stopRest();
+        this._stopSearch('_findRun'); this._stopSearch('_grepRun');
+        this._typed = null;
         this._files?.clear();
         this._net?.clear(); this._procs?.clear(); this._contents?.clear();
+        this._shellText = this._agenda = null;
         this._adaptive = null;                                   // file names are not kept once the palette is closed
     }
 
@@ -594,6 +599,7 @@ export default class NiroSearch extends Extension {
 
     // ---- Finding
     _collect(query) {
+        this._wanted = new Set();          // the web answers this query asks for: only their failures are shown
         const q = query.trim();
         const out = [];
         // score: how well the title (or a keyword) matches, plus the kind's bonus (see rank.ts)
@@ -698,8 +704,9 @@ export default class NiroSearch extends Extension {
         // the next events of Island's calendar
         if (agendaQuery(q)) {
             const now = GLib.DateTime.new_now_local();
-            const coming = upcoming(this._agendaEvents(), now.format('%Y-%m-%d'), now.get_hour() * 60 + now.get_minute());
-            if (!coming.length) this._say('Nothing coming up in Island\'s calendar.');
+            const events = this._agendaEvents();                       // null until the daemon has answered
+            const coming = upcoming(events ?? [], now.format('%Y-%m-%d'), now.get_hour() * 60 + now.get_minute());
+            if (events && !coming.length) this._say('Nothing coming up in Island\'s calendar.');
             coming.forEach(e => add('Tools', {title: e.title, subtitle: `${e.text}  ·  Enter copies the title`, score: 95 - e.inMinutes / 100000, action: 'clipboard.copy', args: {text: e.title}, iconName: ICON.Tools, toast: true, recent: false}));
         }
         // layouts of windows
@@ -738,14 +745,15 @@ export default class NiroSearch extends Extension {
 
     /** An answer from the web: the cached value, or null while it is being fetched (the list is drawn again when it arrives). */
     _remote(key, url, parse, headers = null, ttlSeconds = 0) {
+        this._wanted?.add(key);
         const have = this._net.get(key);
         if (have) return have;
+        if (!this._ready()) return {value: null, busy: true};
         const entry = {value: null, busy: true};
         this._net.set(key, entry);
         if (!this._soup) return entry;
         const msg = Soup.Message.new('GET', url);
         if (headers) for (const [k, v] of Object.entries(headers)) msg.get_request_headers().append(k, v);
-        const query = this._entry.get_text();
         this._soup.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (session, res) => {
             entry.busy = false;
             try {
@@ -753,9 +761,9 @@ export default class NiroSearch extends Extension {
                 if (msg.get_status() !== Soup.Status.OK) throw new Error(`HTTP ${msg.get_status()}`);
                 entry.value = parse(JSON.parse(new TextDecoder().decode(bytes.get_data())));
                 if (!entry.value) throw new Error('nothing found');
-                if (this._live() && this._entry.get_text() === query) this._refresh();
+                if (this._live()) this._refresh();
             } catch (e) {
-                if (this._live() && this._entry.get_text() === query) this._say(`Lookup failed: ${e.message}`);
+                if (this._live() && this._wanted?.has(key)) this._say(`Lookup failed: ${e.message}`);
             }
         });
         return entry;
@@ -777,13 +785,16 @@ export default class NiroSearch extends Extension {
         } catch (_e) { /* no ps */ }
     }
 
-    /** Island's own calendar events, read from the daemon (nothing when it is not running). */
+    /** Island's own calendar events, asked of the daemon once per opening: null until it answers, [] when it is not running. */
     _agendaEvents() {
-        try {
-            const reply = Gio.DBus.session.call_sync('org.niro.island.Daemon', '/org/niro/island/Daemon', 'org.freedesktop.DBus.Properties', 'Get',
-                new GLib.Variant('(ss)', ['org.niro.island.Calendar1', 'Events']), null, Gio.DBusCallFlags.NONE, 800, null);
-            return parseEvents(reply.deepUnpack()[0].deepUnpack());
-        } catch (_e) { return []; }
+        if (this._agenda) return this._agenda.events;
+        const asked = this._agenda = {events: null};
+        Gio.DBus.session.call('org.niro.island.Daemon', '/org/niro/island/Daemon', 'org.freedesktop.DBus.Properties', 'Get',
+            new GLib.Variant('(ss)', ['org.niro.island.Calendar1', 'Events']), null, Gio.DBusCallFlags.NONE, 800, null, (conn, res) => {
+                try { asked.events = parseEvents(conn.call_finish(res).deepUnpack()[0].deepUnpack()); } catch (_e) { asked.events = []; }
+                if (this._agenda === asked && this._live()) this._refresh();
+            });
+        return asked.events;
     }
 
     /** A file of Documents/Niro (or, with `config`, one under ~/.config) as text; '' when it is not there. */
@@ -830,6 +841,11 @@ export default class NiroSearch extends Extension {
 
     /** Matching lines of bash and zsh history (the tail of each file: history can be large). */
     _terminalHistory(needle) {
+        this._shellText ??= this._readShellHistory();          // read once per opening, not on every keystroke
+        return historyMatches(this._shellText, needle);
+    }
+
+    _readShellHistory() {
         let text = '';
         for (const name of ['.bash_history', '.zsh_history']) {
             try {
@@ -841,24 +857,25 @@ export default class NiroSearch extends Extension {
                 stream.close(null);
             } catch (_e) { /* not there */ }
         }
-        return historyMatches(text, needle);
+        return text;
     }
 
     /** `grep` over Documents and the Desktop, at most four seconds. */
     _searchContents(needle) {
         const key = needle.toLowerCase();
-        if (this._contents.has(key)) return;
-        this._contents.set(key, []);
+        if (this._contents.has(key) || this._grepRun?.key === key || !this._ready()) return;
         const dirs = [GLib.UserDirectory.DIRECTORY_DOCUMENTS, GLib.UserDirectory.DIRECTORY_DESKTOP].map(d => GLib.get_user_special_dir(d)).filter(Boolean);
         if (!dirs.length) return;
         let proc;
         try { proc = Gio.Subprocess.new(['grep', ...grepArgs(needle, dirs)], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE); } catch (_e) { return; }
+        const run = this._grepRun = {key, proc};
         const stop = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 4, () => { proc.force_exit(); return GLib.SOURCE_REMOVE; });
         proc.communicate_utf8_async(null, null, (p, res) => {
             GLib.source_remove(stop);
             let out = '';
             try { [, out] = p.communicate_utf8_finish(res); } catch (_e) { out = ''; }
-            if (!this._contents) return;
+            if (this._grepRun !== run) return;                         // killed: what it had so far is not an answer
+            this._grepRun = null;
             this._contents.set(key, rankFiles((out ?? '').split('\n'), needle, GLib.get_home_dir()));
             if (this._live()) this._refresh();
         });
@@ -884,22 +901,23 @@ export default class NiroSearch extends Extension {
     /** `find` in the home folder, at most four seconds, and the list is drawn again when it answers. */
     _findFiles(query) {
         const needle = fileNeedle(query);
-        if (!needle || this._files.has(needle.toLowerCase()) || this._fileBusy === needle) return;
-        this._fileBusy = needle;
+        const key = needle?.toLowerCase();
+        if (!needle || this._files.has(key) || this._findRun?.key === key || !this._ready()) return;
         const home = GLib.get_home_dir();
         let proc;
         try {
             proc = Gio.Subprocess.new(['find', ...findArgs(home, needle)], Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_SILENCE);
-        } catch (e) { this._fileBusy = null; this._say(`Could not search files: ${e.message}`); return; }
+        } catch (e) { this._say(`Could not search files: ${e.message}`); return; }
+        const run = this._findRun = {key, proc};
         const stop = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, 4, () => { proc.force_exit(); return GLib.SOURCE_REMOVE; });
         proc.communicate_utf8_async(null, null, (p, res) => {
             GLib.source_remove(stop);
-            this._fileBusy = null;
             let out = '';
             try { [, out] = p.communicate_utf8_finish(res); } catch (e) { out = ''; }
-            if (!this._files) return;
-            this._files.set(needle.toLowerCase(), rankFiles((out ?? '').split('\n'), needle, home));
-            if (this._live() && fileNeedle(this._entry.get_text())?.toLowerCase() === needle.toLowerCase()) this._refresh();
+            if (this._findRun !== run) return;                         // killed: what it had so far is not an answer
+            this._findRun = null;
+            this._files.set(key, rankFiles((out ?? '').split('\n'), needle, home));
+            if (this._live()) this._refresh();
         });
     }
 
@@ -1054,8 +1072,40 @@ export default class NiroSearch extends Extension {
         return out;
     }
 
+    /** New text: wait for the typing to rest, and kill a `find` or `grep` that is looking for something else now. */
+    _rest(query) {
+        this._typed = query;
+        this._stopRest();
+        this._rested = this._held = false;
+        if (this._findRun && this._findRun.key !== fileNeedle(query)?.toLowerCase()) this._stopSearch('_findRun');
+        if (this._grepRun && this._grepRun.key !== contentNeedle(query)?.toLowerCase()) this._stopSearch('_grepRun');
+        this._restTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, REST_MS, () => {
+            this._restTimer = 0;
+            this._rested = true;
+            if (this._held && this._live()) this._refresh();          // the list is only rebuilt when something was waiting
+            return GLib.SOURCE_REMOVE;
+        });
+    }
+
+    _stopRest() {
+        if (this._restTimer) GLib.source_remove(this._restTimer);
+        this._restTimer = 0;
+    }
+
+    /** May a request or a process start now? If not, it is noted that something waits. */
+    _ready() {
+        if (!this._rested) this._held = true;
+        return this._rested;
+    }
+
+    _stopSearch(slot) {
+        this[slot]?.proc.force_exit();
+        this[slot] = null;
+    }
+
     _refresh() {
         const query = this._entry.get_text();
+        if (query !== this._typed) this._rest(query);
         let results = [];
         let failure = null;
         try { results = this._collect(query); } catch (e) { failure = e.message; }
@@ -1078,7 +1128,7 @@ export default class NiroSearch extends Extension {
         if (failure) {
             this._say(`Search failed: ${failure}`);
         } else if (!results.length) {
-            this._say(this._rateBusy && moneyQuery(query) ? 'Looking up the exchange rate…' : query.trim() ? `Nothing matches "${query.trim()}". Try an app name, a setting, "profile", or a sum like 2 + 2.` : 'Start typing to search.');
+            this._say((this._rateBusy || (this._held && !this._rested)) && moneyQuery(query) ? 'Looking up the exchange rate…' : query.trim() ? `Nothing matches "${query.trim()}". Try an app name, a setting, "profile", or a sum like 2 + 2.` : 'Start typing to search.');
         }
         let section = null;
         results.forEach((r, i) => {
@@ -1128,7 +1178,7 @@ export default class NiroSearch extends Extension {
         const money = moneyQuery(query);
         if (!money || !this._soup) return;
         const have = this._rates.get(money.from);
-        if ((have && Date.now() - have.at < RATE_TTL_MS) || this._rateBusy === money.from) return;
+        if ((have && Date.now() - have.at < RATE_TTL_MS) || this._rateBusy === money.from || !this._ready()) return;
         this._rateBusy = money.from;
         const msg = Soup.Message.new('GET', `https://api.frankfurter.dev/v1/latest?base=${money.from}`);
         this._soup.send_and_read_async(msg, GLib.PRIORITY_DEFAULT, null, (session, res) => {
@@ -1138,9 +1188,9 @@ export default class NiroSearch extends Extension {
                 if (msg.get_status() !== Soup.Status.OK) throw new Error(`rates: HTTP ${msg.get_status()}`);
                 const data = JSON.parse(new TextDecoder().decode(bytes.get_data()));
                 this._rates?.set(money.from, {at: Date.now(), rates: data.rates ?? {}});
-                if (this._live() && this._entry.get_text() === query) this._refresh();
+                if (this._live()) this._refresh();
             } catch (e) {
-                if (this._live() && this._entry.get_text() === query) this._say(`Could not get the exchange rate: ${e.message}`);
+                if (this._live() && moneyQuery(this._entry.get_text())?.from === money.from) this._say(`Could not get the exchange rate: ${e.message}`);
             }
         });
     }
