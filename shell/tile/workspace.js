@@ -10,7 +10,7 @@
 //   moveWindow(id, {workspace, monitor, rect}) -> bool    (workspace 1-based or null, monitor an index or null, rect global or null)
 //   focusWindows(ids), switchWorkspace(n)
 //   launch(appId) -> {ok, reason}
-//   load(name) -> object|null, save(name, object)
+//   load(name) -> parsed JSON, or null only when there is no such file (throws otherwise), save(name, object)
 //   now() -> ms, recoveryEnabled() -> bool
 // }
 // Every call answers {api, ok, ...}; a failure is {ok:false, error}. Windows and apps that are gone are reported in the answer, never an error.
@@ -44,14 +44,24 @@ export function createWorkspaceService({core, host}) {
         return host.liveWindows().map(w => ({id: w.id, appId: w.appId ?? '', title: w.title ?? '', workspace: w.workspace, monitor: keyOf(mons, w.monitor), monitorIndex: w.monitor, rect: w.rect}));
     }
 
-    const readStore = (file, empty) => {
-        const v = host.load(file);
-        return v && typeof v === 'object' ? v : empty;
+    /** The list a stored file holds. A file that cannot be read or understood throws, so that nothing is saved over it. */
+    const readStore = (file, key) => {
+        let v;
+        try {
+            v = host.load(file);
+            if (v !== null && !Array.isArray(v?.[key])) throw new Error(`it has no list of ${key}`);
+        } catch (e) {
+            throw new Error(`${file} could not be read and was left as it is: ${e.message}`);
+        }
+        return v === null ? [] : v[key];
     };
+    // entries that are not understood are kept aside and written back
     const groupStore = () => {
-        const s = readStore(GROUPS_FILE, G.emptyStore());
-        return {version: 1, groups: Array.isArray(s.groups) ? s.groups.filter(g => g && typeof g.id === 'string' && Array.isArray(g.members)) : []};
+        const all = readStore(GROUPS_FILE, 'groups');
+        const valid = g => Boolean(g && typeof g.id === 'string' && Array.isArray(g.members));
+        return {version: 1, groups: all.filter(valid), invalid: all.filter(g => !valid(g))};
     };
+    const saveGroups = ({invalid, ...store}) => host.save(GROUPS_FILE, {...store, groups: [...store.groups, ...invalid]});
 
     // ---- groups
 
@@ -107,7 +117,7 @@ export function createWorkspaceService({core, host}) {
             const {store, group} = G.createGroup(groupStore(), name, chosen);
             const first = chosen[0];
             const saved = first ? G.setTarget(store, group.id, {workspace: first.workspace || null, monitor: first.monitor}) : store;
-            host.save(GROUPS_FILE, saved);
+            saveGroups(saved);
             return ok({group: groupView(saved.groups.find(g => g.id === group.id), windows, mons), skipped: ids.length - chosen.length});
         },
         add({id, windowId}) {
@@ -118,26 +128,26 @@ export function createWorkspaceService({core, host}) {
             let store = G.addWindow(groupStore(), id, w);
             // the first window of a group that has no place yet gives it one
             if (!store.groups.find(g => g.id === id).target) store = G.setTarget(store, id, {workspace: w.workspace || null, monitor: w.monitor});
-            host.save(GROUPS_FILE, store);
+            saveGroups(store);
             return ok({group: groupView(store.groups.find(g => g.id === id), windows, mons)});
         },
         remove({id, windowId}) {
             const mons = monitorList(), windows = live(mons);
             const w = windows.find(x => x.id === windowId);
             const store = G.removeWindow(groupStore(), id, w ?? {id: windowId, appId: '', title: ''});
-            host.save(GROUPS_FILE, store);
+            saveGroups(store);
             return ok({group: groupView(store.groups.find(g => g.id === id), windows, mons)});
         },
         rename({id, name}) {
             const store = G.renameGroup(groupStore(), id, name);
-            host.save(GROUPS_FILE, store);
+            saveGroups(store);
             const mons = monitorList();
             return ok({group: groupView(store.groups.find(g => g.id === id), live(mons), mons)});
         },
         delete({id}) {
             const before = groupStore();
             if (!before.groups.some(g => g.id === id)) throw new Error(`no group "${id}"`);
-            host.save(GROUPS_FILE, G.deleteGroup(before, id));
+            saveGroups(G.deleteGroup(before, id));
             return ok({deleted: id});
         },
         /** Keep where the group's open windows are now as the group's place (the first open member sets it). */
@@ -148,7 +158,7 @@ export function createWorkspaceService({core, host}) {
             const w = G.matchWindow(g.members[0] ?? {appId: '', title: ''}, windows) ?? g.members.map(m => G.matchWindow(m, windows)).find(Boolean);
             if (!w) throw new Error('none of its windows is open, so there is no place to remember');
             const saved = G.setTarget(store, id, {workspace: w.workspace || null, monitor: w.monitor});
-            host.save(GROUPS_FILE, saved);
+            saveGroups(saved);
             return ok({group: groupView(saved.groups.find(x => x.id === id), windows, mons)});
         },
         activate: args => groupMove(args, true),
@@ -183,15 +193,13 @@ export function createWorkspaceService({core, host}) {
     // ---- snapshots
 
     const snapStore = () => {
-        const s = readStore(SNAPSHOTS_FILE, {version: 1, snapshots: []});
-        const snapshots = [];
-        let invalid = 0;
-        for (const x of Array.isArray(s.snapshots) ? s.snapshots : []) {
-            try { snapshots.push({...S.migrateSnapshot(x), id: String(x.id), name: String(x.name ?? ''), at: Number(x.at) || 0, pinned: Boolean(x.pinned)}); } catch (_e) { invalid++; }
+        const snapshots = [], invalid = [];
+        for (const x of readStore(SNAPSHOTS_FILE, 'snapshots')) {
+            try { snapshots.push({...S.migrateSnapshot(x), id: String(x.id), name: String(x.name ?? ''), at: Number(x.at) || 0, pinned: Boolean(x.pinned)}); } catch (_e) { invalid.push(x); }
         }
         return {snapshots, invalid};
     };
-    const saveSnaps = snapshots => host.save(SNAPSHOTS_FILE, {version: 1, snapshots});
+    const saveSnaps = (snapshots, invalid) => host.save(SNAPSHOTS_FILE, {version: 1, snapshots: [...snapshots, ...invalid]});
     const summary = s => ({id: s.id, name: s.name, at: s.at, pinned: s.pinned, windows: s.windows.length, monitors: s.monitors ?? null});
 
     function liveSnapshot(mons = monitorList()) {
@@ -241,23 +249,23 @@ export function createWorkspaceService({core, host}) {
             const store = snapStore();
             const all = [snap, ...store.snapshots.filter(s => s.id !== snap.id)];
             const kept = S.retain(all, at, {max, days});
-            saveSnaps(kept);
+            saveSnaps(kept, store.invalid);
             return ok({snapshot: summary(snap), dropped: all.length - kept.length, windows: snap.windows.length});
         },
         list() {
             const store = snapStore();
-            return ok({snapshots: store.snapshots.sort((a, b) => b.at - a.at).map(summary), invalid: store.invalid});
+            return ok({snapshots: store.snapshots.sort((a, b) => b.at - a.at).map(summary), invalid: store.invalid.length});
         },
         delete({id}) {
             const store = snapStore();
             findSnap(store, id);
-            saveSnaps(store.snapshots.filter(s => s.id !== id));
+            saveSnaps(store.snapshots.filter(s => s.id !== id), store.invalid);
             return ok({deleted: id});
         },
         pin({id, pinned = true}) {
             const store = snapStore();
             findSnap(store, id);
-            saveSnaps(store.snapshots.map(s => (s.id === id ? {...s, pinned: Boolean(pinned)} : s)));
+            saveSnaps(store.snapshots.map(s => (s.id === id ? {...s, pinned: Boolean(pinned)} : s)), store.invalid);
             return ok({id, pinned: Boolean(pinned)});
         },
         /** Differences between two snapshots, or one and the windows open now (`b` left out). */
@@ -296,7 +304,7 @@ export function createWorkspaceService({core, host}) {
         },
         retain({max = 20, days = 30}) {
             const store = snapStore(), kept = S.retain(store.snapshots, host.now(), {max, days});
-            saveSnaps(kept);
+            saveSnaps(kept, store.invalid);
             return ok({kept: kept.length, dropped: store.snapshots.length - kept.length});
         },
     };

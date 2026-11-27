@@ -85,6 +85,10 @@ export default class Tile extends Extension {
         this._guard = createGuard();      // a rule may act on one window only a few times in a short while: nothing can loop
         this._workspace = WORKSPACE_CORE ? createWorkspaceService({core: WORKSPACE_CORE, host: this._workspaceHost()}) : null;
 
+        // The lock screen disables and re-enables Tile: windows already open then are not new, so the automatic rules leave them alone.
+        // At login (shell still starting, not a restart) every window is new.
+        const login = Main.layoutManager._startingUp && !Meta.is_restart?.();
+        this._preexisting = new WeakSet(login ? [] : global.get_window_actors().map(a => a.meta_window));
         const wm = global.window_manager;
         const display = global.display;
         const again = () => this._schedule();
@@ -161,6 +165,7 @@ export default class Tile extends Extension {
         this._stopGhost();
         this._ratios = this._weights = this._shape = null;
         this._placed = null;
+        this._preexisting = null;
         this._map = null;
         this._rules = null;
         this._opacity?.restoreAll();
@@ -408,15 +413,17 @@ export default class Tile extends Extension {
             if (this._order.includes(w) || !w.get_compositor_private())
                 continue;
             this._order.push(w);
-            const rule = matchRule(this._rules, this._classes(w));
-            if (rule?.workspace && rule.workspace <= global.workspace_manager.get_n_workspaces())
-                w.change_workspace_by_index(rule.workspace - 1, false);
-            // Advanced rules run once, when the window is first seen (so nothing can re-apply in a loop); opacity is kept up to date in _applyOpacity.
-            // Windows already open are only touched by the explicit ApplyRules call.
-            try {
-                this._applyEngineTo(w, {dry: false, keys: ['workspace', 'monitor', 'above', 'fullscreen']});
-            } catch (e) {
-                console.warn(`Tile: rules on a new window: ${e.message}`);
+            // Rules run once, when a new window is first seen (so nothing can re-apply in a loop); opacity is kept up to date in _applyOpacity.
+            // Windows already open at enable() are only touched by the explicit ApplyRules call.
+            if (!this._preexisting.has(w)) {
+                const rule = matchRule(this._rules, this._classes(w));
+                if (rule?.workspace && rule.workspace <= global.workspace_manager.get_n_workspaces())
+                    w.change_workspace_by_index(rule.workspace - 1, false);
+                try {
+                    this._applyEngineTo(w, {dry: false, keys: ['workspace', 'monitor', 'above', 'fullscreen']});
+                } catch (e) {
+                    console.warn(`Tile: rules on a new window: ${e.message}`);
+                }
             }
             const ids = [w.connect('workspace-changed', () => this._schedule())];
             ids.push(w.connect('notify::title', () => { if (this._wantsOpacity) this._schedule(); }));   // a rule may match on the title
@@ -928,8 +935,10 @@ export default class Tile extends Extension {
             load: name => {
                 try {
                     return JSON.parse(new TextDecoder().decode(Gio.File.new_for_path(GLib.build_filenamev([dir, name])).load_contents(null)[1]));
-                } catch (_e) {
-                    return null;
+                } catch (e) {
+                    // only a missing file is empty: anything else must reach the caller, or the next save would overwrite it
+                    if (e.matches?.(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND)) return null;
+                    throw e;
                 }
             },
             save: (name, value) => {
