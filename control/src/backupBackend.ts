@@ -15,7 +15,8 @@ export class GioSettingsIO {
 
     keys(source) {
         const schema = this._by[source].settings_schema;
-        return Object.fromEntries(schema.list_keys().map(k => [k, schema.get_key(k).get_value_type().dup_string()]));
+        // The dock's record of what it switched off belongs to this machine: not backed up.
+        return Object.fromEntries(schema.list_keys().filter(k => k !== 'disabled-system-docks').map(k => [k, schema.get_key(k).get_value_type().dup_string()]));
     }
 
     read(source, key) { return this._by[source].get_value(key).print(true); }

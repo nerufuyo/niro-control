@@ -166,6 +166,7 @@ for name, k in schema_keys('island').items():
     items.append(build('island', 'Island', name, island_group(name), k))
 # Dock: Focus app 1 to 10 is one item (ten shortcuts)
 for name, k in schema_keys('dock').items():
+    if name == 'disabled-system-docks': continue  # the dock's own bookkeeping
     if re.match(r'focus-app-(\d+)$', name):
         if name != 'focus-app-1': continue
         it = build('dock', 'Dock', name, 'Shortcuts', k)
