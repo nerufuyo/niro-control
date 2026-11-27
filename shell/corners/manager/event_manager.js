@@ -67,21 +67,24 @@ const connections = [];
  */
 function connect(object, signal, 
 // biome-ignore lint/suspicious/noExplicitAny: Signal callbacks can have any return args and return types.
-callback) {
+callback, owner = object) {
     connections.push({
+        owner: owner,
         object: object,
         id: object.connect(signal, callback),
     });
 }
 /**
- * Disconnect all connected signals from all actors or a specific object.
+ * Disconnect and forget all connected signals, or only those of one owner.
  *
- * @param object - If object is provided, only disconnect signals from it.
+ * @param owner - If provided, only disconnect the signals it owns.
  */
-function disconnectAll(object) {
-    for (const connection of connections) {
-        if (object === undefined || connection.object === object) {
+function disconnectAll(owner) {
+    for (let i = connections.length - 1; i >= 0; i--) {
+        const connection = connections[i];
+        if (owner === undefined || connection.owner === owner) {
             connection.object.disconnect(connection.id);
+            connections.splice(i, 1);
         }
     }
 }
@@ -118,16 +121,16 @@ function applyEffectTo(actor) {
     connect(actor, 'notify::size', () => handlers.onSizeChanged(actor));
     connect(texture, 'size-changed', () => {
         handlers.onSizeChanged(actor);
-    });
+    }, actor);
     // Get notified about fullscreen explicitly, since a window must not change in
     // size to go fullscreen
-    connect(actor.metaWindow, 'notify::fullscreen', () => handlers.onSizeChanged(actor));
+    connect(actor.metaWindow, 'notify::fullscreen', () => handlers.onSizeChanged(actor), actor);
     // Window focus changed.
-    connect(actor.metaWindow, 'notify::appears-focused', () => handlers.onFocusChanged(actor));
+    connect(actor.metaWindow, 'notify::appears-focused', () => handlers.onFocusChanged(actor), actor);
     // Workspace or monitor of the window changed.
     connect(actor.metaWindow, 'workspace-changed', () => {
         handlers.onFocusChanged(actor);
-    });
+    }, actor);
     handlers.onAddEffect(actor);
 }
 /**
@@ -137,6 +140,5 @@ function applyEffectTo(actor) {
  */
 function removeEffectFrom(actor) {
     disconnectAll(actor);
-    disconnectAll(actor.metaWindow);
     handlers.onRemoveEffect(actor);
 }

@@ -88,6 +88,8 @@ pub struct Codex {
     /// The thread is loaded in this process (started, or resumed from `conversation`).
     ready: bool,
     pub conversation: Option<String>,
+    pub web: bool,
+    program: PathBuf,
     /// Counted for `prune` until the process above is gone (dropped after it).
     _alive: Alive,
 }
@@ -131,6 +133,7 @@ impl Codex {
         resume: Option<&str>,
         workspace: &Path,
         instructions: &str,
+        web: bool,
     ) -> anyhow::Result<Self> {
         std::fs::create_dir_all(workspace)?;
         std::fs::create_dir_all(home())?;
@@ -143,6 +146,8 @@ impl Codex {
         let mut command = Command::new(program);
         command
             .args(["app-server", "-c", "sandbox_mode=\"read-only\""])
+            // On the command line, over config.toml, which every Codex here shares.
+            .args((!web).then_some(["-c", "web_search=\"disabled\""]).into_iter().flatten())
             .env("CODEX_HOME", home())
             .current_dir(workspace)
             .stdin(Stdio::piped())
@@ -178,6 +183,8 @@ impl Codex {
             next_id: 0,
             ready: false,
             conversation: resume.map(str::to_owned),
+            web,
+            program: program.to_owned(),
             _alive: alive,
         };
         let version = env!("CARGO_PKG_VERSION");
@@ -197,7 +204,7 @@ impl Codex {
     /// server of its own that is dropped after: nothing is asked of the AI.
     pub async fn models(program: &Path) -> anyhow::Result<(Value, Vec<Value>)> {
         let workspace = crate::store::data_dir().join("assistant");
-        let mut codex = Self::start(program, "", None, &workspace, "").await?;
+        let mut codex = Self::start(program, "", None, &workspace, "", true).await?;
         let account = codex.request("account/read", json!({})).await;
         let account = account.map_err(|err| codex.explained(err))?;
         let mut pages = Vec::new();
@@ -217,6 +224,15 @@ impl Codex {
             }
         }
         Ok((account, pages))
+    }
+
+    /// The same conversation in a new server without web search.
+    pub async fn cut_web(&mut self) -> anyhow::Result<()> {
+        let id = self.conversation.clone().context("no conversation to go on with")?;
+        let (program, model) = (self.program.clone(), self.model.clone());
+        let (workspace, instructions) = (self.workspace.clone(), self.instructions.clone());
+        *self = Self::start(&program, &model, Some(&id), &workspace, &instructions, false).await?;
+        Ok(())
     }
 
     /// Opens the conversation now, so the first turn need not wait for it.

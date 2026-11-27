@@ -10,8 +10,8 @@
 // session ends the applications close one by one, which is a flurry that never settles before the shell is gone, so the
 // last settled state stays.
 //
-// Restoring: once per login (a marker file that names the shell process, so not when this
-// extension starts again, or the screen unlocks), a few seconds after the session is up, applications not running are
+// Restoring: once per login (a marker file that names the shell process, written when it is done, so a restore the screen
+// locking cut short carries on after the unlock), a few seconds after the session is up, applications not running are
 // started a little apart. Saving waits until that is over, so a half-restored desktop is not taken for the desktop one wanted.
 
 import Gio from 'gi://Gio';
@@ -29,6 +29,10 @@ const LAUNCH_GAP_MS = 900;
 const WINDOW_WAIT_MS = 25000;
 /** After the last one is started, saving stays off this long, in ms. */
 const SETTLE_MS = 15000;
+
+/** Started by this shell process: it outlives the screen locking, so a restore cut short does not start these twice (some stay
+ * "stopped" until their window shows). */
+const launched = new Set();
 
 function stateFile() {
     return GLib.build_filenamev([GLib.get_user_state_dir(), 'niro', 'session.json']);
@@ -175,7 +179,7 @@ export class SessionRestore {
     _beginRestore() {
         const marker = Gio.File.new_for_path(markerFile());
         const login = shellId();
-        // Once per login: the marker names this login's session when the shell (or this extension) starts again within one.
+        // Once per login: the marker names this login's session once a restore in it has finished.
         let marked = null;
         try {
             marked = new TextDecoder().decode(marker.load_contents(null)[1]).trim();
@@ -184,18 +188,15 @@ export class SessionRestore {
             this._scheduleSave();
             return;
         }
-        try {
-            marker.replace_contents(new TextEncoder().encode(login), null, false, Gio.FileCreateFlags.NONE, null);
-        } catch (e) {
-            console.warn(`Island: could not mark the session as restored: ${e.message}`);
-        }
         const state = this._read();
         const running = id => {
             const app = Shell.AppSystem.get_default().lookup_app(id);
             return !app || app.state !== Shell.AppState.STOPPED;
         };
-        const queue = (state?.apps ?? []).filter(entry => entry.windows?.length && !running(entry.id));
-        if (!queue.length) {
+        const queue = (state?.apps ?? []).filter(entry => entry.windows?.length && !launched.has(entry.id) && !running(entry.id));
+        // Cut short after the last start: it still has to settle before anything is saved.
+        if (!queue.length && !launched.size) {
+            this._markRestored();
             this._scheduleSave();
             return;
         }
@@ -210,12 +211,23 @@ export class SessionRestore {
         });
     }
 
+    /** Only once there is nothing left to restore: cut short (the screen locking), it carries on next time. */
+    _markRestored() {
+        try {
+            Gio.File.new_for_path(markerFile()).replace_contents(new TextEncoder().encode(shellId()), null, false,
+                Gio.FileCreateFlags.NONE, null);
+        } catch (e) {
+            console.warn(`Island: could not mark the session as restored: ${e.message}`);
+        }
+    }
+
     _launchNext(queue) {
         const entry = queue.shift();
         if (!entry) {
             // Saving starts again once what was started has had time to settle.
             this._launchId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, SETTLE_MS, () => {
                 this._launchId = 0;
+                this._markRestored();
                 this._stopRestoring();
                 this._scheduleSave();
                 return GLib.SOURCE_REMOVE;
@@ -226,6 +238,7 @@ export class SessionRestore {
         if (app && app.state === Shell.AppState.STOPPED) {
             this._pending.set(entry.id, {entry, until: GLib.get_monotonic_time() / 1000 + WINDOW_WAIT_MS});
             try {
+                launched.add(entry.id);
                 app.activate();
             } catch (e) {
                 console.warn(`Island: could not restore ${entry.id}: ${e.message}`);

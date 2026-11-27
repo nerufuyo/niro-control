@@ -63,6 +63,48 @@ const userFolder = (dir: GLib.UserDirectory): Gio.File | null => {
   return path ? Gio.File.new_for_path(path) : null;
 };
 
+/** A folder's entries (the first 5000), read off the main loop; empty when unreadable or cancelled. */
+function listFolder(
+  folder: Gio.File,
+  attributes: string,
+  cancellable: Gio.Cancellable,
+): Promise<Gio.FileInfo[]> {
+  return new Promise((resolve) => {
+    const infos: Gio.FileInfo[] = [];
+    folder.enumerate_children_async(
+      attributes,
+      Gio.FileQueryInfoFlags.NONE,
+      GLib.PRIORITY_DEFAULT,
+      cancellable,
+      (_folder, opened) => {
+        let it: Gio.FileEnumerator;
+        try {
+          it = folder.enumerate_children_finish(opened);
+        } catch (_e) {
+          resolve([]);
+          return;
+        }
+        const done = (result: Gio.FileInfo[]) => {
+          it.close_async(GLib.PRIORITY_DEFAULT, null, null);
+          resolve(result);
+        };
+        const next = () =>
+          it.next_files_async(200, GLib.PRIORITY_DEFAULT, cancellable, (_it, read) => {
+            try {
+              const batch = it.next_files_finish(read);
+              infos.push(...batch);
+              if (batch.length > 0 && infos.length < 5000) next();
+              else done(infos.slice(0, 5000));
+            } catch (_e) {
+              done([]);
+            }
+          });
+        next();
+      },
+    );
+  });
+}
+
 type MenuManager = InstanceType<typeof PopupMenu.PopupMenuManager>;
 
 /** Delegate exposed on a dragged icon so the drop target knows the source. */
@@ -158,6 +200,10 @@ export class IconManager {
   private _downloadTimer = 0;
   private _downloadPulse = 0;
   private _downloading = 0;
+  /** The folder reads in progress; cancelled ones must not touch anything. */
+  private _downloadScan: Gio.Cancellable | null = null;
+  private _downloadChanged = false;
+  private _stackScan: Gio.Cancellable | null = null;
   private _stackSeparator: InstanceType<typeof St.Widget> | null = null;
   private _stackMenu: ContextMenu | null = null;
   private _windowPreviewsEnabled: boolean = false;
@@ -860,7 +906,7 @@ export class IconManager {
       if (this._dragging) {
         // Keep tooltips and previews out of the way while reordering.
         this._hideTooltip();
-        if (this._previewPopup?.isVisible()) this._previewPopup.hide();
+        this._previewPopup?.dismiss();
         return Clutter.EVENT_PROPAGATE;
       }
       if (actor.hover) {
@@ -1149,8 +1195,7 @@ export class IconManager {
     this._dragSlot = this._captureSlot(appId);
     this._pressedAppId = null;
     this._hideTooltip();
-    this._previewPopup?.cancelScheduledHide();
-    this._previewPopup?.hide();
+    this._previewPopup?.dismiss();
     this._onDragStateChanged?.(true);
   }
 
@@ -1542,6 +1587,7 @@ export class IconManager {
 
   private _showContextMenu(actor: IconActor, app: Shell.App): void {
     this._closeContextMenu();
+    this._closeStackMenu();
     if (!this._menuManager) return;
     const menuManager = this._menuManager;
 
@@ -1993,7 +2039,7 @@ export class IconManager {
       });
       this._signals.connectActor(actor, "button-release-event", (_a, event) => {
         const button = (event as { get_button: () => number }).get_button();
-        if (button === 1 || button === 3) this._openStack(actor, folder);
+        if (button === 1 || button === 3) void this._openStack(actor, folder);
         return Clutter.EVENT_STOP;
       });
       this._container.add_child(actor);
@@ -2041,11 +2087,14 @@ export class IconManager {
 
   /** One look at the folder after the changes settle (a download changes its file many times a second). */
   private _scheduleDownloadScan(path: string): void {
+    if (this._downloadScan) {
+      this._downloadChanged = true; // look again when this read ends, never two at once
+      return;
+    }
     if (this._downloadTimer) return;
     this._downloadTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, 800, () => {
       this._downloadTimer = 0;
-      this._downloading = this._countPartial(path);
-      this._showDownloadBar();
+      void this._scanDownloads(path);
       return GLib.SOURCE_REMOVE;
     });
   }
@@ -2065,24 +2114,28 @@ export class IconManager {
     return pages * 4096;
   }
 
-  private _countPartial(path: string): number {
-    const entries: { name: string; modified: number }[] = [];
-    try {
-      const it = Gio.File.new_for_path(path).enumerate_children(
-        "standard::name,time::modified",
-        Gio.FileQueryInfoFlags.NONE,
-        null,
-      );
-      for (let info = it.next_file(null); info && entries.length < 5000; info = it.next_file(null))
-        entries.push({
-          name: info.get_name(),
-          modified: info.get_attribute_uint64("time::modified"),
-        });
-      it.close(null);
-    } catch (_e) {
-      return 0;
-    }
-    return partialDownloads(entries, Math.floor(Date.now() / 1000), this._downloadActiveSeconds);
+  private async _scanDownloads(path: string): Promise<void> {
+    const scan = new Gio.Cancellable();
+    this._downloadScan = scan;
+    this._downloadChanged = false;
+    const infos = await listFolder(
+      Gio.File.new_for_path(path),
+      "standard::name,time::modified",
+      scan,
+    );
+    if (scan.is_cancelled()) return;
+    this._downloadScan = null;
+    const entries = infos.map((info) => ({
+      name: info.get_name(),
+      modified: info.get_attribute_uint64("time::modified"),
+    }));
+    this._downloading = partialDownloads(
+      entries,
+      Math.floor(Date.now() / 1000),
+      this._downloadActiveSeconds,
+    );
+    this._showDownloadBar();
+    if (this._downloadChanged) this._scheduleDownloadScan(path);
   }
 
   private _showDownloadBar(): void {
@@ -2115,6 +2168,8 @@ export class IconManager {
   private _unwatchDownloads(): void {
     if (this._downloadTimer) GLib.source_remove(this._downloadTimer);
     this._downloadTimer = 0;
+    this._downloadScan?.cancel();
+    this._downloadScan = null;
     if (this._downloadPulse) GLib.source_remove(this._downloadPulse);
     this._downloadPulse = 0;
     if (this._downloadMonitor) {
@@ -2128,38 +2183,40 @@ export class IconManager {
   }
 
   /** The folder's newest files, newest first (hidden ones left out). */
-  private _stackFiles(folder: Gio.File): { file: Gio.File; name: string; icon: Gio.Icon | null }[] {
-    const out: { file: Gio.File; name: string; icon: Gio.Icon | null; at: number }[] = [];
-    try {
-      const it = folder.enumerate_children(
-        "standard::name,standard::display-name,standard::icon,standard::is-hidden,time::modified",
-        Gio.FileQueryInfoFlags.NONE,
-        null,
-      );
-      let seen = 0;
-      for (let info = it.next_file(null); info && seen < 5000; info = it.next_file(null), seen++) {
-        if (info.get_is_hidden()) continue;
-        out.push({
-          file: folder.get_child(info.get_name()),
-          name: info.get_display_name(),
-          icon: info.get_icon(),
-          at: info.get_attribute_uint64("time::modified"),
-        });
-      }
-      it.close(null);
-    } catch (_e) {
-      return [];
-    }
-    return out.sort((a, b) => b.at - a.at).slice(0, this._stackFileCount);
+  private async _stackFiles(
+    folder: Gio.File,
+    cancellable: Gio.Cancellable,
+  ): Promise<{ file: Gio.File; name: string; icon: Gio.Icon | null }[]> {
+    const infos = await listFolder(
+      folder,
+      "standard::name,standard::display-name,standard::icon,standard::is-hidden,time::modified",
+      cancellable,
+    );
+    return infos
+      .filter((info) => !info.get_is_hidden())
+      .map((info) => ({
+        file: folder.get_child(info.get_name()),
+        name: info.get_display_name(),
+        icon: info.get_icon(),
+        at: info.get_attribute_uint64("time::modified"),
+      }))
+      .sort((a, b) => b.at - a.at)
+      .slice(0, this._stackFileCount);
   }
 
-  private _openStack(actor: IconActor, folder: StackFolder): void {
+  private async _openStack(actor: IconActor, folder: StackFolder): Promise<void> {
     this._closeContextMenu();
     this._closeStackMenu();
     this._hideTooltip();
     if (!this._menuManager) return;
     const { name, file: root } = this._stackSpec(folder);
     if (!root) return;
+    const scan = new Gio.Cancellable();
+    this._stackScan = scan;
+    const files = await this._stackFiles(root, scan);
+    // Closed, replaced or taken away while the folder was being read.
+    if (scan.is_cancelled() || !this._menuManager) return;
+    this._stackScan = null;
     this._trashArmed = false;
     const menu = new PopupMenu.PopupMenu(actor, 0.5, St.Side.TOP);
     menu.box.add_style_class_name("dock-popup-menu");
@@ -2172,7 +2229,6 @@ export class IconManager {
         Main.notify(name, `Could not open ${file.get_basename()}: ${(e as Error).message}`);
       }
     };
-    const files = this._stackFiles(root);
     if (files.length === 0) {
       const empty = new PopupMenu.PopupMenuItem(`${name} is empty`, { reactive: false });
       menu.addMenuItem(empty);
@@ -2223,6 +2279,8 @@ export class IconManager {
   }
 
   private _closeStackMenu(): void {
+    this._stackScan?.cancel();
+    this._stackScan = null;
     const menu = this._stackMenu;
     this._stackMenu = null;
     if (menu) {

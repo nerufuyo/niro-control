@@ -446,15 +446,12 @@ impl<E: Executor> Flow<E> {
     }
 
     pub fn set_workflow_enabled(&self, id: &str, on: bool) -> Result<(), String> {
-        let wf = {
-            let st = self.lock();
-            let mut wf = st.workflows.iter().find(|w| w.id == id).cloned().ok_or_else(|| format!("no workflow \"{id}\""))?;
-            wf.enabled = on;
-            wf
-        };
-        files::save(&self.inner.paths, &wf).map_err(|e| format!("could not write the workflow: {e}"))?;
+        if !self.lock().workflows.iter().any(|w| w.id == id) {
+            return Err(format!("no workflow \"{id}\""));
+        }
+        let wf = files::set_enabled(&self.inner.paths, id, on)?;
         if let Some(slot) = self.lock().workflows.iter_mut().find(|w| w.id == id) {
-            slot.enabled = on;
+            *slot = wf;
         }
         self.inner.wake.notify_one();
         Ok(())

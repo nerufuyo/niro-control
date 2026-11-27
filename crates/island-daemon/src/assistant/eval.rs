@@ -1318,6 +1318,7 @@ async fn run(case: &Case) -> Result<Vec<Answer>, String> {
         None,
         &data_dir().join("assistant"),
         &session.instructions(),
+        true,
     )
     .await
     .map_err(|err| format!("{err:#}"))?;
@@ -1553,6 +1554,7 @@ async fn latency() {
         None,
         &data_dir().join("assistant"),
         &session.instructions(),
+        true,
     )
     .await
     .unwrap();

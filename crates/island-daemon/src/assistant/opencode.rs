@@ -123,6 +123,18 @@ pub struct Opencode {
     /// opencode 2: lowercase log levels and `--standalone`; 1.x takes neither.
     opencode2: bool,
     pub conversation: Option<String>,
+    pub web: bool,
+}
+
+/// One turn's settings, merged over `config()`: Island's prompt, and web search off unless `web`.
+fn turn_config(prompt: &str, web: bool) -> Value {
+    let mut config = serde_json::json!({"agent": {AGENT: {"prompt": prompt}}});
+    if !web {
+        let deny = serde_json::json!({"websearch": "deny"});
+        config["permission"] = deny.clone();
+        config["agent"][AGENT]["permission"] = deny;
+    }
+    config
 }
 
 /// Island's folders for opencode: its HOME, config, data and state, none of them the user's.
@@ -261,6 +273,7 @@ impl Opencode {
                  code fence around it), as this JSON Schema describes: {SCHEMA}"
             ),
             conversation: resume.map(str::to_owned),
+            web: true,
         })
     }
 
@@ -303,7 +316,7 @@ impl Opencode {
         // Counted until the turn ends, so its conversations are never deleted under it (see `prune`).
         let _running = Running::new();
         let config_path = island_home().join(format!("turn-{}-{turn}.json", std::process::id()));
-        let config = serde_json::json!({"agent": {AGENT: {"prompt": self.prompt}}});
+        let config = turn_config(&self.prompt, self.web);
         crate::store::write_private(&config_path, config.to_string().as_bytes())
             .context("could not write opencode's prompt")?;
         let _config_file = TurnFile(config_path.clone());
@@ -880,8 +893,13 @@ fn hand_back(island: &Path, user: &Path) {
             }
         }
     }
+    // Island's copy may be the only one that still works: kept until the user's file has taken it.
+    if own.is_null() && user.exists() {
+        return;
+    }
     if changed && let Err(err) = write_auth(user, &own) {
         log::warn!("could not hand opencode's renewed sign-in back: {err}");
+        return;
     }
     std::fs::remove_file(island).ok();
 }
@@ -1134,6 +1152,14 @@ mod tests {
     }
 
     #[test]
+    fn a_turn_without_the_web_denies_web_search() {
+        let off = turn_config("p", false);
+        assert_eq!(off["agent"][AGENT]["permission"]["websearch"], "deny");
+        assert_eq!(off["permission"]["websearch"], "deny");
+        assert!(turn_config("p", true)["permission"].is_null());
+    }
+
+    #[test]
     fn hands_a_renewed_sign_in_back() {
         use std::os::unix::fs::PermissionsExt;
         let dir = std::env::temp_dir().join(format!("island-opencode-auth-{}", std::process::id()));
@@ -1166,6 +1192,11 @@ mod tests {
         write(&island, json!({"openai": oauth("new", 200)}));
         hand_back(&island, &user);
         assert_eq!(std::fs::read(&user).unwrap(), before);
+        // The user's file cannot be written (a folder is in the way): Island's copy stays.
+        std::fs::create_dir(user.with_extension("json.island-tmp")).unwrap();
+        write(&island, json!({"openai": oauth("newer", 300)}));
+        hand_back(&island, &user);
+        assert!(island.exists());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 

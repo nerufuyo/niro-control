@@ -102,6 +102,8 @@ pub struct Chat {
     /// The AI it is had with ("claude", "codex", "agy") and its id there.
     pub provider: String,
     pub conversation: String,
+    /// A file of the user's was read in it: its AI keeps its web tools off.
+    pub offline: bool,
     /// The last time anything was said, in milliseconds since 1970.
     pub last: i64,
 }

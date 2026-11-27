@@ -238,3 +238,27 @@ test('the API answer is versioned', () => {
     assert.equal(a.api, 1);
     assert.ok(a.groups.includes('activate') && a.snapshots.includes('restore'));
 });
+
+test('stored files: a damaged one is refused and not overwritten; invalid entries survive every save', () => {
+    const {svc, files} = fake({wins: [W(1, 'a.A', 'x')]});
+    for (const damaged of ['{"groups": [', 'null_', '[]', '{"version":1}']) {
+        files['tile-groups.json'] = files['tile-snapshots.json'] = damaged;
+        assert.match(call(svc, 'groups', 'create', {name: 'G'}).error, /tile-groups\.json could not be read/);
+        assert.match(call(svc, 'snapshots', 'take', {}).error, /tile-snapshots\.json could not be read/);
+        assert.equal(files['tile-groups.json'], damaged);
+        assert.equal(files['tile-snapshots.json'], damaged);
+    }
+    const badSnap = {id: 'future', version: 9, windows: []}, badGroup = {id: 7};
+    files['tile-groups.json'] = JSON.stringify({version: 1, groups: [badGroup]});
+    files['tile-snapshots.json'] = JSON.stringify({version: 1, snapshots: [badSnap]});
+    const kept = (file, key, bad) => assert.deepEqual(JSON.parse(files[file])[key].at(-1), bad);
+    call(svc, 'groups', 'create', {name: 'G', windowIds: [1]});
+    kept('tile-groups.json', 'groups', badGroup);
+    call(svc, 'groups', 'delete', {id: 'g'});
+    kept('tile-groups.json', 'groups', badGroup);
+    const {id} = call(svc, 'snapshots', 'take', {}).snapshot;
+    for (const [op, args] of [['pin', {id}], ['retain', {}], ['delete', {id}]]) {
+        assert.equal(call(svc, 'snapshots', op, args).ok, true);
+        kept('tile-snapshots.json', 'snapshots', badSnap);
+    }
+});

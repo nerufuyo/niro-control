@@ -153,6 +153,23 @@ pub fn save(paths: &Paths, wf: &Workflow) -> io::Result<()> {
     write_atomic(&file_of(paths, &wf.id), text.as_bytes())
 }
 
+/// Flips `enabled` in the file as it is now, so hand edits and fields this version does not know survive.
+pub fn set_enabled(paths: &Paths, id: &str, on: bool) -> Result<Workflow, String> {
+    let path = file_of(paths, id);
+    let text = fs::read_to_string(&path).map_err(|e| format!("could not read the workflow: {e}"))?;
+    let mut wf = niro_flow::parse(&text)?;
+    let issues = structural_problems(&wf);
+    if wf.id != id || !issues.is_empty() {
+        return Err(format!("the workflow file was changed and cannot be used, so it was left alone: {}", issues.join("; ")));
+    }
+    let mut raw: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
+    raw["enabled"] = on.into();
+    wf.enabled = on;
+    let text = serde_json::to_string_pretty(&raw).map_err(|e| e.to_string())?;
+    write_atomic(&path, text.as_bytes()).map_err(|e| format!("could not write the workflow: {e}"))?;
+    Ok(wf)
+}
+
 pub fn delete(paths: &Paths, id: &str) -> io::Result<()> {
     match fs::remove_file(file_of(paths, id)) {
         Err(err) if err.kind() != io::ErrorKind::NotFound => Err(err),
