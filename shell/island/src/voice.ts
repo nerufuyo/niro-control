@@ -17,7 +17,7 @@ import {dur, motionOn} from './motion.js';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import {TILES, describeActions, failed, namesProject, outcomeOf, runnable, slotsFor, stoppable, terminalLine} from './actionRules.js';
+import {TILES, describeActions, failed, linkCard, namesProject, outcomeOf, runnable, slotsFor, stoppable, terminalLine} from './actionRules.js';
 import {Bot} from './bot.js';
 import {ChatView, CommandCard, answerMarkup, elapsed} from './chat.js';
 import {isTerminal} from './clipboard.js';
@@ -478,7 +478,8 @@ export const VoiceView = GObject.registerClass({
 
     // The command card as island-daemon has it. Once over, it stays until the next request; in an open
     // conversation it is a line of the list instead (see ChatView).
-    _syncCard(card) {
+    _syncCard(daemonCard) {
+        const card = this._asked ?? daemonCard;
         const live = card && ['waiting', 'running'].includes(card.status);
         const asking = ['listening', 'transcribing'].includes(this._phase);
         // One that ended before this request is the last one's, which island-daemon may still send (with an error).
@@ -531,6 +532,12 @@ export const VoiceView = GObject.registerClass({
     /** Run (true) or Deny (false), as the card's buttons do. */
     decideCard(run) {
         this._card.decide(run);
+    }
+
+    /** The extension's own Run or Deny card (a link), shown over island-daemon's until answered; null puts it away. */
+    askCard(card) {
+        this._asked = card;
+        this.showCard(card);
     }
 
     /** The command card: {command, why, detail, risks, status, output, seconds, exit}, or null for none. */
@@ -1236,9 +1243,16 @@ function primarySelection() {
 // Each action the AI may answer with (see `Session::prompt` in island-daemon); each returns what it did, for the AI.
 // `island` holds the daemon, audio, notifications, the window in front (`target`), its `writer` and `closeThen`.
 const ACTIONS = {
-    open_url: ({url}) => {
-        if (!/^(https?|mailto):/i.test(url ?? ''))
-            return failed('not a web address');
+    // Asked first, as a command is: an address can carry data out, and the AI reads what others wrote.
+    open_url: async ({url}, {decide}) => {
+        const card = linkCard(url, `link-${GLib.uuid_string_random()}`);
+        if (!card)
+            return failed('not a web address, or too long to show whole');
+        const answer = await decide(card);
+        if (answer === 'unanswered')
+            return failed('no answer in time');
+        if (!answer)
+            return failed('denied by the user: not opened, do not offer it again');
         openUri(url);
         return 'opened in the browser';
     },

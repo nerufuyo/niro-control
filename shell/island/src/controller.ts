@@ -3157,7 +3157,7 @@ export class Controller {
         this._daemon.call('assistant', 'UndoNewChat');
     }
 
-    // A command the AI wants run waits for Run or Deny: on its card while the island shows the assistant,
+    // A command the AI wants run, or a link it wants opened, waits for Run or Deny: on its card while the island shows the assistant,
     // else in an alert. Resolves true for Run, false for Deny, and 'unanswered' after APPROVAL_MS.
     _decide(action) {
         return new Promise(resolve => {
@@ -3170,12 +3170,17 @@ export class Controller {
                     this._deciding = null;
                     this._cancel('decide');
                     this._withdrawAlert(`task-ask:${action.id}`);
+                    if (action.link)
+                        this._voice.askCard(null);
                     resolve(run);
                 },
             };
             this._deciding?.done(false);
             this._deciding = entry;
             this._later('decide', APPROVAL_MS, () => entry.done('unanswered'));
+            // A command's card comes from island-daemon; a link's is the extension's own.
+            if (action.link)
+                this._voice.askCard(action);
             if (this._voiceOpen)
                 this._setKeyboard(true);
             else

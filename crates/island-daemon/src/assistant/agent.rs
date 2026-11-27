@@ -31,8 +31,9 @@ const SLOW_ACTIONS: &[(&str, Duration)] = &[
     ("play_music", Duration::from_secs(13)),
     // The user is asked first (Run or Deny), and may take a while; unanswered, it denies itself.
     ("run", APPROVAL),
+    ("open_url", APPROVAL),
 ];
-/// A command waits this long for Run or Deny (the extension says Deny then).
+/// A command or a link waits this long for Run or Deny (the extension says Deny then).
 pub const APPROVAL: Duration = Duration::from_secs(10 * 60);
 /// Desktop actions that run once the island has closed (typing at the cursor, a screenshot, locking,
 /// the notifications page): left for the reply, unchecked.
@@ -940,6 +941,11 @@ mod tests {
             seen
         });
         (desk, handled)
+    }
+
+    #[test]
+    fn a_link_waits_for_run_or_deny() {
+        assert!(super::act_timeout(&[json!({"type": "open_url"})]) > super::APPROVAL);
     }
 
     #[tokio::test]

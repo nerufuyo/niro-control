@@ -6,7 +6,7 @@ properties holding JSON, with `PropertiesChanged` emitted on every change.
 Timestamps are milliseconds since the Unix epoch; durations are
 milliseconds unless the name says `_us` (microseconds).
 
-Methods that read what the user copied (`Clipboard1.GetText` and `Search`), steer the
+What reads what the user copied (`Clipboard1.Items`, `GetText` and `Search`), steers the
 assistant (every `Assistant1` method but `ClearChat`), answer an AI agent
 (`Agents1.Resolve` and `SetPresent`), change an AI's settings (`Agents1.SetHooked`) or share
 with a phone (`Share1.Start`, `Stop` and `Answer`), pair a device (every `Devices1` method) answer GNOME Shell only, where the extension runs; any other caller gets
@@ -228,7 +228,7 @@ or `""`.
 | `SetPinned(t id, b pinned)` | | At most 10 items are pinned; pinning an eleventh fails with `LimitsExceeded`. |
 | `Remove(t id)` | | |
 | `Clear()` | | Remove every item that is not pinned. |
-| `Items` | `s` | `[{id, kind, preview, uris, image, thumb, thumb_width, thumb_height, width, height, app_id, at_ms, pinned}]`, newest first. `kind` is `text`, `link`, `image` or `files`; `preview` is the first 160 characters of a text, or the file names one per line; `uris` is empty except for files; `image` and `thumb` (paths), `width` and `height` are null except for images; `thumb` is null, and `thumb_width` and `thumb_height` too, while the thumbnail is being made again, and the two sizes are null while an older one stands in; `at_ms` is when it was last copied. |
+| `Items` | `s` | `[{id, kind, preview, uris, image, thumb, thumb_width, thumb_height, width, height, app_id, at_ms, pinned}]`, newest first. GNOME Shell only, and its `PropertiesChanged` is sent to GNOME Shell alone. `kind` is `text`, `link`, `image` or `files`; `preview` is the first 160 characters of a text, or the file names one per line; `uris` is empty except for files; `image` and `thumb` (paths), `width` and `height` are null except for images; `thumb` is null, and `thumb_width` and `thumb_height` too, while the thumbnail is being made again, and the two sizes are null while an older one stands in; `at_ms` is when it was last copied. |
 
 Adding something already in the history (the same text, image or list of
 files) moves that item to the top and returns its id; it stays pinned if
