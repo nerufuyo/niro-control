@@ -64,6 +64,8 @@ export default class RoundedWindowCornersReborn extends Extension {
         this.#injectionManager.overrideMethod(WorkspaceAnimationController.prototype, '_finishWorkspaceSwitch', finishWorkspaceSwitch => function (switchData) {
             removeShadowsAfterWorkspaceSwitch(this);
             finishWorkspaceSwitch.call(this, switchData);
+            // The destroyed switch actors already dropped these; disable() must not do it again.
+            self.#workspaceSwitchConnections = null;
         });
         // Watch for changes of the `enable-preferences-entry` prefs key.
         prefs.connect('changed', (_, key) => {

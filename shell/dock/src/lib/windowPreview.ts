@@ -30,6 +30,7 @@ export class WindowPreviewPopup {
   /** The fade-out is running; `_restY` is where the popup rests, so a returning pointer can bring it back. */
   private _closing = false;
   private _restY = 0;
+  private _dismissed = false;
   private _previewWidth: number;
   private _lastIconActor: IconActor | null = null;
   private _currentApp: Shell.App | null = null;
@@ -62,12 +63,12 @@ export class WindowPreviewPopup {
     const windows = app.get_windows();
     // An app with no window has nothing to preview, and another app's popup must not stay up under its icon.
     if (windows.length === 0) {
-      this.hide();
+      this.dismiss();
       return;
     }
 
     // Already up (or still fading in) for this app: building it again would blink.
-    if (this._popup && this._currentApp === app) {
+    if (this._popup && this._currentApp === app && !this._dismissed) {
       this.cancelScheduledHide();
       return;
     }
@@ -90,6 +91,12 @@ export class WindowPreviewPopup {
     }
   }
 
+  /** Hide for good: unlike a hover-out, a returning pointer does not bring this popup back. */
+  dismiss(): void {
+    this._dismissed = true;
+    this.hide();
+  }
+
   scheduleHide(): void {
     this._cancelCloseTimer();
     this._closeTimer = GLib.timeout_add(GLib.PRIORITY_DEFAULT, CLOSE_DELAY_MS, () => {
@@ -102,7 +109,7 @@ export class WindowPreviewPopup {
   /** The pointer is back: drop the pending hide, and turn a fade-out that already started around. */
   cancelScheduledHide(): void {
     this._cancelCloseTimer();
-    if (!this._closing || !this._popup) return;
+    if (!this._closing || this._dismissed || !this._popup) return;
     this._closing = false;
     this._popup.remove_all_transitions();
     this._startUpdateTimer();
@@ -290,7 +297,7 @@ export class WindowPreviewPopup {
           metaWin.unminimize();
         }
         metaWin.activate(global.get_current_time());
-        this.hide();
+        this.dismiss();
       }
       return Clutter.EVENT_STOP;
     });
@@ -407,11 +414,11 @@ export class WindowPreviewPopup {
   }
 
   private _refreshAfterClose(app: Shell.App): void {
-    if (!this._visible) return;
+    if (!this._visible || this._dismissed) return;
 
     const windows = app.get_windows();
     if (windows.length === 0) {
-      this.hide();
+      this.dismiss();
       return;
     }
 
@@ -448,6 +455,7 @@ export class WindowPreviewPopup {
 
     this._visible = false;
     this._closing = false;
+    this._dismissed = false;
     this._currentApp = null;
   }
 

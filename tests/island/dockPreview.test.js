@@ -55,3 +55,18 @@ test('dock window preview does not blink when the pointer returns', async () => 
     assert.equal(popup.pending.opacity, 0);
     assert.equal(built, 1);
 });
+
+test('a dismissed dock preview is not revived by a returning pointer', async () => {
+    const {WindowPreviewPopup} = await import('../../shell/dock/dist/lib/windowPreview.js');
+    const p = new WindowPreviewPopup();
+    const a = app(1), icon = new Actor();
+    p.show(a, icon);
+
+    const popup = p._popup, before = built;
+    p.dismiss();                                        // thumbnail clicked, or previews turned off
+    p.cancelScheduledHide();                            // enter event during the fade
+    assert.equal(popup.pending.opacity, 0);
+
+    p.show(a, icon);                                    // a new hover on the icon opens a fresh one
+    assert.equal(built, before + 1);
+});

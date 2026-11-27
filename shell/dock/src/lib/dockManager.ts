@@ -241,8 +241,7 @@ export class DockManager {
     magnification.setOnActivity((active) => this._visibility?.setMagnifying(active));
     magnification.start();
     iconManager.setOnDragStateChanged((dragging) => {
-      previewPopup.cancelScheduledHide();
-      previewPopup.hide();
+      previewPopup.dismiss();
       if (dragging) {
         magnification.pause();
       } else {
@@ -376,7 +375,7 @@ export class DockManager {
     this._signals.connect(settings, "changed::window-previews", () => {
       const enabled = settings.get_boolean("window-previews");
       iconManager.setWindowPreviewsEnabled(enabled);
-      if (!enabled) previewPopup.hide();
+      if (!enabled) previewPopup.dismiss();
     });
     this._signals.connect(settings, "changed::preview-scale", () => {
       previewPopup.setPreviewWidth(settings.get_int("preview-scale"));
