@@ -9,6 +9,9 @@ done
 glib-compile-schemas "$T"
 GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" gjs -m tests/gjs/blurPipeline.test.js
 gjs -m tests/gjs/slimeDraw.test.js
+# these two make their own scratch HOME; they need the island's build
+DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent-niro-test-bus gjs -m tests/island/downloads.gjs.js
+gjs -m tests/island/format.gjs.js
 GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/controlUi.test.js
 GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/profiles.test.js
 GSETTINGS_BACKEND=memory GSETTINGS_SCHEMA_DIR="$T" NIRO_SCHEMA_DIR="$T" gjs -m tests/gjs/appearance.test.js

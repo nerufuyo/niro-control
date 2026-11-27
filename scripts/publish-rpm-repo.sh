@@ -14,6 +14,10 @@ if git ls-remote --exit-code --heads "$URL" gh-pages >/dev/null 2>&1; then
 else
     mkdir "$SITE"; git -C "$SITE" init -q -b gh-pages; git -C "$SITE" remote add origin "$URL"
 fi
+# A signed repository stays signed: without the key, repomd.xml.asc would go stale and the .repo would turn the checks off.
+if [ -z "${NIRO_GPG_KEY:-}" ] && [ -f "$SITE/niro-control.gpg" ]; then
+    echo "the published repository is signed: set NIRO_GPG_KEY"; exit 1
+fi
 mkdir -p "$SITE/rpm"
 cp "$RPM" "$SITE/rpm/"
 KEY=${NIRO_GPG_KEY:-}
