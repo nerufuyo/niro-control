@@ -201,6 +201,12 @@ export class SessionRestore {
             return;
         }
         this._restoring = true;
+        // Started before the cut, no window yet: still to be placed, not to be started again.
+        for (const entry of state?.apps ?? []) {
+            if (launched.has(entry.id) && entry.windows?.length &&
+                Shell.AppSystem.get_default().lookup_app(entry.id)?.get_windows().length === 0)
+                this._pending.set(entry.id, {entry, until: GLib.get_monotonic_time() / 1000 + WINDOW_WAIT_MS});
+        }
         // Placing windows as they come up.
         this._windowSignal = global.display.connect('window-created', (_display, win) => this._place(win));
         // A moment after the session is up: what starts by itself is there by then and is not started twice.

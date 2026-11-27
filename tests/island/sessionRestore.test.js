@@ -4,11 +4,13 @@ import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 
 test('a restore cut short carries on after the unlock, saving nothing and starting nothing twice', () => {
-    const files = new Map([['state/niro/session.json', JSON.stringify({apps: [{id: 'a', windows: [{}]}, {id: 'b', windows: [{}]}]})]]);
+    const files = new Map([['state/niro/session.json', JSON.stringify({apps: [{id: 'a', windows: [{workspace: -1}]}, {id: 'b', windows: [{}]}]})]]);
     const saved = files.get('state/niro/session.json');
     const timers = new Map();
     let next = 0;
     const started = [];
+    let windowCreated;
+    let stuck = 0;
     const file = path => ({
         load_contents: () => {
             if (path === '/proc/self/stat')
@@ -27,15 +29,16 @@ test('a restore cut short carries on after the unlock, saving nothing and starti
             timeout_add: (_priority, _ms, run) => (timers.set(++next, run), next),
             Source: {remove: id => timers.delete(id)},
         },
-        Meta: {},
+        Meta: {WindowType: {NORMAL: 0}},
         // Both stay "stopped", as an app does until its window shows.
         Shell: {
             AppState: {STOPPED: 0},
             AppSystem: {get_default: () => ({connect: () => 1, disconnect: () => {},
-                lookup_app: id => ({state: 0, activate: () => started.push(id)})})},
+                lookup_app: id => ({state: 0, get_windows: () => [], activate: () => started.push(id)})})},
+            WindowTracker: {get_default: () => ({get_window_app: win => ({get_id: () => win.id})})},
         },
         maximize: () => {},
-        global: {window_manager: {connect: () => 1, disconnect: () => {}}, display: {connect: () => 1, disconnect: () => {}},
+        global: {window_manager: {connect: () => 1, disconnect: () => {}}, display: {connect: (_signal, run) => (windowCreated = run, 1), disconnect: () => {}},
             get_window_actors: () => []},
     };
     const js = readFileSync(new URL('../../shell/island/src/sessionRestore.ts', import.meta.url), 'utf8')
@@ -54,6 +57,9 @@ test('a restore cut short carries on after the unlock, saving nothing and starti
 
     const second = new SessionRestore(settings);
     second.save();
+    // "a" was started before the lock and shows its window only now: it is still put in its place.
+    windowCreated(null, {id: 'a', window_type: 0, stick: () => stuck++, get_compositor_private: () => null});
+    assert.equal(stuck, 1);
     assert.equal(files.get('state/niro/session.json'), saved);
     tick(); // the delay: "b" starts
     second.destroy(); // locked again, before it settled
