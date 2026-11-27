@@ -199,3 +199,29 @@ print('profiles reliability: ok');
     eq(value('niro.app-rules'), mine, 'rules restored by Undo');
     print('profiles: per-application rules ok');
 }
+
+// a file that is not a valid profile still holds its id: nothing new is written over it
+{
+    const junk = `${engine.profilesDir}/kept.json`;
+    GLib.file_set_contents(junk, 'not json');
+    GLib.file_set_contents(`${tmp}/kept-import.json`, JSON.stringify({format: 'niro-profile', version: 1, name: 'Kept', settings: {}}));
+    eq([engine.create('Kept').id, engine.importFrom(`${tmp}/kept-import.json`).profile.id], ['kept-2', 'kept-3'], 'ids of files are taken');
+    eq(new TextDecoder().decode(GLib.file_get_contents(junk)[1]), 'not json', 'the file is untouched');
+}
+
+// one value out of range: left out and said, the rest is read and applied, and the file keeps it
+{
+    const settings = {'niro.opacity': 500, 'island.hover-delay': 300};
+    const file = `${engine.profilesDir}/partly.json`;
+    GLib.file_set_contents(file, JSON.stringify({format: 'niro-profile', version: 1, id: 'partly', name: 'Partly', settings}));
+    eq(Object.keys(engine.get('partly').settings), ['island.hover-delay'], 'listed without the bad value');
+    if (!/at most 100/.test(engine.apply('partly').skipped.join())) fail('apply should say what it left out');
+    engine.rename('partly', 'Partly renamed');
+    eq(JSON.parse(new TextDecoder().decode(GLib.file_get_contents(file)[1])).settings, settings, 'a rename keeps what the file held');
+    const backup = `${tmp}/partly-backup.json`;
+    GLib.file_set_contents(backup, JSON.stringify({format: 'niro-backup', version: 1, createdAt: '', label: 'x', settings}));
+    const restored = engine.restore(backup);
+    eq([restored.ok, restored.skipped.length], [true, 1], 'the backup restores, less the bad value');
+    if (value('niro.opacity') === 500) fail('an invalid value was written');
+    print('profiles: invalid values and taken files ok');
+}

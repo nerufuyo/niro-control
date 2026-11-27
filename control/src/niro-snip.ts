@@ -1,8 +1,8 @@
 // @ts-nocheck: gjs entry
 // SPDX-License-Identifier: GPL-3.0-or-later
 // niro-snip: a snipping tool with an editor. `niro-snip` takes a screenshot (the desktop's own area / window / screen picker)
-// and opens it for marking up; `niro-snip FILE` opens an image the same way. Save writes over the file, as asked for;
-// Save As makes a copy. Runs under `gjs -m`.
+// and opens it for marking up; `niro-snip FILE` opens an image the same way. Save writes over a PNG or JPEG, as asked for
+// (other formats go to Save As); Save As makes a copy. Runs under `gjs -m`.
 import Gdk from 'gi://Gdk?version=4.0';
 import GdkPixbuf from 'gi://GdkPixbuf';
 import Gio from 'gi://Gio';
@@ -414,6 +414,8 @@ class Editor {
     }
 
     save() {
+        // only PNG and JPEG are written: anything else would get PNG bytes under its own name
+        if (!/\.(png|jpe?g)$/i.test(this.path)) return this.saveAs();
         try { this.write(this.path); this.copy(); this.say('Saved over the original, and copied'); } catch (e) { this.say(`Could not save: ${e.message}`); }
     }
 
@@ -422,7 +424,9 @@ class Editor {
         dialog.save(this.win, null, (d, res) => {
             try {
                 const file = d.save_finish(res);
-                this.write(file.get_path());
+                const path = file.get_path();
+                if (/\.(webp|gif|bmp|tiff?|avif|heic)$/i.test(path)) throw new Error('only PNG and JPEG can be written');
+                this.write(path);
                 this.say(`Saved ${file.get_basename()}`);
             } catch (e) { if (!e.matches?.(Gtk.DialogError, Gtk.DialogError.DISMISSED)) this.say(`Could not save: ${e.message}`); }
         });
