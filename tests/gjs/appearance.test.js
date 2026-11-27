@@ -73,6 +73,29 @@ eq(withoutBlock(withBlock('x\n', 4)), 'x\n', 'block round trip');
 eq(withoutBlock('no block here'), 'no block here', 'no block');
 print('appearance: gtk adapter ok');
 
+// bytes: a BOM survives backup and restore; a gtk.css that is not UTF-8, or cannot be read, is refused and left alone
+{
+    const bytesOf = p => Array.from(GLib.file_get_contents(p)[1]).join();
+    const dirs = name => { const c = `${tmp}/${name}`; for (const d of ['gtk-4.0', 'gtk-3.0']) GLib.mkdir_with_parents(`${c}/${d}`, 0o755); return c; };
+    const put = (p, b) => Gio.File.new_for_path(p).replace_contents(new Uint8Array(b), null, false, Gio.FileCreateFlags.NONE, null);
+    const bom = dirs('bom'), css = `${bom}/gtk-4.0/gtk.css`;
+    put(css, [0xef, 0xbb, 0xbf, 0x61, 0x7b, 0x7d, 0x0a]);
+    const was = bytesOf(css), done = install({...o, configDir: bom});
+    eq(bytesOf(`${done.backupDir}/4-gtk.css`), was, 'the backup is byte exact');
+    restore(bom);
+    eq(bytesOf(css), was, 'restore is byte exact');
+    const latin = dirs('latin'), bad = `${latin}/gtk-3.0/gtk.css`;
+    put(bad, [0x2f, 0x2a, 0xe9, 0x2a, 0x2f]);
+    for (const mode of [0o644, 0o000]) {
+        GLib.chmod(bad, mode);
+        if (mode === 0 && GLib.access(bad, 4) === 0) continue;   // root reads anything
+        try { install({...o, configDir: latin}); fail('installed over a file it cannot read as text'); } catch (e) { if (!/as they were/.test(e.message)) throw e; }
+        GLib.chmod(bad, 0o644);
+        eq(bytesOf(bad), '47,42,233,42,47', 'left alone');
+        eq(GLib.file_test(`${latin}/gtk-4.0/gtk.css`, GLib.FileTest.EXISTS), false, 'rolled back');
+    }
+}
+
 // refresh: only differing files are rewritten, a disabled look writes a neutral file, nothing happens when not installed
 {
     const cfg4 = `${tmp}/refresh`; for (const d of ['gtk-4.0', 'gtk-3.0']) GLib.mkdir_with_parents(`${cfg4}/${d}`, 0o755);

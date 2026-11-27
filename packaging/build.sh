@@ -88,6 +88,8 @@ find "$P/usr/bin" -type f -exec chmod 755 {} +
 [ -n "$STAGE_ONLY" ] && exit 0
 mkdir -p "$P/DEBIAN"
 sed "s/@VERSION@/$VER/" packaging/debian/control.in > "$P/DEBIAN/control"
+# what is shipped under /etc is the user's to edit: an upgrade must ask, not overwrite
+(cd "$P" && find etc -type f -printf '/%p\n') > "$P/DEBIAN/conffiles"
 for s in preinst prerm postrm postinst; do install -m 755 "packaging/debian/$s" "$P/DEBIAN/$s"; done
 dpkg-deb --root-owner-group -Zxz -b "$P" "$OUT/niro-control_${VER}_amd64.deb" >/dev/null
 echo "built $OUT/niro-control_${VER}_amd64.deb"
