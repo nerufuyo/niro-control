@@ -93,9 +93,10 @@ impl<T: Serialize + DeserializeOwned + Default> Store<T> {
     }
 
     /// Whether the value stands in for unreadable or corrupt data, so files it no longer
-    /// mentions may still belong to the user's real data.
+    /// mentions may still belong to the user's real data. So for as long as a corrupt file
+    /// set aside is still there, however many restarts later.
     pub fn lost_track(&self) -> bool {
-        self.read_only || self.fell_back
+        self.read_only || self.fell_back || self.path.with_extension("json.corrupt").exists()
     }
 
     /// Saves atomically, so a crash mid-write never leaves a truncated file. The disk work runs on a
@@ -319,6 +320,16 @@ mod tests {
         );
         store.save(&vec![1]);
         assert_eq!(store.load(), [1]);
+        assert!(store.lost_track());
+
+        // The next start reads a good file, but what the corrupt one listed is still unknown.
+        let mut next = Store::<Vec<u32>>::at(path.clone());
+        assert_eq!(next.load(), [1]);
+        assert!(next.lost_track());
+        fs::remove_file(dir.join("list.json.corrupt")).unwrap();
+        let mut after = Store::<Vec<u32>>::at(path.clone());
+        after.load();
+        assert!(!after.lost_track());
         fs::remove_dir_all(dir).unwrap();
     }
 

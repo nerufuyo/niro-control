@@ -657,13 +657,14 @@ export function taskAsks(card, look, answer) {
         key: `task-ask:${card.id}`,
         bot: {look, glyph: '!'},
         title: card.why,
-        subtitle: card.risks?.includes('root') ? 'Island wants to run this · asks for your password' : 'Island wants to run this',
+        subtitle: card.link ? 'Island wants to open this'
+            : card.risks?.includes('root') ? 'Island wants to run this · asks for your password' : 'Island wants to run this',
         code: card.command,
         tone: 'warn',
         glow: look.palette.glow,
         actions: [
             {label: 'Deny', answer: 'deny', callback: () => answer(false)},
-            {label: 'Run', answer: 'allow', primary: true, done: 'Running', callback: () => answer(true)},
+            {label: 'Run', answer: 'allow', primary: true, done: card.link ? 'Opening' : 'Running', callback: () => answer(true)},
         ],
         sticky: true,
         duration: 600000,

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2026 zickrian
 
-//! Who may call what: the methods that read the user's clipboard or steer the assistant (which can type
-//! and open things) answer GNOME Shell, where the extension runs, and no other program on the bus.
+//! Who may call what: what reads the user's clipboard or steers the assistant (which can type
+//! and open things) answers GNOME Shell, where the extension runs, and no other program on the bus.
 
 use zbus::message::Header;
 use zbus::names::BusName;
@@ -25,7 +25,7 @@ pub async fn shell_only(connection: &Connection, header: &Header<'_>) -> fdo::Re
 }
 
 /// The unique name GNOME Shell has on the bus, if it runs.
-async fn shell_owner(connection: &Connection) -> Option<String> {
+pub async fn shell_owner(connection: &Connection) -> Option<String> {
     let dbus = fdo::DBusProxy::builder(connection)
         .cache_properties(CacheProperties::No)
         .build()

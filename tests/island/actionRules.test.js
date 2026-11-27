@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {ROOT_WRAPPER, RUN_WRAPPER, describeActions, failed, namesProject, outcomeOf, runnable, slotsFor, stoppable, terminalLine} from '../../shell/island/build/src/actionRules.js';
+import {ROOT_WRAPPER, RUN_WRAPPER, describeActions, failed, linkCard, namesProject, outcomeOf, runnable, slotsFor, stoppable, terminalLine} from '../../shell/island/build/src/actionRules.js';
 
 test('an action says what it did, or why it could not', () => {
     assert.deepEqual(outcomeOf(undefined), {ok: true, detail: ''});
@@ -109,6 +109,14 @@ test('a command is typed into a terminal only as the user sees it', () => {
     assert.equal(terminalLine('echo \u001b[8mhidden'), null);
     assert.equal(terminalLine('echo a\tb'), null);
     assert.equal(terminalLine('a'.repeat(401)), null);
+});
+
+test('a link is opened only after a card that shows it whole', () => {
+    const url = 'https://example.com/?q=a%20b';
+    assert.deepEqual(linkCard(url, 'link-1'), {id: 'link-1', link: true, why: 'Open this link?', command: url, status: 'waiting'});
+    assert.equal(linkCard('mailto:a@example.com', 'x').why, 'Write this email?');
+    for (const bad of [undefined, 'file:///etc/passwd', 'https://a.example/\u202egpj.exe', 'https://a.example/\nb', `https://a.example/${'a'.repeat(600)}`])
+        assert.equal(linkCard(bad, 'x'), null);
 });
 
 test('a window names the agent\'s project only as a word of its own', () => {

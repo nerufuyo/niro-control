@@ -337,7 +337,7 @@ export const CommandCard = GObject.registerClass({
         // Waiting, the line under the title says what to know; running, how long it has been at it.
         this._subtitle.text = waiting ? card.detail ?? '' : running ? `Running · ${elapsed(card.seconds ?? 0)}` : '';
         this._subtitle.visible = Boolean(this._subtitle.text);
-        this._command.clutter_text.set_markup(shellMarkup(card.command));
+        this._command.clutter_text.set_markup(card.link ? GLib.markup_escape_text(card.command, -1) : shellMarkup(card.command));
         this._commandText = card.command;
         // Waiting, the whole command shows; once on its way, a line of it is enough.
         this._command.clutter_text.line_wrap = waiting;
