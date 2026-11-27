@@ -14,7 +14,7 @@ use island_core::lrc::{self, LyricLine};
 use island_core::track::{full_title, search_terms};
 use log::{debug, warn};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 
 use super::art::fnv1a;
 use crate::store::cache_dir;
@@ -39,6 +39,8 @@ const BUSY_WAIT_MAX: Duration = Duration::from_secs(5);
 const NOT_FOUND_RETRY: Duration = Duration::from_secs(7 * 24 * 60 * 60);
 /// LRCLIB knows nothing longer (it refuses the length with HTTP 400): a mix, a podcast or a stream.
 const LONGEST_SONG_S: f64 = 3600.0;
+/// Longer lyrics are ignored: parsing copies a line's text once per time tag, which could take gigabytes.
+const LONGEST_LYRICS: usize = 32 * 1024;
 
 /// What the lyrics page shows for the track.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -114,7 +116,9 @@ impl TrackQuery {
 struct Record {
     #[serde(default)]
     artist_name: Option<String>,
+    #[serde(default, deserialize_with = "not_too_long")]
     synced_lyrics: Option<String>,
+    #[serde(default, deserialize_with = "not_too_long")]
     plain_lyrics: Option<String>,
     // `Option` so a `null` reads as `false` instead of failing the whole list.
     #[serde(default)]
@@ -127,6 +131,11 @@ impl Record {
     fn instrumental(&self) -> bool {
         self.instrumental.unwrap_or(false)
     }
+}
+
+/// Lyrics over [`LONGEST_LYRICS`] read as none, so such a record is never picked for them.
+fn not_too_long<'de, D: Deserializer<'de>>(from: D) -> Result<Option<String>, D::Error> {
+    Ok(Option::<String>::deserialize(from)?.filter(|lyrics| lyrics.len() <= LONGEST_LYRICS))
 }
 
 /// Why a lookup failed, which decides what the island tells the user.
@@ -394,6 +403,15 @@ mod tests {
         let records: Vec<Record> = serde_json::from_str(json).unwrap();
         assert!(has_lyrics(&records[0]));
         assert!(!records[0].instrumental());
+    }
+
+    #[test]
+    fn huge_lyrics_are_ignored() {
+        let huge = "[00:01.00]".repeat(LONGEST_LYRICS / 10 + 1);
+        let json = serde_json::json!({"syncedLyrics": huge, "plainLyrics": huge});
+        let record: Record = serde_json::from_value(json).unwrap();
+        assert!(record.synced_lyrics.is_none() && record.plain_lyrics.is_none());
+        assert!(!has_lyrics(&record));
     }
 
     #[test]

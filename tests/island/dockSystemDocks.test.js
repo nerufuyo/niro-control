@@ -16,7 +16,7 @@ registerHooks({resolve(spec, ctx, next) {
     if (spec.endsWith('/ui/main.js')) return fake('export const extensionManager = globalThis.__manager;');
     if (ctx.parentURL?.endsWith('/dockManager.js')) {
         // the dock's other parts are not under test: stand-ins with the names it imports
-        const names = {compat: ['box', 'inhibitScanout', 'isWayland', 'setVertical'], dockVisibility: ['DockVisibility'], genie: ['genie'],
+        const names = {compat: ['box', 'inhibitScanout', 'isWayland', 'setVertical'], dockVisibility: ['DockVisibility'], genie: ['genie', 'stopGenies'],
             iconManager: ['IconManager'], intellihide: ['Intellihide'], magnification: ['Magnification'], mediaManager: ['MediaManager'],
             signalManager: ['SignalManager'], windowPreview: ['WindowPreviewPopup']}[spec.slice(2, -3)];
         if (names) return fake(names.map(n => `export class ${n} {}`).join(';'));

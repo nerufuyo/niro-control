@@ -33,7 +33,17 @@ ${version === 3 ? `/* GTK 3 follows its theme, not GNOME's scheme: the text on t
 `;
 }
 
-const read = path => { try { return new TextDecoder().decode(GLib.file_get_contents(path)[1]); } catch (_e) { return null; } };
+// null is "there is no such file", nothing else: an unreadable file, or one that is not UTF-8, throws and is never written over
+const read = path => {
+    let bytes;
+    try { bytes = GLib.file_get_contents(path)[1]; } catch (e) { if (e.matches(GLib.FileError, GLib.FileError.NOENT)) return null; throw new Error(`cannot read ${path}: ${e.message}`); }
+    let text;
+    try { text = new TextDecoder('utf-8', {fatal: true}).decode(bytes); } catch (_e) { throw new Error(`${path} is not valid UTF-8`); }
+    // the decoder drops a byte order mark (GJS does even with ignoreBOM): put it back, or writing the text back would lose it
+    return bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf && !text.startsWith('\uFEFF') ? `\uFEFF${text}` : text;
+};
+/** For looking only (never for writing back): whatever can be made of the file, or null. */
+const peek = path => { try { return new TextDecoder().decode(GLib.file_get_contents(path)[1]); } catch (_e) { return null; } };
 const isLink = path => { try { return GLib.file_test(path, GLib.FileTest.IS_SYMLINK); } catch (_e) { return false; } };
 const write = (path, text) => {
     GLib.mkdir_with_parents(GLib.path_get_dirname(path), 0o755);
@@ -67,7 +77,7 @@ export function plan(configDir: string) {
 }
 
 export function status(configDir: string, backupRoot: string) {
-    const installed = [4, 3].some(v => (read(target(`${configDir}/gtk-${v}.0/gtk.css`)) ?? '').includes(BEGIN));
+    const installed = [4, 3].some(v => (peek(target(`${configDir}/gtk-${v}.0/gtk.css`)) ?? '').includes(BEGIN));
     const backups = [];
     try {
         const e = Gio.File.new_for_path(backupRoot).enumerate_children('standard::name', 0, null);
@@ -96,7 +106,8 @@ export function install(o: Options) {
                 touched.push({path: real, before});
                 if (before !== null && !before.includes(BEGIN)) {
                     const copy = `${backupDir}/${v}-${GLib.path_get_basename(real)}`;
-                    write(copy, before);
+                    GLib.mkdir_with_parents(backupDir, 0o755);
+                    Gio.File.new_for_path(real).copy(Gio.File.new_for_path(copy), Gio.FileCopyFlags.OVERWRITE, null, null);   // the bytes, not a re-encoding
                     manifest.files.push({path: real, backup: copy});
                 } else if (before === null) manifest.files.push({path: real, backup: null});
                 write(real, withBlock(before, v));
@@ -112,17 +123,20 @@ export function install(o: Options) {
 
 /** Removes the integration: the marked blocks and the generated files. Backups are kept. */
 export function restore(configDir: string) {
-    const removed = [];
+    const removed = [], failed = [];
     for (const v of [4, 3]) {
         const dir = `${configDir}/gtk-${v}.0`;
         for (const name of HOOK_TARGETS[v]) {
             const real = target(`${dir}/${name}`);
-            const text = read(real);
-            if (text?.includes(BEGIN)) { const out = withoutBlock(text); if (out === '') Gio.File.new_for_path(real).delete(null); else write(real, out); removed.push(real); }
+            try {
+                const text = read(real);
+                if (text?.includes(BEGIN)) { const out = withoutBlock(text); if (out === '') Gio.File.new_for_path(real).delete(null); else write(real, out); removed.push(real); }
+            } catch (e) { failed.push(e.message); }      // that file is left as it is; the others are still restored
         }
         const gen = `${dir}/${GENERATED}`;
         if (GLib.file_test(gen, GLib.FileTest.EXISTS)) { Gio.File.new_for_path(gen).delete(null); removed.push(gen); }
     }
+    if (failed.length) throw new Error(`Left as they were, remove the marked block by hand: ${failed.join('; ')}`);
     return removed;
 }
 
@@ -137,7 +151,7 @@ export function refresh(o: Omit<Options, 'consent' | 'backupRoot'>): string[] {
     for (const v of [4, 3]) {
         const path = `${o.configDir}/gtk-${v}.0/${GENERATED}`;
         const next = gtkStylesheet(v, v === 3 ? (o.scheme3 ?? o.scheme) : o.scheme, o.glass, o.tint, o.surfaces, o.disabled, v === 3 && o.solid3);
-        if (read(path) === next) continue;
+        if (peek(path) === next) continue;
         write(path, next);
         rewritten.push(path);
     }

@@ -36,6 +36,8 @@ const STEPPERS = [
 ];
 /** ClutterText's room either side of an editable line (its TEXT_PADDING), in device pixels. */
 const CARET_ROOM = 2;
+/** Outside the page: the screen locking turns Island off, and the stopwatch keeps its time and laps. */
+const stopwatch = new Stopwatch();
 
 // The Timer page: a ring with the time left, the lengths of work and break as steppers, and Start.
 export const TimerPage = GObject.registerClass(
@@ -71,7 +73,7 @@ class TimerPage extends Page {
         this.add_child(steppers);
         this._steppers = steppers;
         // The stopwatch's laps take the steppers' place while it is the stopwatch (see `_setMode`).
-        this._watch = new Stopwatch();
+        this._watch = stopwatch;
         this._mode = 'timer';
         this._laps = label('', 'island-timer-phase', {y_align: Clutter.ActorAlign.CENTER, visible: false});
         this._laps.clutter_text.line_alignment = 0;

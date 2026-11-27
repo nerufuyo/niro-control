@@ -69,12 +69,13 @@ export class TileBackend {
         return r ? JSON.parse(r[0]) : null;
     }
 
-    /** What the settings alone say, for when the shell has nothing to tell. */
+    /** What the settings alone say, for when the shell has nothing to tell. Text that is not JSON reads as empty; it is not written back. */
     settingsState() {
         const s = this.settings;
+        const json = (key, empty) => { try { return JSON.parse(s.get_string(key)) ?? empty; } catch (_e) { return empty; } };
         return {
-            enabled: s.get_boolean('enabled'), layout: s.get_string('layout'), layoutMap: JSON.parse(s.get_string('layout-map') || '{}'),
-            rules: JSON.parse(s.get_string('window-rules') || '[]'), gapInner: s.get_int('gap-inner'), gapOuter: s.get_int('gap-outer'),
+            enabled: s.get_boolean('enabled'), layout: s.get_string('layout'), layoutMap: json('layout-map', {}),
+            rules: json('window-rules', []), gapInner: s.get_int('gap-inner'), gapOuter: s.get_int('gap-outer'),
             masterFactor: s.get_double('master-factor'), columnWidth: s.get_double('column-width'), animate: s.get_boolean('animate'),
         };
     }

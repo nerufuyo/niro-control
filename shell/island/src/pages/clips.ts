@@ -150,6 +150,7 @@ export const ClipsView = GObject.registerClass({
     // search's straight to this one's, so none blink out and back while typing; without island-daemon, by what they show.
     _search(query, {reset = false} = {}) {
         const search = ++this._searches;
+        this._asked = {query, reset};
         if (!query) {
             this._searching = null;
             [this._query, this._found] = ['', null];
@@ -203,9 +204,10 @@ export const ClipsView = GObject.registerClass({
         }
         this.refreshAges();
         this._filter();
-        // A new copy may hold the words searched for too.
-        if (this._query)
-            this._search(this._query);
+        // A new copy may hold the words searched for too. A search still unanswered is asked again, not the older one.
+        const {query, reset} = this._searching ? this._asked : {query: this._query, reset: false};
+        if (query)
+            this._search(query, {reset});
     }
 
     /** Shows the cards of the items that match `kind` and `query`, drawing those not drawn yet. */

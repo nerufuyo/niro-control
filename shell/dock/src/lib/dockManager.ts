@@ -8,7 +8,7 @@ import St from "gi://St";
 import * as Main from "resource:///org/gnome/shell/ui/main.js";
 import { box, inhibitScanout, isWayland, setVertical } from "./compat.js";
 import { DockVisibility } from "./dockVisibility.js";
-import { genie } from "./genie.js";
+import { genie, stopGenies } from "./genie.js";
 import { IconManager, type MediaAction, type StackFolder } from "./iconManager.js";
 import { Intellihide } from "./intellihide.js";
 import { Magnification } from "./magnification.js";
@@ -593,6 +593,7 @@ export class DockManager {
 
     this._removeKeybindings();
     this._signals.disconnectAll();
+    stopGenies();
 
     if (this._debounceSourceId !== null) {
       GLib.source_remove(this._debounceSourceId);

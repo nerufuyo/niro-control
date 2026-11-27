@@ -16,12 +16,33 @@ const MAX_REGEX_LENGTH = 200;
 
 const minutes = s => Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
 
+// True when a repeated group itself holds a group, an alternation or a quantifier: (a+)+, ((a))+, (a|aa)+. These can backtrack exponentially.
+// shortcut: adjacent repeats (a*a*a*b) and backreferences still pass; use a linear-time matcher if that ever bites.
+function backtracks(source) {
+    // Blank out escapes and character classes, and the "?" of (?: (?= (?<name>, so only structural characters are left.
+    const s = source.replace(/\\.|\[(?:\\.|[^\\\]])*\]/g, '_').replace(/\(\?(?:[:=!]|<[=!]|<[^>]*>)/g, '(');
+    const groups = [];   // per open group: does it hold a group, alternation or quantifier?
+    for (let i = 0; i < s.length; i++) {
+        if (s[i] === ')') {
+            // "Repeated" = *, + or {n} above 1; a group that is only optional runs at most once.
+            if (groups.pop() && /^(?:[*+]|\{(?!(?:0,)?[01]\})\d)/.test(s.slice(i + 1)))
+                return true;
+        } else {
+            if (groups.length && '(|*+?{'.includes(s[i]))
+                groups[groups.length - 1] = true;
+            if (s[i] === '(')
+                groups.push(false);
+        }
+    }
+    return false;
+}
+
 function titleMatcher(pattern) {
     const m = /^\/(.+)\/([gimsuy]*)$/.exec(pattern);
     if (!m)
         return t => t.toLowerCase().includes(pattern.toLowerCase());
-    // A regex typed by the user must not hang the shell: bounded length, no nested quantifier groups.
-    if (m[1].length > MAX_REGEX_LENGTH || /\([^)]*[+*][^)]*\)[+*{]/.test(m[1]))
+    // A regex typed by the user must not hang the shell: bounded length, no repeated complex groups.
+    if (m[1].length > MAX_REGEX_LENGTH || backtracks(m[1]))
         return null;
     try {
         const re = new RegExp(m[1], m[2].replace(/[gy]/g, ''));

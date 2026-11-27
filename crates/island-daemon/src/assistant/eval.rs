@@ -1394,6 +1394,7 @@ async fn run(case: &Case) -> Result<Vec<Answer>, String> {
             activity: &activity,
             draft: &activity,
             cards: &cards,
+            web_off: &|| {},
         };
         let answer = agent::think(&mut agy, &prompt, &out, &desk)
             .await
@@ -1582,6 +1583,7 @@ async fn latency() {
             activity: &activity,
             draft: &draft,
             cards: &cards,
+            web_off: &|| {},
         };
         let answer = agent::think(&mut brain, &prompt, &out, &desk)
             .await

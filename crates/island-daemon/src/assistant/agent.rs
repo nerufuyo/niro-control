@@ -334,6 +334,8 @@ pub struct Out<'a> {
     pub draft: &'a UnboundedSender<String>,
     /// The card of a command the AI wants run: waiting for Run, running, then how it went (see tasks.rs).
     pub cards: &'a UnboundedSender<Value>,
+    /// Called as the web goes off, before anything that made it so is sent: to keep that on disk.
+    pub web_off: &'a (dyn Fn() + Send + Sync),
 }
 
 /// Asks once within `ASK_TIMEOUT`, and strips any `spawn` or `stop` the AI wrote itself.
@@ -394,34 +396,29 @@ pub async fn think(
             activity.send(answer.say.trim().to_owned()).ok();
         }
         let mut results = Vec::new();
-        let mut read_a_file = false;
+        // A file's words, or a command's output, may try to send themselves out.
+        let mut private = false;
         for call in calls {
             if brain.web_cut()
                 && call["type"] == "check"
                 && reaches_web(call["command"].as_str().unwrap_or_default())
             {
                 results.push(
-                    "That check was refused: it reaches the network, which is off since a file was read."
+                    "That check was refused: it reaches the network, which is off since a file was read \
+                     or a command ran."
                         .into(),
                 );
                 continue;
             }
-            read_a_file |= call["type"] == "read_text";
             activity.send(describe(&call)).ok();
             used.push(call["type"].as_str().unwrap_or_default().to_owned());
             if call["type"] == "check" {
                 checks.push(call["command"].as_str().unwrap_or_default().to_owned());
             }
-            results.push(run(call, &mut niro_seen).await);
-        }
-        // A file's words may try to send themselves out: off before the AI sees them.
-        if read_a_file && !brain.web_cut() {
-            brain.cut_web().await?;
-            results.push(
-                "Web search and page reading are now off for the rest of this conversation, since a \
-                 file of the user's was read."
-                    .into(),
-            );
+            let reads = call["type"] == "read_text";
+            let result = run(call, &mut niro_seen).await;
+            private |= reads && files::gave_words(&result);
+            results.push(result);
         }
         // A command to run goes on its own, after the rest: asked, then followed to its end.
         let commands: Vec<Value> = actions
@@ -449,7 +446,17 @@ pub async fn think(
                 );
                 break;
             }
-            results.push(run_command(desk, out, &command, &mut ran).await);
+            results.push(run_command(desk, out, &command, &mut ran, &mut private).await);
+        }
+        // Off before the AI sees them.
+        if private && !brain.web_cut() {
+            (out.web_off)();
+            brain.cut_web().await?;
+            results.push(
+                "Web search and page reading are now off for the rest of this conversation, since a \
+                 file of the user's was read or a command ran."
+                    .into(),
+            );
         }
         activity.send(String::new()).ok();
         let next = if last {
@@ -492,12 +499,13 @@ pub async fn think(
 }
 
 /// Offers a command to the user (the card: Run or Deny) and, run, follows it to its end; what came of it,
-/// as text for the AI. `ran` keeps it for the conversation.
+/// as text for the AI. `ran` keeps it for the conversation; `started` is set if it did run.
 async fn run_command(
     desk: &Desk,
     out: &Out<'_>,
     action: &Value,
     ran: &mut Vec<(String, String)>,
+    started: &mut bool,
 ) -> String {
     let asked = action["command"].as_str().unwrap_or_default().trim();
     let (command, root) = match tasks::without_sudo(
@@ -590,6 +598,7 @@ async fn run_command(
             )
         };
     }
+    *started = true;
     tasks::remember(&task);
     let (ended, output) = tasks::follow(&task, |progress| {
         let status = match progress.ended {
@@ -729,6 +738,7 @@ mod tests {
                 activity: &$activity,
                 draft: &$activity,
                 cards: &unbounded_cards(),
+                web_off: &|| {},
             }
         };
     }
@@ -805,18 +815,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_file_that_could_not_be_read_keeps_the_web() {
+        let mut brain = Scripted::new([json!({"say": "", "done": false,
+            "actions": [{"type": "read_text", "path": "~/island-no-such-file.txt"}]})]);
+        let (activity, _steps) = tokio::sync::mpsc::unbounded_channel();
+        let (desk, _handled) = desk();
+        think(&mut brain, "x", &out!(activity), &desk)
+            .await
+            .unwrap();
+        assert_eq!(brain.cut_at, None);
+    }
+
+    #[tokio::test]
     async fn reading_a_file_turns_the_web_off_before_its_words_are_sent() {
+        // read_text only reads below home.
+        let file = super::home().join(format!("island-test-read-{}.txt", std::process::id()));
+        std::fs::write(&file, "hello").unwrap();
         let mut brain = Scripted::new([
             json!({"say": "", "done": false,
-                "actions": [{"type": "read_text", "path": "~/island-no-such-file.txt"}]}),
+                "actions": [{"type": "read_text", "path": file}]}),
             json!({"say": "", "done": false,
                 "actions": [{"type": "check", "command": "ping -c 1 secret.example.com"}]}),
         ]);
         let (activity, _steps) = tokio::sync::mpsc::unbounded_channel();
         let (desk, _handled) = desk();
-        let answer = think(&mut brain, "x", &out!(activity), &desk)
-            .await
-            .unwrap();
+        let kept = std::sync::atomic::AtomicBool::new(false);
+        let keep = || kept.store(true, std::sync::atomic::Ordering::Relaxed);
+        let cards = unbounded_cards();
+        let out = Out {
+            activity: &activity,
+            draft: &activity,
+            cards: &cards,
+            web_off: &keep,
+        };
+        let answer = think(&mut brain, "x", &out, &desk).await;
+        std::fs::remove_file(&file).unwrap();
+        let answer = answer.unwrap();
+        assert!(kept.into_inner());
         // Cut after the first answer, before the prompt carrying the file.
         assert_eq!(brain.cut_at, Some(1));
         assert!(brain.prompts[2].contains("check was refused"));
@@ -862,6 +897,7 @@ mod tests {
             activity: &activity,
             draft: &draft,
             cards: &unbounded_cards(),
+            web_off: &|| {},
         };
         let (desk, _handled) = desk();
         think(&mut brain, "x", &out, &desk).await.unwrap();
@@ -1032,6 +1068,7 @@ mod tests {
             activity: &activity,
             draft: &activity,
             cards: &cards,
+            web_off: &|| {},
         };
         let (desk, handled) = desk_answering(true, 0);
         let answer = think(&mut brain, "install vlc", &out, &desk).await.unwrap();
@@ -1057,6 +1094,8 @@ mod tests {
             answer.ran,
             [("sudo apt install -y vlc".to_owned(), "done".to_owned())]
         );
+        // What it printed may be a file's words: the web goes before they are sent.
+        assert_eq!(brain.cut_at, Some(1));
         let mut statuses = Vec::new();
         while let Ok(card) = shown.try_recv() {
             statuses.push(card["status"].as_str().unwrap().to_owned());
@@ -1077,6 +1116,7 @@ mod tests {
             activity: &activity,
             draft: &activity,
             cards: &cards,
+            web_off: &|| {},
         };
         let (desk, _handled) = desk_answering(false, 0);
         let answer = think(&mut brain, "install vlc", &out, &desk).await.unwrap();
@@ -1089,6 +1129,7 @@ mod tests {
             answer.ran,
             [("flatpak install -y vlc".to_owned(), "denied".to_owned())]
         );
+        assert_eq!(brain.cut_at, None);
     }
 
     #[tokio::test]
@@ -1103,6 +1144,7 @@ mod tests {
             activity: &activity,
             draft: &activity,
             cards: &cards,
+            web_off: &|| {},
         };
         let (desk, handled) = desk_answering(true, 0);
         think(&mut brain, "clean my home", &out, &desk)

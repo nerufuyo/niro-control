@@ -102,9 +102,10 @@ export function tilingPage(model, ctx) {
         const scopes = () => {
             const names = ['All workspaces (general)', 'The active workspace'];
             (state?.monitors ?? []).forEach(m => names.push(`Monitor ${m.index}${m.primary ? ' (primary)' : ''}`));
-            return Gtk.StringList.new(names);
+            return names;
         };
-        scopeRow.set_model(scopes());
+        let shown = scopes();
+        scopeRow.set_model(Gtk.StringList.new(shown));
         scopeRow.connect('notify::selected', () => { scope = scopeRow.selected; });
         g.add(scopeRow);
         const flow = new Gtk.FlowBox({selection_mode: Gtk.SelectionMode.NONE, max_children_per_line: 5, min_children_per_line: 1, homogeneous: true, column_spacing: 12, row_spacing: 12, margin_top: 6});
@@ -130,7 +131,15 @@ export function tilingPage(model, ctx) {
             const ws = state?.workspaces.find(w => w.active);
             const current = scope === 1 && ws ? ws.layout : scope >= 2 && state ? state.monitors[scope - 2]?.layout : s.layout;
             for (const [id, b] of buttons) { b.set_label(id === current ? 'In use' : 'Apply'); b.set_sensitive(id !== current); if (id === current) b.add_css_class('suggested-action'); else b.remove_css_class('suggested-action'); }
-            scopeRow.set_model(scopes()); scopeRow.set_selected(Math.min(scope, (state?.monitors.length ?? 0) + 1));
+            // a new model resets the selection (and so `scope`): only when the choices changed, and the choice is put back.
+            // No state (the shell did not answer this time) says nothing about the monitors.
+            const names = scopes();
+            if (state && String(names) !== String(shown)) {
+                const keep = scope;
+                shown = names;
+                scopeRow.set_model(Gtk.StringList.new(names));
+                scopeRow.set_selected(Math.min(keep, names.length - 1));
+            }
         };
         refreshers.push(mark);
         const wrap = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 12});
@@ -176,16 +185,24 @@ export function tilingPage(model, ctx) {
         const g = group('Window rules', 'Per application, by its window class (the app id: org.gnome.Calculator, firefox…). Float keeps it out of the tiling; Tile tiles it anyway; a workspace sends its windows there when they open.');
         const list = new Gtk.ListBox({selection_mode: Gtk.SelectionMode.NONE, css_classes: ['boxed-list']});
         const read = () => parseRules(backend.settings.get_string('window-rules'));
-        const save = next => attempt('Could not save the rules', () => backend.change({'window-rules': JSON.stringify(next)}, 'rules'));
+        // text that cannot be read shows as no rules here, and must not be replaced by what this page builds from that
+        const unreadable = () => { try { return !Array.isArray(JSON.parse(backend.settings.get_string('window-rules') || '[]')); } catch (_e) { return true; } };
+        const save = next => attempt('Could not save the rules', () => {
+            if (unreadable()) throw new Error('the stored rules cannot be read; correct them under Advanced first');
+            return backend.change({'window-rules': JSON.stringify(next)}, 'rules');
+        });
+        let drawn = null;
         const draw = () => {
             let c; while ((c = list.get_first_child())) list.remove(c);
+            drawn = backend.settings.get_string('window-rules');
             const all = read();
-            if (!all.length) list.append(new Adw.ActionRow({title: 'No rules yet', subtitle: 'Add one below, or pick from the windows open now.', css_classes: ['dim-label']}));
-            all.forEach((r, i) => {
+            if (unreadable()) list.append(new Adw.ActionRow({title: 'The stored rules cannot be read', subtitle: 'Correct them under Advanced.', css_classes: ['error']}));
+            else if (!all.length) list.append(new Adw.ActionRow({title: 'No rules yet', subtitle: 'Add one below, or pick from the windows open now.', css_classes: ['dim-label']}));
+            all.forEach(r => {
                 const row = new Adw.ActionRow({title: GLib.markup_escape_text(r.match, -1), subtitle: [r.action === 'float' ? 'Floats' : r.action === 'tile' ? 'Always tiled' : '', r.workspace ? `Opens on workspace ${r.workspace}` : ''].filter(Boolean).join(' · ')});
                 const del = new Gtk.Button({icon_name: 'user-trash-symbolic', valign: Gtk.Align.CENTER, css_classes: ['flat']});
                 del.update_property([Gtk.AccessibleProperty.LABEL], [`Remove the rule for ${r.match}`]);
-                del.connect('clicked', () => { save(read().filter((_x, k) => k !== i)); draw(); });
+                del.connect('clicked', () => { save(read().filter(x => JSON.stringify(x) !== JSON.stringify(r))); draw(); });
                 row.add_suffix(del);
                 list.append(row);
             });
@@ -214,6 +231,7 @@ export function tilingPage(model, ctx) {
         [match, action, ws].forEach(r => add.add(r));
         add.add(addButton);
         draw();
+        refreshers.push(() => { if (backend.settings.get_string('window-rules') !== drawn) draw(); });
         const wrap = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL, spacing: 12});
         wrap.append(g); wrap.append(list);
         return [wrap, add];
@@ -705,13 +723,34 @@ export function tilingPage(model, ctx) {
         const editor = (title, key, fallback) => {
             const exp = new Adw.ExpanderRow({title});
             const view = new Gtk.TextView({monospace: true, wrap_mode: Gtk.WrapMode.WORD_CHAR, top_margin: 8, bottom_margin: 8, left_margin: 8, right_margin: 8, css_classes: ['card']});
-            view.get_buffer().set_text(JSON.stringify(JSON.parse(backend.settings.get_string(key) || fallback), null, 1), -1);
+            const buffer = view.get_buffer();
+            const text = () => buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), false);
+            const stored = () => backend.settings.get_string(key);
+            let loaded, clean;   // the stored value the text came from, and the text as it was put there
+            const load = () => {
+                loaded = stored();
+                let value = loaded || fallback;
+                try { value = JSON.stringify(JSON.parse(value), null, 1); } catch (_e) { /* shown as it is, to be corrected here */ }
+                buffer.set_text(value, -1);
+                clean = text();
+            };
+            load();
+            refreshers.push(() => { if (stored() !== loaded && text() === clean) load(); });
             view.update_property([Gtk.AccessibleProperty.LABEL], [title]);
             const save = new Gtk.Button({label: 'Check and save', halign: Gtk.Align.END, margin_top: 6, margin_bottom: 6, margin_end: 8, css_classes: ['suggested-action']});
+            const write = () => {
+                const edited = text();
+                try { JSON.parse(edited); } catch (e) { toast(`Not JSON: ${e.message}`); return; }
+                if (attempt(`Not saved`, () => backend.change({[key]: JSON.stringify(JSON.parse(edited))}, `edit ${key}`)) === null) return;
+                loaded = stored(); clean = edited;
+                toast('Saved');
+            };
             save.connect('clicked', () => {
-                const b = view.get_buffer(); const text = b.get_text(b.get_start_iter(), b.get_end_iter(), false);
-                try { JSON.parse(text); } catch (e) { toast(`Not JSON: ${e.message}`); return; }
-                if (attempt(`Not saved`, () => backend.change({[key]: JSON.stringify(JSON.parse(text))}, `edit ${key}`)) !== null) toast('Saved');
+                const now = stored();
+                if (now === loaded) write();
+                else if (text() === clean) { load(); toast('This was changed elsewhere: the newer value is shown now'); }
+                else ask(`Replace the newer ${title.toLowerCase()}?`, 'They were changed elsewhere after you started editing. Replace saves your text over that change. Cancel keeps your text unsaved; undo your edit to see the newer value.', 'Replace',
+                    () => { if (stored() === now) write(); else toast('Changed again: nothing was saved'); });
             });
             const box = new Gtk.Box({orientation: Gtk.Orientation.VERTICAL}); box.append(view); box.append(save);
             const r = new Adw.PreferencesRow({child: box}); exp.add_row(r);

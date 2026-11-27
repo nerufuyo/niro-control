@@ -55,6 +55,16 @@ entry.set_text('');
 all(widget, w => w instanceof Gtk.Button && w.label === 'Add the rule')[0].emit('clicked');
 if (!toasts.some(t => /window class first/.test(t))) fail(`no sentence for an empty rule (${toasts})`);
 all(widget, w => w instanceof Gtk.Button && /^Remove the rule/.test(w.get_accessible_label?.() ?? ''))?.[0]?.emit('clicked');
+// rules changed elsewhere since the list was drawn: the button removes the rule it names, not the one now in its place
+const bin = () => all(widget, w => w instanceof Gtk.Button && w.tooltip_text === null && w.icon_name === 'user-trash-symbolic')[0] ?? fail('no remove button');
+backend.settings.set_string('window-rules', '[]');
+entry.set_text('x.X'); action.set_selected(1);
+all(widget, w => w instanceof Gtk.Button && w.label === 'Add the rule')[0].emit('clicked');
+const stale = bin();
+backend.settings.set_string('window-rules', '[{"match":"y.Y","action":"float"},{"match":"x.X","action":"float"}]');
+stale.emit('clicked');
+if (!/y\.Y/.test(backend.settings.get_string('window-rules')) || /x\.X/.test(backend.settings.get_string('window-rules'))) fail(`removed the wrong rule: ${backend.settings.get_string('window-rules')}`);
+backend.settings.set_string('window-rules', '[]');
 
 // a profile is saved from the form, and appears
 const nameRow = all(widget, w => w instanceof Adw.EntryRow && /Save the current setup/.test(w.title))[0] ?? fail('no profile form');
@@ -74,6 +84,45 @@ views[0].get_buffer().set_text('{"workspaces":{"1":"zig"}}', -1);
 all(widget, w => w instanceof Gtk.Button && w.label === 'Check and save')[0].emit('clicked');
 if (!toasts.some(t => /not a layout/.test(t))) fail(`a bad edit was not explained (${toasts})`);
 if (backend.settings.get_string('layout-map') !== before) fail('a bad edit changed the map');
+
+// the raw editors follow a change made elsewhere, never over an unsaved edit, and saving over a newer value asks first
+{
+    const [mapView, ruleView] = views;
+    const textOf = v => { const b = v.get_buffer(); return b.get_text(b.get_start_iter(), b.get_end_iter(), false); };
+    const saveRules = () => all(widget, w => w instanceof Gtk.Button && w.label === 'Check and save')[1].emit('clicked');
+    backend.settings.set_string('window-rules', '[{"match":"a.A","action":"float"}]');
+    widget.emit('map');
+    if (!/a\.A/.test(textOf(ruleView))) fail('the editor did not reload');
+    mapView.get_buffer().set_text('{}', -1);
+    ruleView.get_buffer().set_text('[{"match":"mine","action":"float"}]', -1);
+    backend.settings.set_string('window-rules', '[{"match":"b.B","action":"float"}]');
+    widget.emit('map');
+    if (!/mine/.test(textOf(ruleView))) fail('an unsaved edit was discarded');
+    asked.length = 0; agree = false; saveRules();
+    if (!asked.length || !/b\.B/.test(backend.settings.get_string('window-rules'))) fail('a newer value was overwritten without asking');
+    agree = true; saveRules(); agree = false;
+    if (!/mine/.test(backend.settings.get_string('window-rules'))) fail('a confirmed save did not write');
+    widget.emit('unmap');
+    asked.length = 0;
+}
+// the chosen scope survives the refresh
+{
+    const scopeRow = all(widget, w => w instanceof Adw.ComboRow && w.title === 'Apply to')[0];
+    scopeRow.set_selected(1);
+    widget.emit('map'); widget.emit('unmap');
+    if (scopeRow.selected !== 1) fail('the refresh reset "Apply to"');
+}
+// stored text that is not JSON: the page still builds, shows it as it is, and writes nothing over it
+{
+    const keep = ['window-rules', 'layout-map'].map(k => [k, backend.settings.get_string(k)]);
+    for (const [k] of keep) backend.settings.set_string(k, '{oops');
+    const broken = tilingPage(model, ctx);
+    if (all(broken, w => w instanceof Gtk.TextView && w.editable).filter(v => { const b = v.get_buffer(); return b.get_text(b.get_start_iter(), b.get_end_iter(), false) === '{oops'; }).length !== 2) fail('the raw text is not shown');
+    all(broken, w => w instanceof Adw.EntryRow && w.title === 'Application (window class)')[0].set_text('x');
+    all(broken, w => w instanceof Adw.ComboRow && w.title === 'Tiling')[0].set_selected(1);
+    all(broken, w => w instanceof Gtk.Button && w.label === 'Add the rule')[0].emit('clicked');
+    for (const [k, v] of keep) { if (backend.settings.get_string(k) !== '{oops') fail(`${k} was written over`); backend.settings.set_string(k, v); }
+}
 
 
 // ---- Advanced Rules: the engine switch, a rule list with add/edit/remove, conflicts and a dry run that applies nothing

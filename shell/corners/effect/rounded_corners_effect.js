@@ -69,7 +69,8 @@ export const RoundedCornersEffect = GObject.registerClass({}, class Effect exten
         // This is needed for squircle corners
         let exponent = smoothing * 10 + 2;
         let radius = outerRadius * 0.5 * exponent;
-        const maxRadius = Math.min(bounds[3] - bounds[0], bounds[4] - bounds[1]);
+        // bounds is {left, top, right, bottom}; the shader needs opposite corner circles not to overlap, so half the smaller side.
+        const maxRadius = Math.max(0, Math.min(bounds[2] - bounds[0], bounds[3] - bounds[1]) / 2);
         if (radius > maxRadius) {
             exponent *= maxRadius / radius;
             radius = maxRadius;
