@@ -219,6 +219,7 @@ const RAW_RULES = [
 export const EXAMPLES = ['copy hello to clipboard', 'open firefox then mute', 'lock screen'];
 export const NOT_UNDERSTOOD = `Not understood: nothing would run. Try, for example: ${EXAMPLES.map(e => `"${e}"`).join(', ')}.`;
 
+// `raw`: matched against the part as typed, so the note or task keeps its case and accents.
 const RULES = [
     {action: 'app.launch', re: /^(?:tolong |please )?(?:buka|bukakan|jalankan|open|launch|start|run)\s+(?!file\b|pengaturan\b|settings\b)(.+)$/, args: m => ({id: cleanName(m[1])})},
     {action: 'profile.apply', re: /^(?:aktifkan|nyalakan|pakai|terapkan|enable|activate|turn on|apply|use|switch to)\s+(?:mode |profil |profile )?(.+?)(?: mode| profile| profil)?$/, args: m => ({id: cleanName(m[1]).replace(/\s+/g, '-')}), when: m => !/^(wifi|wi-fi|bluetooth|vpn|dnd|mute|night ?light)/.test(m[1])},
@@ -231,8 +232,8 @@ const RULES = [
     {action: 'system.nightlight.toggle', re: /^(?:aktifkan|matikan|nyalakan|turn (?:on|off)|toggle)\s+(?:night ?light|mode malam|cahaya malam)$/, args: () => ({})},
     {action: 'system.lock', re: /^(?:kunci(?: layar)?|lock(?: (?:the|my))?(?: screen| computer| session)?)$/, args: () => ({})},
     {action: 'system.screenshot', re: /^(?:ambil )?(?:screenshot|tangkapan layar|take a screenshot|take screenshot)$/, args: () => ({})},
-    {action: 'note.add', re: /^(?:catat|note|add (?:a )?note)\s+(.+)$/, args: m => ({text: m[1].trim()})},
-    {action: 'todo.add', re: /^(?:tambah(?:kan)? tugas|add (?:a )?(?:todo|to-do|task))\s+(.+)$/, args: m => ({text: m[1].trim()})},
+    {action: 'note.add', raw: true, re: /^(?:catat|note|add (?:a )?note)\s+(.+)$/i, args: m => ({text: m[1].trim()})},
+    {action: 'todo.add', raw: true, re: /^(?:tambah(?:kan)? tugas|add (?:a )?(?:todo|to-do|task))\s+(.+)$/i, args: m => ({text: m[1].trim()})},
 ];
 
 function ruleArgsFit(params, args) {
@@ -286,7 +287,7 @@ export function localParse(text, catalog) {
             const a = actions.get(r.action);
             if (!a)
                 continue;
-            const m = part.match(r.re);
+            const m = (r.raw ? rawPart : part).match(r.re);
             if (!m || (r.when && !r.when(m)))
                 continue;
             const args = ruleArgsFit(a.params ?? [], r.args(m));

@@ -9,7 +9,7 @@ import {createHistory, exportDiagnostics, nextInterval} from './shared/perfHisto
 import {parsePactlDevices, parsePactlStreams, planStreamVolume, planRules, createLoopGuard, recordMoves} from './shared/audioRouter.js';
 import {createHud, HUD_KINDS} from './shared/hud.js';
 import {createPrivacy} from './shared/privacy.js';
-import {createShelf} from './shared/shelfCollections.js';
+import {createShelf, DEFAULTS as SHELF_DEFAULTS} from './shared/shelfCollections.js';
 import {createHub as createWidgetHub, validateWidgetManifest} from './shared/widgetRegistry.js';
 
 const MIN = 60000;
@@ -235,7 +235,8 @@ export function createSystemHub(s) {
     const shelfFile = 'shelf-collections.json';
     function openShelf() {
         if (shelf) return shelf;
-        shelf = createShelf();
+        // every collection that can be created is kept: only expired ones go on open
+        shelf = createShelf({maxUnpinned: SHELF_DEFAULTS.maxCollections});
         try { shelf.load(JSON.parse(s.readConfig(shelfFile) ?? '').collections); } catch (_e) { /* a first run, or a file that is not ours: start empty */ }
         shelf.cleanup(s.now());
         return shelf;
