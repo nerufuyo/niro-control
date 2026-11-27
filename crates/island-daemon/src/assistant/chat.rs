@@ -102,7 +102,7 @@ pub struct Chat {
     /// The AI it is had with ("claude", "codex", "agy") and its id there.
     pub provider: String,
     pub conversation: String,
-    /// A file of the user's was read in it: its AI keeps its web tools off.
+    /// A file was read or a command ran in it: its AI keeps its web tools off.
     pub offline: bool,
     /// The last time anything was said, in milliseconds since 1970.
     pub last: i64,
@@ -178,31 +178,57 @@ pub fn mask_secrets(text: &str) -> String {
     out
 }
 
+/// The names a secret goes by.
+const SECRET_KEYS: [&str; 8] = [
+    "password",
+    "passwd",
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "api-key",
+    "authorization",
+];
+
+/// Where each secret's name ends in `lower` (lowercased text), but for the words that only look like one:
+/// "secretary", "secretariat", and a count ("Tokens used").
+fn key_ends(lower: &str) -> impl Iterator<Item = usize> {
+    SECRET_KEYS.iter().flat_map(move |&key| {
+        lower
+            .match_indices(key)
+            .map(move |(at, _)| at + key.len())
+            .filter(move |&end| {
+                let rest = &lower[end..];
+                !(key == "secret" && (rest.starts_with("ary") || rest.starts_with("ari"))
+                    || key == "token" && rest.starts_with("s "))
+            })
+    })
+}
+
+/// Whether a table (CSV) has a password, secret or token column: its values carry no name on their own lines,
+/// so `mask_secrets` cannot find them.
+// shortcut: looks for the column names in the first five lines.
+pub fn has_secret_column(text: &str) -> bool {
+    text.lines().take(5).any(|line| {
+        let line = line.to_ascii_lowercase();
+        line.contains([',', ';', '\t'])
+            && line.split([',', ';', '\t']).any(|field| key_ends(field).next().is_some())
+    })
+}
+
 /// One line of `mask_secrets`: the value after a secret-sounding key, or a known key prefix.
 fn mask_line(line: &str) -> String {
     // ASCII-only, so offsets in `lower` stay valid in `line` (İ grows when lowercased).
     let lower = line.to_ascii_lowercase();
-    // "password=…", "token: …", "Authorization: Bearer …": what follows is hidden.
-    for key in [
-        "password",
-        "passwd",
-        "secret",
-        "token",
-        "api_key",
-        "apikey",
-        "api-key",
-        "authorization",
-    ] {
-        if let Some(at) = lower.find(key) {
-            let rest = &line[at + key.len()..];
-            if let Some(sep) = rest.find([':', '=']) {
-                let value = rest[sep + 1..].trim();
-                if !value.is_empty() {
-                    let cut = at + key.len() + sep + 1;
-                    return format!("{} [hidden]", line[..cut].trim_end());
-                }
-            }
-        }
+    // "password=…", "token: …", "Authorization: Bearer …": what follows the first one is hidden.
+    let cut = key_ends(&lower)
+        .filter_map(|end| {
+            let cut = end + line[end..].find([':', '='])? + 1;
+            (!line[cut..].trim().is_empty()).then_some(cut)
+        })
+        .min();
+    if let Some(cut) = cut {
+        return format!("{} [hidden]", line[..cut].trim_end());
     }
     // Keys that announce themselves: GitHub, OpenAI, Anthropic, AWS, Slack.
     line.split(' ')
@@ -286,6 +312,30 @@ mod tests {
             mask_secrets("Unpacking libreoffice-core ..."),
             "Unpacking libreoffice-core ..."
         );
+    }
+
+    #[test]
+    fn hides_only_what_follows_a_key_name() {
+        for plain in ["Meeting with secretary at 10:30", "Tokens used = 500"] {
+            assert_eq!(mask_secrets(plain), plain);
+        }
+        for secret in [
+            "secret_key=abc",
+            "\"password\": \"abc\"",
+            "passwords are: abc",
+            "Password (admin): abc",
+            "SecretAccessKey: abc",
+            "\"SecretAccessKey\": \"abc\"",
+            "clientSecretValue=abc",
+            "passwordHash=abc",
+            "password2=abc",
+            "Your password is: abc",
+        ] {
+            assert!(!mask_secrets(secret).contains("abc"), "{secret}");
+        }
+        assert!(has_secret_column("My export\nname,login_password\nmail,abc\n"));
+        assert!(has_secret_column("user;Client Secret\nana;abc"));
+        assert!(!has_secret_column("name,secretary,Tokens used\nana,bo,500"));
     }
 
     #[test]

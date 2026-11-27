@@ -565,7 +565,7 @@ struct Session {
     /// The conversation, resumed if its process had to go, and the AI it was had with.
     conversation: Option<String>,
     provider: Option<Provider>,
-    /// A file was read in this conversation: no web tools until it ends.
+    /// A file was read or a command ran in this conversation: no web tools until it ends.
     offline: bool,
     /// The user's data as last sent in this conversation.
     sent_data: Option<String>,
@@ -1089,6 +1089,16 @@ impl Talk {
     }
 }
 
+/// Saves `chat`, if there is one to resume, as having its web tools off, before returning.
+fn keep_offline(store: &Store<Chat>, chat: &Chat) {
+    if !chat.is_empty() {
+        store.save_now(&Chat {
+            offline: true,
+            ..chat.clone()
+        });
+    }
+}
+
 /// The local date, by which the chat starts afresh each day.
 fn today() -> NaiveDate {
     chrono::Local::now().date_naive()
@@ -1536,14 +1546,19 @@ async fn turn(
     let (draft, mut drafts) = mpsc::unbounded_channel();
     let (cards, mut card_updates) = mpsc::unbounded_channel();
     let (desk, mut acts) = mpsc::unbounded_channel();
-    let out = agent::Out {
-        activity: &activity,
-        draft: &draft,
-        cards: &cards,
-    };
     let mut retried = false;
     let result = loop {
         let brain = session.brain.as_mut().expect("started above");
+        // The web going off mid-turn is saved then, not once it ends: a restart in between must not
+        // resume it with the web.
+        let (store, chat) = (&talk.store, talk.chat.clone());
+        let web_off = move || keep_offline(store, &chat);
+        let out = agent::Out {
+            activity: &activity,
+            draft: &draft,
+            cards: &cards,
+            web_off: &web_off,
+        };
         let asked = tokio::time::timeout(RUN_TIMEOUT, agent::think(brain, &prompt, &out, &desk));
         let result = drive(
             asked,
@@ -1558,7 +1573,7 @@ async fn turn(
         )
         .await;
         session.conversation = session.brain.as_ref().and_then(Brain::conversation);
-        // Saved at once: a turn that fails after reading a file must not leave it resumable with the web.
+        // Saved again with the AI's conversation: a turn that fails must not leave it resumable with the web.
         if session.brain.as_ref().is_some_and(|brain| !brain.web()) {
             session.offline = true;
             talk.save(session);
@@ -2470,6 +2485,20 @@ mod tests {
         );
         session.resume(day.succ_opt().unwrap());
         assert_eq!((session.conversation, session.sent_data), (None, None));
+    }
+
+    #[test]
+    fn the_web_going_off_is_on_disk_at_once() {
+        let dir = std::env::temp_dir().join(format!("island-offline-{}", std::process::id()));
+        let path = dir.join("chat.json");
+        let chat = Chat {
+            conversation: "abc".into(),
+            ..Chat::default()
+        };
+        keep_offline(&Store::at(path.clone()), &chat);
+        let kept: Chat = Store::at(path.clone()).load();
+        assert_eq!((kept.conversation.as_str(), kept.offline), ("abc", true));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

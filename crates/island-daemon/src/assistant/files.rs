@@ -299,6 +299,11 @@ pub fn recent_files(home: &Path) -> String {
     text
 }
 
+/// Whether `result`, of `read_text`, carries the file's words rather than why they could not be read.
+pub fn gave_words(result: &str) -> bool {
+    result.contains(":\n\"\"\"")
+}
+
 /// The start of a small text file, never one in a hidden folder (settings, keys).
 pub fn read_text(path: &Path, home: &Path) -> String {
     let shown = shorten(path, home);
@@ -324,6 +329,10 @@ pub fn read_text(path: &Path, home: &Path) -> String {
         }
         Ok(_) => match fs::read_to_string(path) {
             Ok(text) => {
+                let csv = path.extension().is_some_and(|e| e.eq_ignore_ascii_case("csv"));
+                if csv && super::chat::has_secret_column(&text) {
+                    return format!("read_text {shown}: has a password column, so it is not sent.");
+                }
                 // Masked before the cut, so no secret survives as a half the mask no longer knows.
                 let cut: String = super::chat::mask_secrets(&text)
                     .chars()
