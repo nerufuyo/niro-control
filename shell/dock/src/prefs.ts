@@ -29,7 +29,7 @@ export default class DockPreferences extends ExtensionPreferences {
       subtitle: "Pixel size of dock icons",
       adjustment: new Gtk.Adjustment({
         lower: 16,
-        upper: 96,
+        upper: 128,
         step_increment: 2,
         page_increment: 8,
         value: settings.get_int("icon-size"),
@@ -102,7 +102,7 @@ export default class DockPreferences extends ExtensionPreferences {
       subtitle: "Corner radius of the dock in pixels",
       adjustment: new Gtk.Adjustment({
         lower: 0,
-        upper: 50,
+        upper: 40,
         step_increment: 1,
         page_increment: 4,
         value: settings.get_int("dock-border-radius"),
@@ -226,8 +226,8 @@ export default class DockPreferences extends ExtensionPreferences {
       title: "Show threshold",
       subtitle: "Distance in pixels from screen edge to trigger dock show",
       adjustment: new Gtk.Adjustment({
-        lower: 5,
-        upper: 100,
+        lower: 0,
+        upper: 200,
         step_increment: 5,
         page_increment: 10,
         value: settings.get_int("show-threshold"),
@@ -319,14 +319,14 @@ export default class DockPreferences extends ExtensionPreferences {
     // Max scale - connect to adjustment's signal, not the row's
     const magScaleAdj = new Gtk.Adjustment({
       lower: 1.0,
-      upper: 2.0,
+      upper: 3.0,
       step_increment: 0.05,
       page_increment: 0.1,
       value: settings.get_double("magnification-scale"),
     });
     const magScaleRow = new Adw.SpinRow({
       title: "Max scale",
-      subtitle: "1.0 = no magnification, 2.0 = double size",
+      subtitle: "1.0 = no magnification, 3.0 = triple size",
       adjustment: magScaleAdj,
       digits: 2,
     });

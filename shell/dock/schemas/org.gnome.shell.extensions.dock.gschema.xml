@@ -27,6 +27,11 @@
       <summary>Turn off the system's own dock</summary>
       <description>While this dock is on, the docks the system brings (Ubuntu Dock, Dash to Dock) are turned off, and turned on again when this one is. GNOME's own dash in the Overview is always hidden.</description>
     </key>
+    <key name="disabled-system-docks" type="as">
+      <default>[]</default>
+      <summary>Internal: system docks turned off by this dock</summary>
+      <description>The extensions to turn on again once this dock is off. Not a setting.</description>
+    </key>
     <key name="fullscreen-reveal" type="b">
       <default>true</default>
       <summary>Hide over full-screen apps, show at the edge</summary>
