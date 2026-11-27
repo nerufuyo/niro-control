@@ -3575,6 +3575,16 @@ export class Controller {
         if (this._monitorsChanged)
             Main.layoutManager.disconnect(this._monitorsChanged);
         this._releaseScanout();
+        this._stopRevealWait();
+        if (this._fsScanout)
+            inhibitScanout(false);
+        this._fsScanout = false;
+        if (this._strip) {
+            Main.layoutManager.removeChrome(this._strip);
+            this._strip.destroy();
+            this._strip = null;
+        }
+        this._saving?.cancel();
         for (const part of [this._osd, this._keyboard, this._reminders, this._installedApps])
             part?.destroy();
         this._shelfHelper?.destroy();
@@ -3589,6 +3599,10 @@ export class Controller {
         }
         this._destroyMirrors();
         this._island?.destroy();
+        // GNOME's own top bar comes back.
+        for (const part of [this._sessionRestore, this._barHider])
+            part?.destroy();
+        this._sessionRestore = this._barHider = null;
         for (const service of [this._topBar, this._writer, this._appUsage, this._clipboard, this._focusMode, this._call,
             this._privacy, this._audio, this._notifications, this._daemon])
             service?.destroy();
