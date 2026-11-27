@@ -28,3 +28,5 @@ shell/emulator/build/
 shell/island/build/
 shell/search/build/
 target/
+__pycache__/
+/backups/
