@@ -353,6 +353,8 @@ pub async fn run(iface: InterfaceRef<UsageService>, refresh: Arc<Notify>) {
             if deepseek_key().is_none() {
                 // Asked for, but with no key yet: a card that says where to put it.
                 deepseek = Some(deepseek_shell(DeepseekError::NoKey));
+                // No deadline without a key: a past one would wake the loop every second.
+                asked_deepseek = None;
             } else if (forced && due(CLAUDE_AT_MOST)) || (!paused && due(CLAUDE_EVERY)) {
                 asked_deepseek = Some(Instant::now());
                 let fresh = tokio::task::spawn_blocking(read_deepseek).await.ok();
@@ -419,8 +421,8 @@ pub async fn run(iface: InterfaceRef<UsageService>, refresh: Arc<Notify>) {
             .map(|_| due_in(asked_opencode, opencode_wait));
         let deepseek_due_in = deepseek
             .as_ref()
-            .filter(|d| !paused && d.updated_ms > 0)
-            .map(|_| due_in(asked_deepseek, CLAUDE_EVERY));
+            .filter(|_| !paused)
+            .and_then(|_| deepseek_due(asked_deepseek));
         let remote_due = [claude_due_in, grok_due_in, opencode_due_in, deepseek_due_in]
             .into_iter()
             .flatten()
@@ -432,6 +434,11 @@ pub async fn run(iface: InterfaceRef<UsageService>, refresh: Arc<Notify>) {
         ));
         publish(&iface, Usage { providers }).await;
     }
+}
+
+/// How long until DeepSeek is asked again, also after a failed first read; `None` when never asked.
+fn deepseek_due(asked: Option<Instant>) -> Option<Duration> {
+    asked.map(|at| CLAUDE_EVERY.saturating_sub(at.elapsed()))
 }
 
 /// How long to sleep: until Claude or Grok is due (`None`: not asked) or a window resets, and at most a
@@ -1369,6 +1376,13 @@ mod tests {
         assert!(asked.starts_with("GET /user/balance"), "{asked}");
         assert!(asked.to_lowercase().contains("authorization: bearer sk-test-key-123"), "{asked}");
         assert!(card.empty.contains("$3.25"), "{}", card.empty);
+    }
+
+    #[test]
+    fn deepseek_is_due_once_asked() {
+        assert_eq!(deepseek_due(None), None);
+        let wait = deepseek_due(Some(Instant::now())).unwrap();
+        assert!(wait > Duration::ZERO && wait <= CLAUDE_EVERY);
     }
 
     #[test]
