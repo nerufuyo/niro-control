@@ -39,7 +39,7 @@ export class SQLite {
   }
 
   destroy() {
-    this.db.close();
+    this.db?.close(); // null when loading failed
     this.db = null;
   }
 
