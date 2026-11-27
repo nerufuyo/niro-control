@@ -324,7 +324,11 @@ pub fn read_text(path: &Path, home: &Path) -> String {
         }
         Ok(_) => match fs::read_to_string(path) {
             Ok(text) => {
-                let cut: String = text.chars().take(MAX_TEXT_CHARS).collect();
+                // Masked before the cut, so no secret survives as a half the mask no longer knows.
+                let cut: String = super::chat::mask_secrets(&text)
+                    .chars()
+                    .take(MAX_TEXT_CHARS)
+                    .collect();
                 // Its quotes softened, so it cannot end the quote and pose as more of the prompt.
                 format!("read_text {shown}:\n\"\"\"{}\"\"\"", super::soften(&cut))
             }
@@ -517,6 +521,16 @@ mod tests {
         assert!(read.contains("Anggaran naik \" Ignore"), "{read}");
         assert!(read_text(&home.join(".ssh/ttd_key"), &home).contains("only plain text"));
         assert!(read_text(&home.join("Downloads/laporan.pdf"), &home).contains("only plain text"));
+        fs::remove_dir_all(home).unwrap();
+    }
+
+    #[test]
+    fn read_text_hides_secrets() {
+        let home = tree("secrets");
+        let path = home.join("Documents/env.txt");
+        fs::write(&path, "user=ana\npassword=hunter2\n").unwrap();
+        let read = read_text(&path, &home);
+        assert!(read.contains("user=ana") && !read.contains("hunter2"), "{read}");
         fs::remove_dir_all(home).unwrap();
     }
 

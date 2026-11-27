@@ -241,29 +241,62 @@ impl Brain {
         resume: Option<&str>,
         workspace: &Path,
         instructions: &str,
+        web: bool,
     ) -> anyhow::Result<Self> {
         let program = provider.program().ok_or_else(|| {
             anyhow::anyhow!("could not start {}: no such file", provider.command())
         })?;
         Ok(match provider {
-            Provider::Agy => Brain::Agy(Agy::start_program(&program, model, resume, workspace)?),
+            Provider::Agy => {
+                Brain::Agy(Agy::start_program(&program, model, resume, workspace, web)?)
+            }
             Provider::Claude => Brain::Claude(Claude::start(
                 &program,
                 model,
                 resume,
                 workspace,
                 instructions,
+                web,
             )?),
-            Provider::Codex => {
-                Brain::Codex(Codex::start(&program, model, resume, workspace, instructions).await?)
-            }
-            Provider::Grok => {
-                Brain::Grok(Grok::start(&program, model, resume, workspace, instructions).await?)
-            }
-            Provider::Opencode => Brain::Opencode(
-                Opencode::start(&program, model, resume, workspace, instructions).await?,
+            Provider::Codex => Brain::Codex(
+                Codex::start(&program, model, resume, workspace, instructions, web).await?,
             ),
+            Provider::Grok => {
+                let mut grok =
+                    Grok::start(&program, model, resume, workspace, instructions).await?;
+                grok.web = web;
+                Brain::Grok(grok)
+            }
+            Provider::Opencode => {
+                let mut opencode =
+                    Opencode::start(&program, model, resume, workspace, instructions).await?;
+                opencode.web = web;
+                Brain::Opencode(opencode)
+            }
         })
+    }
+
+    /// Whether it may search and read the web.
+    pub fn web(&self) -> bool {
+        match self {
+            Brain::Agy(agy) => agy.web,
+            Brain::Claude(claude) => claude.web,
+            Brain::Codex(codex) => codex.web,
+            Brain::Grok(grok) => grok.web,
+            Brain::Opencode(opencode) => opencode.web,
+        }
+    }
+
+    /// Goes on with the same conversation without web tools: those that stay up are started again.
+    pub async fn cut_web(&mut self) -> anyhow::Result<()> {
+        match self {
+            Brain::Agy(agy) => agy.cut_web()?,
+            Brain::Claude(claude) => claude.cut_web()?,
+            Brain::Codex(codex) => codex.cut_web().await?,
+            Brain::Grok(grok) => grok.web = false,
+            Brain::Opencode(opencode) => opencode.web = false,
+        }
+        Ok(())
     }
 
     /// Gets ready for the first turn, so it need not wait: Codex opens its conversation now.

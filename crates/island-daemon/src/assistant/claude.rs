@@ -31,9 +31,20 @@ pub struct Claude {
     events: Events<ChildStdout>,
     stderr: Arc<Mutex<VecDeque<String>>>,
     pub conversation: Option<String>,
+    pub web: bool,
+    /// What it was started with, to start it again (see `cut_web`).
+    launch: (PathBuf, String, PathBuf, String),
 }
 
 impl Claude {
+    /// The same conversation in a new process without the web tools.
+    pub fn cut_web(&mut self) -> anyhow::Result<()> {
+        let (program, model, workspace, instructions) = self.launch.clone();
+        let id = self.conversation.clone().context("no conversation to go on with")?;
+        *self = Self::start(&program, &model, Some(&id), &workspace, &instructions, false)?;
+        Ok(())
+    }
+
     /// Starts Claude Code with Island's job (`instructions`) in place of its own coding-agent prompt.
     pub fn start(
         program: &Path,
@@ -41,6 +52,7 @@ impl Claude {
         resume: Option<&str>,
         workspace: &Path,
         instructions: &str,
+        web: bool,
     ) -> anyhow::Result<Self> {
         std::fs::create_dir_all(workspace)?;
         let mut command = Command::new(program);
@@ -70,6 +82,10 @@ impl Claude {
             None => {
                 std::fs::remove_file(&sign_in).ok();
             }
+        }
+        if !web {
+            // A denial wins over --allowedTools.
+            command.args(["--disallowedTools", TOOLS]);
         }
         if !model.is_empty() {
             command.args(["--model", model]);
@@ -104,6 +120,13 @@ impl Claude {
             events,
             stderr,
             conversation: resume.map(str::to_owned),
+            web,
+            launch: (
+                program.to_owned(),
+                model.to_owned(),
+                workspace.to_owned(),
+                instructions.to_owned(),
+            ),
         })
     }
 

@@ -48,6 +48,18 @@ enabled = false
 enabled = false
 ";
 
+/// Which tools a turn gets. Headless runs can't ask: the web tools are allowed by name, nothing else is.
+fn tool_args(web: bool) -> Vec<String> {
+    let mut args = vec!["--tools".into(), TOOLS.into(), "--disallowed-tools".into()];
+    if web {
+        args.push(DISALLOWED.into());
+        args.extend(["--allow", "WebFetch", "--allow", "WebSearch"].map(String::from));
+    } else {
+        args.push(format!("{DISALLOWED},{TOOLS}"));
+    }
+    args
+}
+
 /// How hard it thinks: `EFFORT`, unless the eval tries another (ISLAND_GROK_EFFORT).
 fn effort() -> String {
     std::env::var("ISLAND_GROK_EFFORT").unwrap_or_else(|_| EFFORT.to_owned())
@@ -60,6 +72,7 @@ pub struct Grok {
     workspace: PathBuf,
     instructions: String,
     pub conversation: Option<String>,
+    pub web: bool,
 }
 
 /// The HOME Island runs Grok with: GROK_HOME alone still brings the user's ~/.claude skills, hooks and
@@ -127,6 +140,7 @@ impl Grok {
             workspace: workspace.to_owned(),
             instructions: instructions.to_owned(),
             conversation: resume.map(str::to_owned),
+            web: true,
         })
     }
 
@@ -181,9 +195,7 @@ impl Grok {
                 "--system-prompt-override",
             ])
             .arg(&self.instructions)
-            .args(["--tools", TOOLS, "--disallowed-tools", DISALLOWED])
-            // Headless runs can't ask: the web tools are allowed by name, nothing else is.
-            .args(["--allow", "WebFetch", "--allow", "WebSearch"])
+            .args(tool_args(self.web))
             .args(["--no-plan", "--no-subagents", "--no-memory"])
             .args(["--reasoning-effort", &effort(), "--max-turns", MAX_TURNS])
             .arg("--leader-socket")
@@ -836,6 +848,13 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn without_the_web_no_web_tool_is_allowed() {
+        let off = tool_args(false);
+        assert!(off[3].ends_with(TOOLS) && !off.iter().any(|arg| arg == "--allow"));
+        assert!(tool_args(true).iter().any(|arg| arg == "--allow"));
+    }
 
     #[test]
     fn reads_groks_answer_and_steps() {

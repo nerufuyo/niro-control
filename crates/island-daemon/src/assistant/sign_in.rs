@@ -18,6 +18,8 @@ pub fn share(real: &Path, linked: &Path) {
             "could not hand a renewed sign-in back to {}: {err}",
             real.display()
         );
+        // Island's copy may be the only one that still works: kept, to be handed back next time.
+        return;
     }
     // The user signed out (or never signed in): so is Island's copy, never the other way round.
     if !real.exists() {
@@ -87,6 +89,22 @@ mod tests {
         let file = fs::File::options().write(true).open(path).unwrap();
         file.set_modified(SystemTime::now() - Duration::from_secs(seconds_ago))
             .unwrap();
+    }
+
+    #[test]
+    fn a_renewed_sign_in_stays_when_it_cannot_be_handed_back() {
+        let root = std::env::temp_dir().join(format!("island-sign-in-kept-{}", std::process::id()));
+        let (real, linked) = (root.join("auth.json"), root.join("island/auth.json"));
+        fs::create_dir_all(linked.parent().unwrap()).unwrap();
+        fs::write(&real, "token 1").unwrap();
+        aged(&real, 60);
+        fs::write(&linked, "token 2").unwrap();
+        // A folder where the temporary file would go: the write fails.
+        fs::create_dir(real.with_extension("island-tmp")).unwrap();
+        share(&real, &linked);
+        assert!(fs::symlink_metadata(&linked).unwrap().is_file());
+        assert_eq!(fs::read_to_string(&linked).unwrap(), "token 2");
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

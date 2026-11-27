@@ -565,6 +565,8 @@ struct Session {
     /// The conversation, resumed if its process had to go, and the AI it was had with.
     conversation: Option<String>,
     provider: Option<Provider>,
+    /// A file was read in this conversation: no web tools until it ends.
+    offline: bool,
     /// The user's data as last sent in this conversation.
     sent_data: Option<String>,
     /// The day the conversation began, and its answered turns.
@@ -693,6 +695,7 @@ impl Session {
         if let (Some(provider), Some(id)) = (self.provider, self.conversation.take()) {
             forget(provider, id);
         }
+        self.offline = false;
         self.sent_data = None;
         self.day = None;
         self.turns = 0;
@@ -1061,6 +1064,7 @@ impl Talk {
     fn save(&mut self, session: &Session) {
         self.chat.provider = session.provider.map_or("", Provider::id).to_owned();
         self.chat.conversation = session.conversation.clone().unwrap_or_default();
+        self.chat.offline = session.offline;
         if self.chat.is_empty() {
             self.store.remove();
         } else {
@@ -1127,6 +1131,7 @@ pub async fn run(iface: InterfaceRef<AssistantService>, data: Sources, mut comma
     let mut keep = Keep::Day;
     session.provider = Provider::from_id(&talk.chat.provider);
     session.conversation = Some(talk.chat.conversation.clone()).filter(|id| !id.is_empty());
+    session.offline = talk.chat.offline;
     show_history(&iface, &talk.chat).await;
     new_day(&mut session, &mut pruned);
     // The ids of the commands followed until they end and are told (see `Command::Settled`).
@@ -1280,6 +1285,7 @@ pub async fn run(iface: InterfaceRef<AssistantService>, data: Sources, mut comma
                 let mut kept = old.clone();
                 kept.provider = session.provider.map_or("", Provider::id).to_owned();
                 kept.conversation = session.conversation.take().unwrap_or_default();
+                kept.offline = std::mem::take(&mut session.offline);
                 if let Some((older, _)) = talk
                     .undo
                     .replace((kept, tokio::time::Instant::now() + UNDO_NEW_CHAT))
@@ -1301,6 +1307,7 @@ pub async fn run(iface: InterfaceRef<AssistantService>, data: Sources, mut comma
                     session.provider = Provider::from_id(&old.provider).or(session.provider);
                     session.conversation =
                         Some(old.conversation.clone()).filter(|id| !id.is_empty());
+                    session.offline = old.offline;
                     talk.chat = old;
                     talk.save(&session);
                     show_history(&iface, &talk.chat).await;
@@ -1551,6 +1558,11 @@ async fn turn(
         )
         .await;
         session.conversation = session.brain.as_ref().and_then(Brain::conversation);
+        // Saved at once: a turn that fails after reading a file must not leave it resumable with the web.
+        if session.brain.as_ref().is_some_and(|brain| !brain.web()) {
+            session.offline = true;
+            talk.save(session);
+        }
         // A model the plan no longer has: asked again at once with the default, so an answer comes.
         let refused = match &result {
             Ok(Ok(Err(err))) => retry_model(session, provider, err, retried),
@@ -1735,6 +1747,7 @@ async fn start_brain(
         session.conversation.as_deref(),
         &workspace,
         &instructions,
+        !session.offline,
     );
     // A stuck start would hold up every command after it (Super+I too).
     let Ok(started) = tokio::time::timeout(START_TIMEOUT, started).await else {
@@ -2457,6 +2470,19 @@ mod tests {
         );
         session.resume(day.succ_opt().unwrap());
         assert_eq!((session.conversation, session.sent_data), (None, None));
+    }
+
+    #[test]
+    fn the_web_stays_off_until_the_conversation_ends() {
+        let mut session = Session {
+            conversation: Some("abc".into()),
+            offline: true,
+            ..Session::default()
+        };
+        session.end();
+        assert!(session.offline);
+        session.drop_conversation();
+        assert!(!session.offline);
     }
 
     #[test]

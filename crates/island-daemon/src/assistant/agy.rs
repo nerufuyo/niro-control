@@ -195,22 +195,43 @@ pub struct Agy {
     stderr: Arc<Mutex<VecDeque<String>>>,
     /// Set from agy's first event; a later session can resume it.
     pub conversation: Option<String>,
+    pub web: bool,
+    /// What it was started with, to start it again (see `cut_web`).
+    launch: (PathBuf, String, PathBuf),
+}
+
+/// `HOOKS`, without the two web tools unless `web`.
+fn hooks(web: bool) -> String {
+    if web {
+        HOOKS.to_owned()
+    } else {
+        HOOKS.replace("search_web|read_url_content|", "")
+    }
 }
 
 impl Agy {
+    /// The same conversation in a new process without the web tools.
+    pub fn cut_web(&mut self) -> anyhow::Result<()> {
+        let (program, model, workspace) = self.launch.clone();
+        let id = self.conversation.clone().context("no conversation to go on with")?;
+        *self = Self::start_program(&program, &model, Some(&id), &workspace, false)?;
+        Ok(())
+    }
+
     /// Starts agy in its own home with Island's hook in `workspace`, resuming `resume` if given.
     pub(super) fn start_program(
         program: &Path,
         model: &str,
         resume: Option<&str>,
         workspace: &Path,
+        web: bool,
     ) -> anyhow::Result<Self> {
         if let Some(user) = dirs::home_dir() {
             link_login(&user, &home());
         }
         let agents = workspace.join(".agents");
         std::fs::create_dir_all(&agents)?;
-        std::fs::write(agents.join("hooks.json"), HOOKS).context("could not write agy's hooks")?;
+        std::fs::write(agents.join("hooks.json"), hooks(web)).context("could not write agy's hooks")?;
         let mut command = Command::new(program);
         command
             .args(["--print=", "--input-format", "stream-json"])
@@ -255,6 +276,8 @@ impl Agy {
             events,
             stderr,
             conversation: resume.map(str::to_owned),
+            web,
+            launch: (program.to_owned(), model.to_owned(), workspace.to_owned()),
         })
     }
 
@@ -427,7 +450,7 @@ mod tests {
         // A test running a program at the same moment may still hold the new script open ("Text file
         // busy") for a blink: try again then.
         let mut agy = loop {
-            match Agy::start_program(&fake, "", None, &root.join("workspace")) {
+            match Agy::start_program(&fake, "", None, &root.join("workspace"), true) {
                 Ok(agy) => break agy,
                 Err(err) if format!("{err:#}").contains("Text file busy") => {
                     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
@@ -472,6 +495,13 @@ mod tests {
         );
         assert_eq!(std::fs::read_to_string(user.join(LOGIN)).unwrap(), "token");
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn without_the_web_the_hook_allows_no_web_tool() {
+        let off = hooks(false);
+        assert!(!off.contains("search_web") && !off.contains("read_url_content"));
+        assert!(off.contains("(finish|wait)"));
     }
 
     #[test]

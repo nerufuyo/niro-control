@@ -222,6 +222,11 @@ fn strings(value: &Value) -> Vec<String> {
     }
 }
 
+/// Whether the check `command` sends words of the AI's choosing over the network.
+fn reaches_web(command: &str) -> bool {
+    check::parse(command).is_ok_and(|words| ["ping", "npm", "snap"].contains(&words[0].as_str()))
+}
+
 /// Runs one tool, off the async threads, and returns its result as text for the AI.
 async fn run(call: Value, niro: &mut super::niro::Seen) -> String {
     if call["type"] == "niro" {
@@ -295,6 +300,12 @@ pub trait Ask {
         activity: &UnboundedSender<String>,
         draft: &UnboundedSender<String>,
     ) -> anyhow::Result<Answer>;
+
+    /// Whether its web tools are off for this conversation (see `cut_web`).
+    fn web_cut(&self) -> bool;
+
+    /// Turns its web search and page reading off for the rest of the conversation.
+    async fn cut_web(&mut self) -> anyhow::Result<()>;
 }
 
 impl Ask for Brain {
@@ -306,6 +317,14 @@ impl Ask for Brain {
         draft: &UnboundedSender<String>,
     ) -> anyhow::Result<Answer> {
         Brain::ask(self, prompt, Some(activity), Some(draft)).await
+    }
+
+    fn web_cut(&self) -> bool {
+        !self.web()
+    }
+
+    async fn cut_web(&mut self) -> anyhow::Result<()> {
+        Brain::cut_web(self).await
     }
 }
 
@@ -375,13 +394,34 @@ pub async fn think(
             activity.send(answer.say.trim().to_owned()).ok();
         }
         let mut results = Vec::new();
+        let mut read_a_file = false;
         for call in calls {
+            if brain.web_cut()
+                && call["type"] == "check"
+                && reaches_web(call["command"].as_str().unwrap_or_default())
+            {
+                results.push(
+                    "That check was refused: it reaches the network, which is off since a file was read."
+                        .into(),
+                );
+                continue;
+            }
+            read_a_file |= call["type"] == "read_text";
             activity.send(describe(&call)).ok();
             used.push(call["type"].as_str().unwrap_or_default().to_owned());
             if call["type"] == "check" {
                 checks.push(call["command"].as_str().unwrap_or_default().to_owned());
             }
             results.push(run(call, &mut niro_seen).await);
+        }
+        // A file's words may try to send themselves out: off before the AI sees them.
+        if read_a_file && !brain.web_cut() {
+            brain.cut_web().await?;
+            results.push(
+                "Web search and page reading are now off for the rest of this conversation, since a \
+                 file of the user's was read."
+                    .into(),
+            );
         }
         // A command to run goes on its own, after the rest: asked, then followed to its end.
         let commands: Vec<Value> = actions
@@ -701,6 +741,8 @@ mod tests {
     struct Scripted {
         answers: std::collections::VecDeque<Value>,
         prompts: Vec<String>,
+        /// How many prompts it had been given when its web tools went.
+        cut_at: Option<usize>,
     }
 
     impl Scripted {
@@ -708,6 +750,7 @@ mod tests {
             Self {
                 answers: answers.into_iter().collect(),
                 prompts: Vec::new(),
+                cut_at: None,
             }
         }
     }
@@ -725,6 +768,15 @@ mod tests {
                 .pop_front()
                 .unwrap_or(json!({"say": "ok", "actions": []}));
             Ok(serde::Deserialize::deserialize(next)?)
+        }
+
+        fn web_cut(&self) -> bool {
+            self.cut_at.is_some()
+        }
+
+        async fn cut_web(&mut self) -> anyhow::Result<()> {
+            self.cut_at = Some(self.prompts.len());
+            Ok(())
         }
     }
 
@@ -750,6 +802,25 @@ mod tests {
             batches
         });
         (desk, handled)
+    }
+
+    #[tokio::test]
+    async fn reading_a_file_turns_the_web_off_before_its_words_are_sent() {
+        let mut brain = Scripted::new([
+            json!({"say": "", "done": false,
+                "actions": [{"type": "read_text", "path": "~/island-no-such-file.txt"}]}),
+            json!({"say": "", "done": false,
+                "actions": [{"type": "check", "command": "ping -c 1 secret.example.com"}]}),
+        ]);
+        let (activity, _steps) = tokio::sync::mpsc::unbounded_channel();
+        let (desk, _handled) = desk();
+        let answer = think(&mut brain, "x", &out!(activity), &desk)
+            .await
+            .unwrap();
+        // Cut after the first answer, before the prompt carrying the file.
+        assert_eq!(brain.cut_at, Some(1));
+        assert!(brain.prompts[2].contains("check was refused"));
+        assert!(answer.checks.is_empty());
     }
 
     #[tokio::test]
