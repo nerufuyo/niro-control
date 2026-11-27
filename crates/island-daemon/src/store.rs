@@ -99,6 +99,21 @@ impl<T: Serialize + DeserializeOwned + Default> Store<T> {
         self.read_only || self.fell_back || self.path.with_extension("json.corrupt").exists()
     }
 
+    /// For when the user clears this data: deletes the corrupt file set aside. False, deleting
+    /// nothing, when the real file could not be read or moved and so still holds the data.
+    pub fn discard_backup(&self) -> bool {
+        if self.read_only {
+            return false;
+        }
+        let backup = self.path.with_extension("json.corrupt");
+        match fs::remove_file(&backup) {
+            Ok(()) => {}
+            Err(err) if err.kind() == io::ErrorKind::NotFound => {}
+            Err(err) => warn!("could not delete {}: {err}", backup.display()),
+        }
+        true
+    }
+
     /// Saves atomically, so a crash mid-write never leaves a truncated file. The disk work runs on a
     /// blocking thread; saves made meanwhile are merged into the newest, which always lands last.
     pub fn save(&self, value: &T) {

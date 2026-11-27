@@ -149,6 +149,15 @@ impl ClipboardService {
         Ok(added.id)
     }
 
+    /// After the user clears the history, images a lost (corrupt) history left behind go too,
+    /// with the file set aside from it. Never called without that explicit clear.
+    fn discard_lost(&self) {
+        if self.store.discard_backup() {
+            self.clips
+                .remove_orphans(&self.history.image_hashes().collect());
+        }
+    }
+
     /// The `Items` list, built fresh from the history.
     fn view(&self) -> Vec<ItemView<'_>> {
         self.history
@@ -437,7 +446,7 @@ impl ClipboardService {
         Ok(())
     }
 
-    /// Removes every item that is not pinned.
+    /// Removes every item that is not pinned, and what a corrupt history left on disk.
     async fn clear(
         &mut self,
         #[zbus(signal_emitter)] emitter: SignalEmitter<'_>,
@@ -445,6 +454,7 @@ impl ClipboardService {
         let unreferenced = self.history.clear();
         self.changed(&emitter).await?;
         self.clips.remove(&unreferenced);
+        self.discard_lost();
         Ok(())
     }
 
@@ -798,6 +808,39 @@ mod tests {
         fs::write(clips.old_thumb("shot"), png(320, 200)).unwrap();
         clips.remove(&["shot".to_owned()]);
         assert_eq!(fs::read_dir(&clips.dir).unwrap().count(), 0);
+        fs::remove_dir_all(&clips.dir).unwrap();
+    }
+
+    #[test]
+    fn clearing_discards_what_a_corrupt_history_left() {
+        let clips = scratch("lost");
+        let path = clips.dir.with_extension("json");
+        let backup = path.with_extension("json.corrupt");
+        fs::write(&path, "{ not json").unwrap();
+        let mut store = Store::<ClipboardHistory>::at(path);
+        let mut history = store.load();
+        let image = |hash: &str| Clip::Image {
+            hash: hash.into(),
+            width: 1,
+            height: 1,
+        };
+        let pinned = history.add(image("pinned"), "", 1).id;
+        history.set_pinned(pinned, true).unwrap();
+        for hash in ["pinned", "lost"] {
+            fs::write(clips.image(hash), "x").unwrap();
+        }
+        let service = ClipboardService {
+            history,
+            store,
+            clips: clips.clone(),
+            stale: HashMap::new(),
+            secrets_skipped: 0,
+        };
+        assert!(backup.is_file() && clips.image("lost").is_file());
+
+        service.discard_lost();
+        assert!(!backup.exists() && !clips.image("lost").exists());
+        assert!(clips.image("pinned").is_file());
         fs::remove_dir_all(&clips.dir).unwrap();
     }
 
