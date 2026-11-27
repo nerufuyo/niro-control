@@ -14,6 +14,11 @@ if gh release view "$TAG" >/dev/null 2>&1; then echo "$TAG is already released: 
 if [ -z "${NIRO_GPG_KEY:-}" ] && git fetch -q origin gh-pages 2>/dev/null && git cat-file -e FETCH_HEAD:niro-control.gpg 2>/dev/null; then
     echo "the published repository is signed: set NIRO_GPG_KEY"; exit 1
 fi
+# A key that cannot sign (no rpmsign, no secret key, no passphrase) must stop here, not after the GitHub release exists.
+if [ -n "${NIRO_GPG_KEY:-}" ]; then
+    command -v rpmsign >/dev/null || { echo "NIRO_GPG_KEY is set but rpmsign is not installed (dnf install rpm-sign)"; exit 1; }
+    echo test | gpg --local-user "$NIRO_GPG_KEY" --detach-sign >/dev/null || { echo "cannot sign with $NIRO_GPG_KEY"; exit 1; }
+fi
 make test      # npm test and the Rust tests
 make rpm
 RPM=$(ls -t out/niro-control-"$VER"-*.rpm | head -1)

@@ -108,6 +108,8 @@ On Fedora, if the extensions do not show up after logging in, enable them once: 
 
 The island tells you when a newer version is out (Settings → Island → About; it asks GitHub for the latest release every six hours and sends nothing but the request; turn it off there). It never downloads or runs anything itself: it says where the new version is.
 
+Updating from 1.6.1 or older on Ubuntu: if Ubuntu Dock or Dash to Dock stayed off after Niro Dock hid it, turn it on again once by hand (the old version did not remember what it had turned off).
+
 On **Fedora**, add the package repository once, then update like any package (GNOME Software shows it too):
 
 ```sh
