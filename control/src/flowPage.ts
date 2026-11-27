@@ -191,7 +191,7 @@ export function flowPage(model, ctx, backend = new DBusFlowBackend()) {
     stack.add_named(editor, 'editor');
 
     function openEditor(wf) {
-        if (wf) { const r = workflowToForm(wf); draft = r.form; draftLossy = r.lossy; draftIsNew = false; }
+        if (wf) { const r = workflowToForm(wf, S.actions); draft = r.form; draftLossy = r.lossy; draftIsNew = false; }
         else { draft = emptyForm(); draftLossy = []; draftIsNew = true; }
         S.saveProblems = [];
         buildEditor();
@@ -320,9 +320,10 @@ export function flowPage(model, ctx, backend = new DBusFlowBackend()) {
             if (!p.required && a.args[p.name] === undefined) w.set_subtitle('Not set');
             w.connect('notify::value', () => set(w.get_value()));
         } else if (p.type === 'enum' && Array.isArray(p.enum)) {
-            w = new Adw.ComboRow({title: label, model: list(p.enum), selected: Math.max(0, p.enum.indexOf(a.args[p.name]))});
-            w.connect('notify::selected', () => set(p.enum[w.get_selected()]));
-            if (a.args[p.name] === undefined && p.enum.length) set(p.enum[0]);
+            const choices = p.required ? p.enum : [undefined, ...p.enum];
+            w = new Adw.ComboRow({title: label, model: list(choices.map(c => c ?? 'Not set')), selected: Math.max(0, choices.indexOf(a.args[p.name]))});
+            w.connect('notify::selected', () => set(choices[w.get_selected()]));
+            if (p.required && a.args[p.name] === undefined && p.enum.length) set(p.enum[0]);
         } else if (p.type === 'boolean') {
             w = new Adw.SwitchRow({title: label, active: a.args[p.name] === true});
             w.connect('notify::active', () => set(w.get_active()));

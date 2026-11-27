@@ -87,7 +87,7 @@ test('the form makes the workflow the daemon wants, and reading it back is lossl
     assert.equal(wf.steps[1].next, 'a2'); assert.equal(wf.steps[2].next, null);
     assert.deepEqual(wf.allow, ['settings', 'window'], 'the allow list is exactly what the actions need');
     assert.equal(wf.enabled, false);
-    const back = workflowToForm(wf);
+    const back = workflowToForm(wf, known());
     assert.deepEqual(back.lossy, []);
     assert.deepEqual(formToWorkflow(back.form, known()), wf);
     // a trigger with a field, a time condition, a text condition
@@ -99,12 +99,23 @@ test('the form makes the workflow the daemon wants, and reading it back is lossl
 
 test('a workflow the form cannot show is marked lossy, so it is never saved over', () => {
     const delay = {...TEMPLATE, steps: [{kind: 'delay', id: 'w', seconds: 5, next: 'profile'}, ...TEMPLATE.steps]};
-    assert.match(workflowToForm(delay).lossy.join(), /delay/);
+    assert.match(workflowToForm(delay, known()).lossy.join(), /delay/);
     const branch = {...TEMPLATE, steps: [{kind: 'condition', id: 'c', expr: {op: 'eq', var: 'ac', value: true}, then: 'profile', else: 'profile'}, ...TEMPLATE.steps]};
-    assert.match(workflowToForm(branch).lossy.join(), /otherwise/);
+    assert.match(workflowToForm(branch, known()).lossy.join(), /otherwise/);
     const odd = {...TEMPLATE, trigger: {type: 'from_the_future'}};
-    assert.match(workflowToForm(odd).lossy.join(), /from_the_future/);
-    assert.deepEqual(workflowToForm(TEMPLATE).lossy, []);
+    assert.match(workflowToForm(odd, known()).lossy.join(), /from_the_future/);
+    assert.deepEqual(workflowToForm(TEMPLATE, known()).lossy, []);
+});
+
+test('a condition or allow list that Save would rewrite makes the workflow read-only', () => {
+    const lossy = (expr, allow = ['settings']) => workflowToForm({...TEMPLATE, allow, steps: [{kind: 'condition', id: 'c', expr, then: 'profile', else: null}, ...TEMPLATE.steps]}, known()).lossy.length > 0;
+    assert.equal(lossy({op: 'cmp', var: 'workspace', cmp: 'gt', value: 2}), true);
+    assert.equal(lossy({op: 'eq', var: 'workspace', value: 2}), true);
+    assert.equal(lossy({op: 'eq', var: 'app', value: 2}), true);
+    assert.equal(lossy({op: 'eq', var: 'battery', value: 50}), false);
+    assert.equal(lossy({op: 'cmp', var: 'battery', cmp: 'lt', value: 30}), false);
+    assert.equal(lossy({op: 'eq', var: 'ac', value: true}, ['profile.apply']), true);
+    assert.equal(lossy({op: 'eq', var: 'ac', value: true}, []), true);
 });
 
 test('the form is checked before it is sent, in words', () => {

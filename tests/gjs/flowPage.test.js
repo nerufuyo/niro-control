@@ -174,6 +174,22 @@ const make = async (b, load = true) => { const model = new Model(ctx); const pag
     page.dispose();
 }
 
+// ---- opening the editor fills a required choice, never an optional one
+{
+    const b = fake();
+    const params = [{name: 'must', type: 'enum', required: true, enum: ['a', 'b']}, {name: 'may', type: 'enum', enum: ['x', 'y']}];
+    b.knownActions = async () => parseActions(JSON.stringify({ok: true, actions: [{id: 'demo.set', title: 'Demo', params, capability: 'settings', flow_can_run: true}]}));
+    b.workflows = [{...TEMPLATE, id: 'enums', steps: [{kind: 'action', id: 'a1', name: 'demo.set', args: {}, next: null}]}];
+    const {page, root} = await make(b);
+    click(root, 'flow-edit:enums'); await settle();
+    const may = need(root, 'flow-form-arg:0:may');
+    if (may.get_selected() !== 0 || may.get_model().get_string(0) !== 'Not set') fail('an optional choice does not start as Not set');
+    click(root, 'flow-form-save'); await settle();
+    const args = JSON.stringify(b.workflows[0].steps[0].args);
+    if (args !== '{"must":"a"}') fail(`opening the editor filled the wrong arguments: ${args}`);
+    page.dispose();
+}
+
 // ---- applying: while a change is out, the page says so and cannot be pressed
 {
     const b = fake(); b.workflows = [TEMPLATE];

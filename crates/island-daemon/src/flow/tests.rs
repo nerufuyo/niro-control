@@ -154,6 +154,24 @@ async fn saving_checks_the_registry_and_survives_a_restart() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn switching_a_workflow_keeps_hand_edits_and_refuses_a_broken_file() {
+    let rig = rig("handedit", true);
+    assert!(rig.flow.save_json(&coding("coding", &["settings"])).await.0);
+    let path = rig.paths.workflows.join("coding.json");
+    let mut edited: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    edited["name"] = json!("by hand");
+    edited["note"] = json!("keep me");
+    std::fs::write(&path, edited.to_string()).unwrap();
+    rig.flow.set_workflow_enabled("coding", false).unwrap();
+    edited["enabled"] = json!(false);
+    assert_eq!(serde_json::from_str::<Value>(&std::fs::read_to_string(&path).unwrap()).unwrap(), edited);
+    assert!(rig.flow.get_json("coding").unwrap().contains("by hand"));
+    std::fs::write(&path, "{half an edit").unwrap();
+    assert!(rig.flow.set_workflow_enabled("coding", true).is_err());
+    assert_eq!(std::fs::read_to_string(&path).unwrap(), "{half an edit");
+}
+
+#[tokio::test(start_paused = true)]
 async fn the_registry_being_down_saves_nothing_and_stops_a_run() {
     let rig = rig("down", true);
     rig.fake.down.store(true, Ordering::SeqCst);

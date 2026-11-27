@@ -176,10 +176,10 @@ export function formToWorkflow(form: Form, known: KnownAction[]) {
 
 /**
  * Reads a saved workflow back into the form. A workflow the form cannot show without losing something (delays, variables,
- * several conditions, branches, an allow list wider than its actions need) comes back with `lossy` reasons: the page then
+ * several conditions, branches, a condition or allow list the form would rewrite) comes back with `lossy` reasons: the page then
  * shows it read-only and never saves the form over it.
  */
-export function workflowToForm(wf: any): {form: Form; lossy: string[]} {
+export function workflowToForm(wf: any, known: KnownAction[]): {form: Form; lossy: string[]} {
     const form = emptyForm();
     const lossy: string[] = [];
     form.id = wf.id; form.name = wf.name ?? ''; form.enabled = wf.enabled !== false;
@@ -202,7 +202,17 @@ export function workflowToForm(wf: any): {form: Form; lossy: string[]} {
     const actions = steps.filter(s => s.kind === 'action');
     form.actions = actions.map(a => ({name: a.name, args: {...(a.args ?? {})}}));
     // the form always lays steps out in one chain; anything else would be rewritten by Save
-    const rebuilt = formToWorkflow(form, []);
+    const rebuilt = formToWorkflow(form, known);
+    // Save derives the condition's types and the allow list again: either coming out different would rewrite the file
+    const e = conds[0]?.expr;
+    if (e?.op === 'eq' || e?.op === 'cmp') {
+        const v = CONDITION_VARS.find(x => x.name === e.var);
+        const out = rebuilt.steps[0].expr;
+        if (!v || (e.op === 'cmp' && v.kind !== 'number') || Object.keys(out).some(k => out[k] !== e[k])) lossy.push(`a condition on "${e.var}"`);
+    }
+    const allowed = (l: any[]) => JSON.stringify([...new Set(l)].sort());
+    if (allowed(wf.allow ?? []) !== allowed(rebuilt.allow))
+        lossy.push(actions.every(a => known.some(k => k.id === a.name)) ? 'its own allow list' : 'an action Search does not list now (its permission cannot be checked)');
     const shape = (list: any[]) => list.map(s => [s.kind, list.findIndex(x => x.id === (s.next ?? s.then ?? null)), s.else ? 1 : 0]);
     const sameShape = JSON.stringify(shape(rebuilt.steps)) === JSON.stringify(shape(steps));
     if (!lossy.length && !sameShape) lossy.push('steps in an order the form does not make');
