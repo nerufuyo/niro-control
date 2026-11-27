@@ -112,6 +112,18 @@ export function showsWhole(text, max) {
         ![...text].some(c => c.charCodeAt(0) < 0x20 || (c.charCodeAt(0) >= 0x7f && c.charCodeAt(0) <= 0x9f));
 }
 
+// The longest address shown whole on a card and in an alert.
+const MAX_LINK = 600;
+
+/** The Run or Deny card for a web or mail address the AI wants opened; null for anything else, and for one the user
+ * could not see whole. */
+export function linkCard(url, id) {
+    if (typeof url !== 'string' || !/^(https?|mailto):/i.test(url) || !showsWhole(url, MAX_LINK))
+        return null;
+    return {id, link: true, why: /^mailto:/i.test(url) ? 'Write this email?' : 'Open this link?', command: url,
+        status: 'waiting'};
+}
+
 /** The line `command` is typed into a terminal as, its lines joined by `&&` (a newline would be an Enter of its
  * own); null for one the user could not see whole there, as a card would not offer it. */
 export function terminalLine(command) {

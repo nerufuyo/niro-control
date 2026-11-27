@@ -46,8 +46,13 @@ export default class EmojiCopy extends Extension {
     // null when there is nothing to copy on close.
     this.pendingClipboard = null;
 
-    this.sqlite = new SQLite();
-    await this.sqlite.initializeDB(this.path);
+    const sqlite = (this.sqlite = new SQLite());
+    await sqlite.initializeDB(this.path);
+    // disable() (and perhaps another enable()) ran while the database loaded
+    if (this.sqlite !== sqlite) {
+      sqlite.destroy();
+      return;
+    }
 
     this.super_btn = new PanelMenu.Button(0.0, _("Emoji Copy"), false);
     let box = new St.BoxLayout();
@@ -148,6 +153,13 @@ export default class EmojiCopy extends Extension {
   }
 
   disable() {
+    // Still loading the database: nothing was built or bound yet.
+    if (!this.super_btn) {
+      this.sqlite = null;
+      this._settings = null;
+      return;
+    }
+
     // Don't lose emojis collected in a menu that is still open, and keep
     // its picks in "recently used". Persist only: the menu is going away.
     this.flushPendingClipboard();

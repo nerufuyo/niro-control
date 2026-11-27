@@ -5,6 +5,7 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
+import {uniqueId} from './profileLogic.js';
 import {Stores} from './store.js';
 import {checkLayoutMap, checkRules} from './tile/config.js';
 import {LAYOUT_IDS, LAYOUTS} from './tile/layouts.js';
@@ -427,8 +428,11 @@ export class TileBackend {
 
     importProfile(file) {
         const data = this.readProfile(file);
-        const name = safe(data.name ?? GLib.path_get_basename(file).replace(/\.json$/, ''));
-        write(GLib.build_filenamev([profileDir(), `${name}.json`]), JSON.stringify(data, null, 1));
+        const wanted = safe(data.name ?? GLib.path_get_basename(file).replace(/\.json$/, ''));
+        // never over one that is there: a suffix, as for settings profiles (the base is cut so safe() keeps the suffix)
+        const taken = this._names(profileDir()).map(f => f.replace(/\.json$/, ''));
+        const name = taken.includes(wanted) ? uniqueId(wanted.slice(0, 56).trim(), taken) : wanted;
+        write(GLib.build_filenamev([profileDir(), `${name}.json`]), JSON.stringify({...data, name}, null, 1));
         return name;
     }
 

@@ -771,6 +771,17 @@ fn find(program: &str) -> Option<PathBuf> {
     .find(|path| path.is_file())
 }
 
+/// Whether `name`, found at `path`, may be run: a program no list names is only asked its version
+/// when it is the system's own, never a script in a folder the user can write.
+fn may_run(name: &str, path: &Path) -> bool {
+    ["cat", "which"].contains(&name)
+        || SHAPES.iter().any(|(listed, ..)| *listed == name)
+        || ALLOWED.iter().any(|(listed, ..)| *listed == name)
+        || ["/usr/bin", "/bin", "/usr/sbin"]
+            .iter()
+            .any(|dir| path.parent() == Some(Path::new(dir)))
+}
+
 /// Runs the check `command`: its output (the end of it, secrets hidden) and exit code, as text for the AI.
 pub async fn run(command: &str) -> String {
     let words = match parse(command) {
@@ -794,6 +805,13 @@ pub async fn run(command: &str) -> String {
     let Some(program) = find(&words[0]) else {
         return format!("check `{command}`: {} is not installed", words[0]);
     };
+    if !may_run(&words[0], &program) {
+        return format!(
+            "check `{command}` did not run: {} is not one of the system's own programs. Propose it \
+             with run instead if it is needed.",
+            program.display()
+        );
+    }
     // No shell to expand `~` (du ~/Videos).
     let home = dirs::home_dir().unwrap_or_default();
     let args: Vec<String> = words[1..]
@@ -865,6 +883,16 @@ pub fn tail(text: &str, max: usize) -> String {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn only_the_systems_own_programs_are_asked_their_version_unlisted() {
+        let at = |name, path| super::may_run(name, std::path::Path::new(path));
+        assert!(at("libreoffice", "/usr/bin/libreoffice"));
+        assert!(!at("mytool", "/home/ana/.local/bin/mytool"));
+        assert!(!at("mytool", "/usr/local/bin/mytool"));
+        // A listed program keeps running from wherever it is.
+        assert!(at("npm", "/home/ana/.nvm/versions/node/v22/bin/npm"));
+    }
+
     use super::*;
 
     #[test]

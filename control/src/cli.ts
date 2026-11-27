@@ -36,6 +36,7 @@ export function runCli(args: string[]): number | null {
         if (!newest) { printerr('No backups yet.'); return 2; }
         const r = engine.restore(newest.file);
         if (!r.ok) { printerr(`Could not restore: ${r.failed.title}: ${r.failed.error}`); return 1; }
+        for (const s of r.skipped ?? []) printerr(`Left out: ${s}`);
         print(`Restored "${newest.label}": ${r.changed.length} setting(s) changed`);
         return 0;
     }
@@ -49,6 +50,7 @@ export function runCli(args: string[]): number | null {
         printerr(`Could not apply "${id}": ${result.failed.title}: ${result.failed.error}. ${result.rolledBack ? 'Nothing was changed.' : 'Some settings could not be put back.'}`);
         return 1;
     }
+    for (const s of result.skipped ?? []) printerr(`Left out: ${s}`);
     print(`Applied "${id}": ${result.changed.length} setting(s) changed`);
     return 0;
 }

@@ -4,6 +4,7 @@
 //! Clipboard history over D-Bus: the shell reports copies, island-daemon keeps the list and images.
 //! Images are stored once per hash in `~/.local/share/island/clips`, each with a thumbnail.
 
+use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io::{self, Cursor};
@@ -17,8 +18,12 @@ use island_core::clipboard::{
 use log::{debug, warn};
 use serde::Serialize;
 use zbus::object_server::{InterfaceRef, SignalEmitter};
-use zbus::{fdo, interface};
+use zbus::message::Header;
+use zbus::names::{BusName, InterfaceName};
+use zbus::zvariant::Value;
+use zbus::{Connection, fdo, interface};
 
+use crate::caller::{shell_only, shell_owner};
 use crate::clock::now_ms;
 use crate::store::{Store, create_private_dir, data_dir, write_private};
 
@@ -112,7 +117,28 @@ impl ClipboardService {
     /// Saves the history and signals `Items`.
     async fn changed(&self, emitter: &SignalEmitter<'_>) -> zbus::Result<()> {
         self.store.save(&self.history);
-        self.items_changed(emitter).await
+        self.announce(emitter).await
+    }
+
+    /// `PropertiesChanged` for `Items`, sent to GNOME Shell alone: broadcast, it would hand the
+    /// previews to every program on the bus.
+    async fn announce(&self, emitter: &SignalEmitter<'_>) -> zbus::Result<()> {
+        let Some(shell) = shell_owner(emitter.connection()).await else {
+            return Ok(());
+        };
+        let items = Value::from(self.items_json());
+        fdo::Properties::properties_changed(
+            &emitter.clone().set_destination(BusName::try_from(shell)?),
+            InterfaceName::from_static_str_unchecked("org.niro.island.Clipboard1"),
+            HashMap::from([("Items", items)]),
+            Cow::Borrowed(&[]),
+        )
+        .await
+    }
+
+    /// The `Items` property's JSON.
+    fn items_json(&self) -> String {
+        serde_json::to_string(&self.view()).unwrap_or_default()
     }
 
     /// Saves and announces an addition, then deletes the image files the
@@ -208,7 +234,7 @@ pub async fn remake_thumbs(own: InterfaceRef<ClipboardService>) {
     }
     crate::trim_memory();
     let service = own.get().await;
-    if let Err(err) = service.items_changed(own.signal_emitter()).await {
+    if let Err(err) = service.announce(own.signal_emitter()).await {
         warn!("could not announce the new clipboard thumbnails: {err}");
     }
 }
@@ -331,7 +357,7 @@ impl ClipboardService {
         #[zbus(connection)] connection: &zbus::Connection,
         #[zbus(header)] header: zbus::message::Header<'_>,
     ) -> fdo::Result<String> {
-        crate::caller::shell_only(connection, &header).await?;
+        shell_only(connection, &header).await?;
         let item = self.history.get(id).ok_or_else(|| not_found(id))?;
         Ok(match &item.clip {
             Clip::Text { text } | Clip::Link { text } => text.clone(),
@@ -348,7 +374,7 @@ impl ClipboardService {
         #[zbus(connection)] connection: &zbus::Connection,
         #[zbus(header)] header: zbus::message::Header<'_>,
     ) -> fdo::Result<Vec<u64>> {
-        crate::caller::shell_only(connection, &header).await?;
+        shell_only(connection, &header).await?;
         let query = query.to_lowercase();
         // A copy of the texts, searched off the event loop: they can be long.
         let items: Vec<(u64, Clip)> = self
@@ -422,10 +448,17 @@ impl ClipboardService {
         Ok(())
     }
 
-    /// JSON array of items, newest first (see `ItemView`).
-    #[zbus(property)]
-    fn items(&self) -> String {
-        serde_json::to_string(&self.view()).unwrap_or_default()
+    /// JSON array of items, newest first (see `ItemView`). GNOME Shell only; its changes are
+    /// sent by `announce`, never by zbus.
+    #[zbus(property(emits_changed_signal = "false"))]
+    async fn items(
+        &self,
+        #[zbus(connection)] connection: &Connection,
+        #[zbus(header)] header: Option<Header<'_>>,
+    ) -> fdo::Result<String> {
+        let header = header.ok_or_else(|| fdo::Error::AccessDenied("no caller".into()))?;
+        shell_only(connection, &header).await?;
+        Ok(self.items_json())
     }
 }
 

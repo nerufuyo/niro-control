@@ -12,7 +12,9 @@ build:
 
 test:
 	npm test
-	cargo test -p island-core -p island-daemon
+	cargo test -p island-core -p island-daemon -p niro-flow
+	# without glslc or Vulkan, the processor-only build, as packaging/build.sh does
+	cargo test -p island-whisper $$({ command -v glslc >/dev/null && pkg-config --exists vulkan; } || echo --no-default-features)
 
 test-shell:           # a headless GNOME Shell against this checkout (needs the daemon built); no installed package required
 	tests/shell/run-staged.sh

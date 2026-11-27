@@ -10,6 +10,11 @@ VER=$(tr -d '[:space:]' < VERSION); TAG="v$VER"
 git fetch -q origin
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] || { echo "main is not origin/main"; exit 1; }
 if gh release view "$TAG" >/dev/null 2>&1; then echo "$TAG is already released: raise VERSION first"; exit 1; fi
+# The same refusal as publish-rpm-repo.sh, here before there is a GitHub release to be left half done.
+if [ -z "${NIRO_GPG_KEY:-}" ] && git fetch -q origin gh-pages 2>/dev/null && git cat-file -e FETCH_HEAD:niro-control.gpg 2>/dev/null; then
+    echo "the published repository is signed: set NIRO_GPG_KEY"; exit 1
+fi
+make test      # npm test and the Rust tests
 make rpm
 RPM=$(ls -t out/niro-control-"$VER"-*.rpm | head -1)
 gh release create "$TAG" "$RPM" --target main --title "Niro Control $VER" --notes "${NOTES:-Niro Control $VER}"

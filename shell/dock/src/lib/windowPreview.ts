@@ -27,6 +27,9 @@ export class WindowPreviewPopup {
   private _closeTimer: number | null = null;
   private _refreshTimer: number | null = null;
   private _visible = false;
+  /** The fade-out is running; `_restY` is where the popup rests, so a returning pointer can bring it back. */
+  private _closing = false;
+  private _restY = 0;
   private _previewWidth: number;
   private _lastIconActor: IconActor | null = null;
   private _currentApp: Shell.App | null = null;
@@ -57,10 +60,15 @@ export class WindowPreviewPopup {
 
   show(app: Shell.App, iconActor: IconActor): void {
     const windows = app.get_windows();
-    if (windows.length === 0) return;
+    // An app with no window has nothing to preview, and another app's popup must not stay up under its icon.
+    if (windows.length === 0) {
+      this.hide();
+      return;
+    }
 
-    // If already showing for the same app, do nothing
-    if (this._visible && this._popup && this._currentApp === app) {
+    // Already up (or still fading in) for this app: building it again would blink.
+    if (this._popup && this._currentApp === app) {
+      this.cancelScheduledHide();
       return;
     }
 
@@ -75,7 +83,7 @@ export class WindowPreviewPopup {
     this._cancelRefreshTimer();
     this._stopUpdateTimer();
 
-    if (this._popup) {
+    if (this._popup && !this._closing) {
       this._animateOut(() => {
         this._destroyPopup();
       });
@@ -91,8 +99,22 @@ export class WindowPreviewPopup {
     });
   }
 
+  /** The pointer is back: drop the pending hide, and turn a fade-out that already started around. */
   cancelScheduledHide(): void {
     this._cancelCloseTimer();
+    if (!this._closing || !this._popup) return;
+    this._closing = false;
+    this._popup.remove_all_transitions();
+    this._startUpdateTimer();
+    this._popup.ease({
+      opacity: 255,
+      y: this._restY,
+      duration: 100,
+      mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+      onComplete: () => {
+        this._visible = true;
+      },
+    });
   }
 
   stop(): void {
@@ -319,6 +341,7 @@ export class WindowPreviewPopup {
     if (!this._popup) return;
     this._popup.opacity = 0;
     const startY = this._popup.y;
+    this._restY = startY;
     this._popup.y = startY + 10;
     this._popup.ease({
       opacity: 255,
@@ -338,10 +361,10 @@ export class WindowPreviewPopup {
       return;
     }
     const popupRef = this._popup;
-    const startY = this._popup.y;
+    this._closing = true;
     this._popup.ease({
       opacity: 0,
-      y: startY + 10,
+      y: this._restY + 10,
       duration: 120,
       mode: Clutter.AnimationMode.EASE_IN_QUAD,
       onComplete: () => {
@@ -424,6 +447,7 @@ export class WindowPreviewPopup {
     this._thumbs = [];
 
     this._visible = false;
+    this._closing = false;
     this._currentApp = null;
   }
 

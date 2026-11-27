@@ -43,8 +43,6 @@ export class DockManager {
   private _scanoutInhibited = false;
   /** The dock is on screen or sliding (told by DockVisibility). */
   private _dockActive = false;
-  /** The system docks this one turned off, to turn on again when it goes (see `_syncSystemDocks`). */
-  private _disabledDocks: string[] = [];
   private _systemDocksSourceId: number | null = null;
   private _iconManager: IconManager | null = null;
   private _magnification: Magnification | null = null;
@@ -448,11 +446,16 @@ export class DockManager {
     const manager = Main.extensionManager;
     const ACTIVE = 1; // ExtensionState.ACTIVE
     if (settings.get_boolean("hide-system-dock")) {
+      // Kept in GSettings: after a lock or a new login this is all that says which docks to turn on again.
+      const disabled = settings.get_strv("disabled-system-docks");
       for (const uuid of SYSTEM_DOCKS) {
         const extension = manager.lookup(uuid);
         if (!extension || extension.state !== ACTIVE) continue;
         manager.disableExtension(uuid);
-        if (!this._disabledDocks.includes(uuid)) this._disabledDocks.push(uuid);
+        if (!disabled.includes(uuid)) {
+          disabled.push(uuid);
+          settings.set_strv("disabled-system-docks", disabled);
+        }
       }
     } else {
       this._restoreSystemDocks();
@@ -460,7 +463,10 @@ export class DockManager {
   }
 
   private _restoreSystemDocks(): void {
-    for (const uuid of this._disabledDocks.splice(0)) Main.extensionManager.enableExtension(uuid);
+    const disabled = this._settings?.get_strv("disabled-system-docks") ?? [];
+    if (!disabled.length) return;
+    this._settings?.set_strv("disabled-system-docks", []);
+    for (const uuid of disabled) Main.extensionManager.enableExtension(uuid);
   }
 
   /**
