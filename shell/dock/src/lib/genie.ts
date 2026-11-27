@@ -47,12 +47,20 @@ const GenieEffect = GObject.registerClass(GenieEffectBase);
  */
 type Rect = { x: number; y: number; width: number; height: number };
 
+// One stop function per actor being animated; each puts the window's own opacity back.
+const running = new Map<Clutter.Actor, () => void>();
+
+export function stopGenies(): void {
+  for (const stop of running.values()) stop();
+}
+
 export function genie(
   actor: Clutter.Actor,
   rect: Rect | null,
   { reverse = false, duration = 480 } = {},
 ): void {
   let clone: Clutter.Clone | null = null;
+  let stop: (() => void) | null = null;
   try {
     const [x, y] = actor.get_transformed_position();
     const [w, h] = actor.get_size();
@@ -67,17 +75,29 @@ export function genie(
     const small = Math.max(0.06, Math.min(0.12, rect.width / w));
     const effect = new GenieEffect() as InstanceType<typeof GenieEffectBase>;
     clone.add_effect_with_name("dock-genie", effect as unknown as Clutter.Effect);
-    const hidden = actor.opacity;
-    actor.opacity = 0;
-    const finish = () => {
+    // A genie still running on this window has hidden it: end that one first, so the opacity read is the window's own.
+    running.get(actor)?.();
+    const opacity = actor.opacity;
+    let done = false;
+    stop = () => {
+      if (done) return;
+      done = true; // before destroy(), which ends the ease and calls finish
+      running.delete(actor);
       try {
         clone?.destroy();
       } catch (_e) {
         /* already gone */
       }
       clone = null;
+      actor.opacity = opacity;
+    };
+    running.set(actor, stop);
+    actor.opacity = 0;
+    const finish = () => {
+      // A genie that was replaced must not cut the animations of its successor.
+      if (done) return;
       actor.remove_all_transitions?.();
-      actor.opacity = reverse ? 255 : hidden;
+      stop?.();
     };
     const from = reverse
       ? { translation_x: dx, translation_y: dy, scale_x: small, scale_y: small, opacity: 0 }
@@ -100,11 +120,7 @@ export function genie(
     timeline.start();
   } catch (e) {
     console.error(`Dock: genie effect failed: ${e}`);
-    try {
-      clone?.destroy();
-    } catch (_e) {
-      /* already gone */
-    }
-    actor.opacity = 255;
+    if (stop) stop();
+    else clone?.destroy(); // the window was not touched yet
   }
 }

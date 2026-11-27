@@ -1196,6 +1196,7 @@ export class IconManager {
     this._pressedAppId = null;
     this._hideTooltip();
     this._previewPopup?.dismiss();
+    this._closeStackMenu(); // a folder still being read must not open its menu mid-drag
     this._onDragStateChanged?.(true);
   }
 
