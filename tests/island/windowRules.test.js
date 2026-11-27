@@ -24,6 +24,14 @@ test('validation says what is wrong, and invalid rules are dropped, not guessed 
     assert.equal(parseRules([rule('a', {appId: 'x'}, {workspace: 2}), rule('bad id!', {appId: 'x'}, {workspace: 2})]).length, 1);
 });
 
+test('a title regex that can backtrack exponentially is rejected, ordinary ones are kept', () => {
+    const problems = title => checkRules([rule('a', {title}, {above: true})]);
+    for (const title of ['/((a+))+$/', '/(a|aa)+$/', '/(?:a|aa)*$/', '/((a|aa)?){30}$/', '/(a?){2,}$/', '/([)]+)+$/', '/(a{1,3})+$/'])
+        assert.match(problems(title).join(), /safe/, title);
+    for (const title of ['/(Mozilla )?Firefox$/', '/(foo|bar) - /', '/^(\\d+) new/', '/(?:ab)+/', '/(?<n>\\d+)?x/', '/\\((\\d+)\\) Inbox/', '/[(a+|)]+$/', '/( - (Private|Incognito))?$/'])
+        assert.deepEqual(problems(title), [], title);
+});
+
 test('priority orders rules, the first rule to set an action wins that action, others still add theirs', () => {
     const rules = parseRules([
         rule('low', {appId: 'org.gnome.Calculator'}, {workspace: 3, above: true}, {priority: 1}),

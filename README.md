@@ -110,6 +110,8 @@ The island tells you when a newer version is out (Settings → Island → About;
 
 Updating from 1.6.1 or older on Ubuntu: if Ubuntu Dock or Dash to Dock stayed off after Niro Dock hid it, turn it on again once by hand (the old version did not remember what it had turned off).
 
+Tile window rules: a title pattern that repeats a group with choices or repeats inside, such as `/(ab|cd)+/`, is now refused because it can freeze the desktop. Remove or rewrite such a rule; until then it does not apply and other advanced rules cannot be saved.
+
 On **Fedora**, add the package repository once, then update like any package (GNOME Software shows it too):
 
 ```sh
